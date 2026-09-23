@@ -1,0 +1,32 @@
+{
+  "name": "lol-skin-assistant",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "A local-first League of Legends CN client skin selection assistant.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "doctor": "node src/cli.js doctor",
+    "probe": "node src/cli.js status",
+    "watch": "node src/cli.js watch",
+    "skins": "node src/cli.js skins",
+    "apply": "node src/cli.js apply",
+    "ui:dev": "vite --host 127.0.0.1 --port 1420",
+    "ui:build": "tsc --noEmit && vite build",
+    "desktop:dev": "npm run icons:generate && tauri dev",
+    "icons:generate": "tauri icon ui/public/app-mark.svg",
+    "desktop:build": "npm run icons:generate && tauri build",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "lucide": "^0.468.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0"
+  }
+}
