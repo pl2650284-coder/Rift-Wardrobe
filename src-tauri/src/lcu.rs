@@ -16,7 +16,8 @@ const SKIN_CAROUSEL_ENDPOINT: &str = "/lol-champ-select/v1/skin-carousel-skins";
 const SKIN_SELECTOR_INFO_ENDPOINT: &str = "/lol-champ-select/v1/skin-selector-info";
 const PICKABLE_SKIN_IDS_ENDPOINT: &str = "/lol-champ-select/v1/pickable-skin-ids";
 const MY_SELECTION_ENDPOINT: &str = "/lol-champ-select/v1/session/my-selection";
-const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_IMAGE_BYTES: usize = 12 * 1024 * 1024;
+const IMAGE_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const APPLY_DEADLINE_MS: u64 = 950;
 
 #[derive(Debug, Error)]
@@ -359,7 +360,8 @@ impl LcuClient {
             .http
             .get(self.url(path).map_err(|error| error.to_string())?)
             .basic_auth("riot", Some(&self.credentials.token))
-            .header("Accept", "image/*")
+            .header("Accept", "*/*")
+            .timeout(IMAGE_REQUEST_TIMEOUT)
             .send()
             .await
             .map_err(|_| "无法从客户端读取皮肤图片".to_string())?;
@@ -371,8 +373,20 @@ impl LcuClient {
             .get(reqwest::header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
             .filter(|value| value.starts_with("image/"))
-            .unwrap_or("image/jpeg")
-            .to_string();
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                let extension = path
+                    .rsplit_once('.')
+                    .map(|(_, extension)| extension.to_ascii_lowercase());
+                match extension.as_deref() {
+                    Some("png") => "image/png",
+                    Some("webp") => "image/webp",
+                    Some("gif") => "image/gif",
+                    Some("avif") => "image/avif",
+                    _ => "image/jpeg",
+                }
+                .to_string()
+            });
         let bytes = response
             .bytes()
             .await

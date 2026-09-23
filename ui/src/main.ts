@@ -114,6 +114,7 @@ const imageCache = new Map<string, string>();
 const imageRequests = new Set<string>();
 const imageFailures = new Set<string>();
 let imageLoadFrame = 0;
+let imageErrorNotice: string | null = null;
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("app root is missing");
@@ -312,9 +313,19 @@ async function loadSkinImages(): Promise<void> {
       const dataUrl = await invokeCommand<string>("get_skin_image", { path });
       imageCache.set(path, dataUrl);
       render();
-    } catch {
+    } catch (error) {
       imageFailures.add(path);
+      console.error("Failed to load League skin image", { path, error });
+      if (
+        imageErrorNotice === null
+        && current
+        && [current.tileImagePath, current.splashImagePath].includes(path)
+      ) {
+        const reason = error instanceof Error ? error.message : String(error);
+        imageErrorNotice = `皮肤图片读取失败：${reason}`;
+      }
       render();
+      if (imageErrorNotice) showToast(imageErrorNotice, "error");
     } finally {
       imageRequests.delete(path);
     }
@@ -470,6 +481,7 @@ async function reconnectClient(): Promise<void> {
     imageCache.clear();
     imageRequests.clear();
     imageFailures.clear();
+    imageErrorNotice = null;
     showToast("正在重新连接客户端…");
   } catch (error) {
     showToast(error instanceof Error ? error.message : "重新连接失败", "error");
@@ -492,6 +504,7 @@ async function bootstrap(): Promise<void> {
         imageCache.clear();
         imageRequests.clear();
         imageFailures.clear();
+        imageErrorNotice = null;
         previewOnlySelectionId = null;
         selectedSkinId = snapshot.selectedSkinId;
       }
