@@ -2,26 +2,57 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
+  Activity,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CheckCircle2,
   Check,
+  ChevronRight,
+  CircleUser,
+  Clock3,
   createIcons,
+  Database,
+  Gamepad2,
+  Gauge,
+  Heart,
   ImageOff,
+  Info,
   LayoutGrid,
+  ListChecks,
   LoaderCircle,
   Lock,
+  Moon,
   Minus,
+  Palette,
   Pin,
   Radio,
   RefreshCw,
+  RefreshCcw,
+  Search,
   SearchX,
+  Settings2,
   ShieldCheck,
+  Star as StarIcon,
   Shuffle,
   SlidersHorizontal,
   Sparkles,
+  Sun,
+  Swords,
   X,
+  Trophy,
+  UserRound,
+  Users,
+  Wifi,
+  Zap,
 } from "lucide";
+import { DEFAULT_PREFERENCES } from "./data/mock";
+import type { AppPreferences, AssistantLog, AugmentStat, ChampionStat, ProfileSummary } from "./data/types";
+import { getAssistantLogs, getAugmentStats, getChampionStats } from "./services/mock";
+import { getProfileSummary } from "./services/profile";
 import "./styles.css";
 
-type ConnectionState = "disconnected" | "connecting" | "ready";
+type ConnectionState = "disconnected" | "ready";
 
 type Skin = {
   id: number;
@@ -85,32 +116,121 @@ const demoSnapshot: Snapshot = {
 
 const icon = (name: string, size = 18): string => `<i data-lucide="${name}" style="width:${size}px;height:${size}px"></i>`;
 const iconSet = {
+  Activity,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CheckCircle2,
   Check,
+  ChevronRight,
+  CircleUser,
+  Clock3,
   ImageOff,
+  Info,
+  Database,
+  Gamepad2,
+  Gauge,
+  Heart,
   LayoutGrid,
+  ListChecks,
   LoaderCircle,
   Lock,
+  Moon,
   Minus,
+  Palette,
   Pin,
   Radio,
   RefreshCw,
+  RefreshCcw,
+  Search,
   SearchX,
+  Settings2,
   ShieldCheck,
+  Star: StarIcon,
   Shuffle,
   SlidersHorizontal,
   Sparkles,
+  Sun,
+  Swords,
+  Trophy,
+  UserRound,
+  Users,
+  Wifi,
+  Zap,
   X,
 };
 
-let snapshot: Snapshot = demoSnapshot;
-let activeFilter = "可用";
+const isTauri = Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+const disconnectedSnapshot: Snapshot = {
+  connection: "disconnected",
+  phase: "Disconnected",
+  active: false,
+  contextId: null,
+  championId: null,
+  championName: null,
+  selectedSkinId: null,
+  writeEnabled: false,
+  writeBlockReason: null,
+  skins: [],
+  revision: 0,
+  updatedAtMs: 0,
+};
+
+let snapshot: Snapshot = isTauri ? disconnectedSnapshot : demoSnapshot;
+type CatalogFilter = "可用" | "全部" | "收藏";
+type AppRoute = "profile" | "assistant" | "news" | "settings";
+type NewsTab = "champions" | "augments";
+type ChampionRole = "全部" | "上路" | "打野" | "中路" | "下路" | "辅助";
+
+function isAppRoute(value: string): value is AppRoute {
+  return value === "profile" || value === "assistant" || value === "news" || value === "settings";
+}
+
+const FAVORITES_STORAGE_KEY = "lol-skin-assistant:favorites";
+const CATALOG_STATE_STORAGE_KEY = "lol-skin-assistant:catalog-state";
+const WINDOW_PREFERENCES_STORAGE_KEY = "lol-skin-assistant:window-preferences";
+const APP_PREFERENCES_STORAGE_KEY = "lol-skin-assistant:app-preferences";
+
+let activeFilter: CatalogFilter = "可用";
+let searchQuery = "";
+let favoriteSkinIds = new Set<number>();
 let selectedSkinId = snapshot.selectedSkinId;
 let previewOnlySelectionId: number | null = null;
 let busy = false;
 let alwaysOnTop = false;
+let launchAtStartup = false;
+let settingsOpen = false;
+let settingsBusy = false;
+const initialRoute = window.location.hash.slice(1);
+let currentRoute: AppRoute = isAppRoute(initialRoute) ? initialRoute : "profile";
+let newsTab: NewsTab = "champions";
+let championRole: ChampionRole = "全部";
+let newsQuery = "";
+let profileData: ProfileSummary | null = null;
+let profileLoading = false;
+let profileError: string | null = null;
+let profileRequestId = 0;
+let profileLastAttemptMs = 0;
+let profileRefreshTimer: number | undefined;
+let championStats: ChampionStat[] = [];
+let augmentStats: AugmentStat[] = [];
+let assistantLogs: AssistantLog[] = [];
+let dashboardLoading = true;
+let logsOpen = false;
+let newsDetailId: string | null = null;
+let autoAccept = DEFAULT_PREFERENCES.autoAccept;
+let autoSkin = DEFAULT_PREFERENCES.autoSkin;
+let notifyEnabled = DEFAULT_PREFERENCES.notify;
+let compactMode = DEFAULT_PREFERENCES.compactMode;
+let animationsEnabled = DEFAULT_PREFERENCES.animations;
+let themeMode: AppPreferences["themeMode"] = DEFAULT_PREFERENCES.themeMode;
+let accentColor = DEFAULT_PREFERENCES.accentColor;
 let toastTimer: number | undefined;
+let toastMessage: string | null = null;
+let toastKind: "info" | "error" = "info";
 let cleanupListener: UnlistenFn | undefined;
 const imageCache = new Map<string, string>();
+const MAX_IMAGE_CACHE_ENTRIES = 24;
 const imageRequests = new Set<string>();
 const imageFailures = new Set<string>();
 let imageLoadFrame = 0;
@@ -119,8 +239,6 @@ let imageErrorNotice: string | null = null;
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("app root is missing");
 const app: HTMLDivElement = appRoot;
-
-const isTauri = Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 
 const windowApi: WindowApi = {
   minimize: async () => {
@@ -138,6 +256,167 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] ?? character);
 }
 
+function readLocalStorage<T>(key: string, fallback: T): T {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === null ? fallback : JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function persistCatalogState(): void {
+  try {
+    window.localStorage.setItem(CATALOG_STATE_STORAGE_KEY, JSON.stringify({ activeFilter, searchQuery }));
+  } catch {
+    // Local storage is optional; the catalog remains usable when it is blocked.
+  }
+}
+
+function persistFavorites(): void {
+  try {
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteSkinIds]));
+  } catch {
+    // Local storage is optional; favorite changes still apply for this session.
+  }
+}
+
+function persistWindowPreferences(): void {
+  try {
+    window.localStorage.setItem(WINDOW_PREFERENCES_STORAGE_KEY, JSON.stringify({ alwaysOnTop }));
+  } catch {
+    // Local storage is optional; the native state still applies for this session.
+  }
+}
+
+function currentPreferences(): AppPreferences {
+  return {
+    themeMode,
+    accentColor,
+    compactMode,
+    animations: animationsEnabled,
+    launchAtStartup,
+    alwaysOnTop,
+    autoAccept,
+    autoSkin,
+    notify: notifyEnabled,
+  };
+}
+
+function persistAppPreferences(): void {
+  try {
+    window.localStorage.setItem(APP_PREFERENCES_STORAGE_KEY, JSON.stringify(currentPreferences()));
+  } catch {
+    // Preferences are best-effort in browser preview mode.
+  }
+}
+
+function applyAppearance(): void {
+  app.dataset.theme = themeMode;
+  app.dataset.accent = accentColor;
+  app.dataset.compact = String(compactMode);
+  app.dataset.motion = String(animationsEnabled);
+}
+
+async function hydrateDashboardData(): Promise<void> {
+  dashboardLoading = true;
+  render();
+  try {
+    const [champions, augments, logs] = await Promise.all([
+      getChampionStats(),
+      getAugmentStats(),
+      getAssistantLogs(),
+    ]);
+    championStats = champions;
+    augmentStats = augments;
+    assistantLogs = logs;
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "暂时无法加载演示数据", "error");
+  } finally {
+    dashboardLoading = false;
+    render();
+  }
+}
+
+function clearProfileData(): void {
+  profileRequestId += 1;
+  profileData = null;
+  profileError = null;
+  profileLoading = false;
+  profileLastAttemptMs = 0;
+}
+
+async function hydrateProfileData(): Promise<void> {
+  if (profileLoading) return;
+  if (isTauri && snapshot.connection !== "ready") {
+    clearProfileData();
+    render();
+    return;
+  }
+  const requestId = ++profileRequestId;
+  profileLoading = true;
+  profileError = null;
+  profileLastAttemptMs = Date.now();
+  render();
+  try {
+    const profile = await getProfileSummary(isTauri, favoriteSkinIds.size);
+    if (requestId !== profileRequestId) return;
+    profile.assets.favorites = favoriteSkinIds.size;
+    profileData = profile;
+  } catch (error) {
+    if (requestId !== profileRequestId) return;
+    profileData = null;
+    profileError = (error instanceof Error ? error.message : String(error)).replace(/^[A-Z_]+:\s*/, "");
+  } finally {
+    if (requestId === profileRequestId) {
+      profileLoading = false;
+      render();
+    }
+  }
+}
+
+function refreshProfileIfNeeded(): void {
+  const refreshAfterMs = profileError ? 5_000 : 60_000;
+  if (isTauri && currentRoute === "profile" && !document.hidden
+    && snapshot.connection === "ready" && Date.now() - profileLastAttemptMs >= refreshAfterMs) {
+    void hydrateProfileData();
+  }
+}
+
+function loadLocalPreferences(): void {
+  const storedFavorites = readLocalStorage<unknown>(FAVORITES_STORAGE_KEY, []);
+  if (Array.isArray(storedFavorites)) {
+    favoriteSkinIds = new Set(storedFavorites
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 0));
+  }
+  const catalogState = readLocalStorage<unknown>(CATALOG_STATE_STORAGE_KEY, {});
+  if (catalogState && typeof catalogState === "object") {
+    const state = catalogState as { activeFilter?: unknown; searchQuery?: unknown };
+    if (state.activeFilter === "可用" || state.activeFilter === "全部" || state.activeFilter === "收藏") {
+      activeFilter = state.activeFilter;
+    }
+    if (typeof state.searchQuery === "string") searchQuery = state.searchQuery.slice(0, 80);
+  }
+  const windowPreferences = readLocalStorage<unknown>(WINDOW_PREFERENCES_STORAGE_KEY, {});
+  if (windowPreferences && typeof windowPreferences === "object") {
+    const preferences = windowPreferences as { alwaysOnTop?: unknown };
+    if (typeof preferences.alwaysOnTop === "boolean") alwaysOnTop = preferences.alwaysOnTop;
+  }
+  const storedPreferences = readLocalStorage<unknown>(APP_PREFERENCES_STORAGE_KEY, {});
+  if (storedPreferences && typeof storedPreferences === "object") {
+    const preferences = storedPreferences as Partial<AppPreferences>;
+    if (preferences.themeMode === "dark" || preferences.themeMode === "light") themeMode = preferences.themeMode;
+    if (typeof preferences.accentColor === "string") accentColor = preferences.accentColor;
+    if (typeof preferences.compactMode === "boolean") compactMode = preferences.compactMode;
+    if (typeof preferences.animations === "boolean") animationsEnabled = preferences.animations;
+    if (typeof preferences.autoAccept === "boolean") autoAccept = preferences.autoAccept;
+    if (typeof preferences.autoSkin === "boolean") autoSkin = preferences.autoSkin;
+    if (typeof preferences.notify === "boolean") notifyEnabled = preferences.notify;
+    if (typeof preferences.launchAtStartup === "boolean") launchAtStartup = preferences.launchAtStartup;
+  }
+}
+
 function skinImage(skin: Skin, large = false): string {
   const paths = large
     ? [skin.splashImagePath, skin.tileImagePath]
@@ -151,10 +430,24 @@ function skinImage(skin: Skin, large = false): string {
   return `<div class="skin-art ${large ? "skin-art--large" : ""}" style="--skin-hue:${hue}deg"><span>${escapeHtml(label)}</span></div>`;
 }
 
+function cacheImage(path: string, dataUrl: string): void {
+  if (imageCache.has(path)) imageCache.delete(path);
+  while (imageCache.size >= MAX_IMAGE_CACHE_ENTRIES) {
+    const oldest = imageCache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    imageCache.delete(oldest);
+  }
+  imageCache.set(path, dataUrl);
+}
+
 function connectionLabel(): string {
   if (snapshot.connection === "ready" && snapshot.active) return "已连接 · 选人阶段";
   if (snapshot.connection === "ready") return "已连接 · 等待选人";
-  if (snapshot.connection === "connecting") return "正在连接客户端";
+  return "连接失败";
+}
+
+function connectionTitle(): string {
+  if (snapshot.connection === "ready") return connectionLabel();
   const reason = snapshot.writeBlockReason ?? "";
   if (reason === "league-client-not-found" || reason === "No active League client credentials were found") {
     return "未找到客户端连接信息";
@@ -171,12 +464,7 @@ function connectionLabel(): string {
   if (reason.startsWith("LCU returned an unsupported response:")) {
     return "客户端接口返回了无法识别的数据";
   }
-  return "未连接到客户端";
-}
-
-function connectionTitle(): string {
-  const reason = snapshot.writeBlockReason;
-  return snapshot.connection === "disconnected" && reason ? reason : connectionLabel();
+  return reason || "未连接到客户端，助手会在后台自动重试";
 }
 
 function phaseLabel(): string {
@@ -185,7 +473,6 @@ function phaseLabel(): string {
     Lobby: "房间中",
     None: "客户端空闲",
     Disconnected: "等待客户端",
-    Connecting: "正在连接",
   };
   return labels[snapshot.phase] ?? snapshot.phase;
 }
@@ -193,7 +480,6 @@ function phaseLabel(): string {
 function writeBlockLabel(): string | null {
   if (snapshot.writeEnabled || !snapshot.writeBlockReason) return null;
   const labels: Record<string, string> = {
-    connecting: "正在等待客户端连接",
     "champion-not-selected": "先在客户端选择英雄",
     "outside-champion-select": "进入选人阶段后才能切换皮肤",
     "client-disabled-skin-selection": "客户端暂时禁止皮肤切换",
@@ -203,20 +489,79 @@ function writeBlockLabel(): string | null {
 }
 
 function filteredSkins(): Skin[] {
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("zh-CN");
   return snapshot.skins.filter((skin) => {
-    if (activeFilter === "可用") return skin.available;
-    return true;
+    if (activeFilter === "可用" && !skin.available) return false;
+    if (activeFilter === "收藏" && !favoriteSkinIds.has(skin.id)) return false;
+    if (!normalizedQuery) return true;
+    return skin.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
   });
 }
 
-function render(): void {
+function favoriteLabel(skin: Skin): string {
+  return favoriteSkinIds.has(skin.id) ? `取消收藏 ${skin.name}` : `收藏 ${skin.name}`;
+}
+
+function toggleFavorite(skinId: number): void {
+  if (favoriteSkinIds.has(skinId)) favoriteSkinIds.delete(skinId);
+  else favoriteSkinIds.add(skinId);
+  persistFavorites();
+  if (profileData) profileData.assets.favorites = favoriteSkinIds.size;
+  render();
+}
+
+function renderSkinCard(skin: Skin): string {
+  const favorite = favoriteSkinIds.has(skin.id);
+  return `
+    <article class="skin-card-wrap">
+      <button class="skin-card ${skin.id === selectedSkinId ? "skin-card--selected" : ""} ${!skin.available ? "skin-card--locked" : ""}" data-skin-id="${skin.id}" ${busy ? "disabled" : ""}>
+        <div class="skin-thumb">${skinImage(skin)}${skin.id === selectedSkinId ? `<span class="selected-mark">${icon("check", 13)}</span>` : ""}${!skin.available ? `<span class="lock-mark">${icon("lock", 13)}</span>` : ""}</div>
+        <div class="skin-info"><strong>${escapeHtml(skin.name)}</strong><span>${skin.isBase ? "默认外观" : skin.isChroma ? "炫彩预览" : skin.available ? "可用" : "不可用"}</span></div>
+      </button>
+      <button class="favorite-button ${favorite ? "favorite-button--active" : ""}" data-favorite-id="${skin.id}" aria-label="${escapeHtml(favoriteLabel(skin))}" title="${escapeHtml(favoriteLabel(skin))}">${icon("star", 13)}</button>
+    </article>`;
+}
+
+function renderSettingsDialog(): string {
+  if (!settingsOpen) return "";
+  return `
+    <div class="modal-backdrop" data-action="close-settings">
+      <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header class="settings-head">
+          <div><span class="eyebrow">PREFERENCES</span><h2 id="settings-title">偏好设置</h2></div>
+          <button class="icon-button" data-action="close-settings" aria-label="关闭设置">${icon("x", 18)}</button>
+        </header>
+        <div class="settings-body">
+          <label class="setting-row">
+            <span><strong>开机自动启动</strong><small>登录 Windows 后在后台启动助手</small></span>
+            <input class="switch-input" type="checkbox" data-setting="launch-at-startup" ${launchAtStartup ? "checked" : ""} ${settingsBusy ? "disabled" : ""} />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <label class="setting-row">
+            <span><strong>窗口保持置顶</strong><small>选人时让助手显示在其他窗口上方</small></span>
+            <input class="switch-input" type="checkbox" data-setting="always-on-top" ${alwaysOnTop ? "checked" : ""} ${settingsBusy ? "disabled" : ""} />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <div class="setting-row setting-row--button">
+            <span><strong>图片内存缓存</strong><small>清除后会从客户端重新加载当前皮肤图片</small></span>
+            <button class="secondary-button" data-action="clear-image-cache">清除缓存</button>
+          </div>
+        </div>
+        <footer class="settings-foot"><span>收藏、筛选和搜索条件保存在本机</span><button class="primary-button" data-action="close-settings">完成</button></footer>
+      </section>
+    </div>`;
+}
+
+function renderSkinWorkspace(): void {
+  const restoreSearchFocus = document.activeElement instanceof HTMLInputElement
+    && document.activeElement.matches("[data-search]");
   const current = snapshot.skins.find((skin) => skin.id === selectedSkinId) ?? snapshot.skins[0];
   const champion = snapshot.championName ?? "等待选择英雄";
   const availableCount = snapshot.skins.filter((skin) => skin.available).length;
   const filtered = filteredSkins();
   const ready = snapshot.connection === "ready" && snapshot.active;
   const canApply = ready && snapshot.contextId !== null && snapshot.writeEnabled && !busy;
-  const statusClass = snapshot.connection === "ready" ? "status-ready" : snapshot.connection === "connecting" ? "status-connecting" : "status-offline";
+  const statusClass = snapshot.connection === "ready" ? "status-ready" : "status-offline";
 
   app.innerHTML = `
     <div class="shell">
@@ -236,20 +581,22 @@ function render(): void {
         <aside class="sidebar">
           <div class="sidebar-section">
             <span class="eyebrow">WORKSPACE</span>
-            <button class="nav-item nav-item--active" data-action="home">${icon("layout-grid", 17)}<span>皮肤库</span><b>${snapshot.skins.length}</b></button>
+            <button class="nav-item ${currentRoute === "profile" ? "nav-item--active" : ""}" data-route="profile">${icon("circle-user", 17)}<span>个人信息</span></button>
+            <button class="nav-item ${currentRoute === "assistant" ? "nav-item--active" : ""}" data-route="assistant">${icon("gamepad-2", 17)}<span>游戏辅助</span><b>${snapshot.skins.length}</b></button>
+            <button class="nav-item ${currentRoute === "news" ? "nav-item--active" : ""}" data-route="news">${icon("book-open", 17)}<span>游戏资讯</span></button>
           </div>
           <div class="sidebar-section sidebar-section--bottom">
             <span class="eyebrow">SYSTEM</span>
             <button class="nav-item" data-action="refresh">${icon("refresh-cw", 17)}<span>重新连接</span></button>
-            <button class="nav-item" data-action="settings">${icon("sliders-horizontal", 17)}<span>偏好设置</span></button>
+            <button class="nav-item ${currentRoute === "settings" ? "nav-item--active" : ""}" data-route="settings">${icon("settings-2", 17)}<span>应用设置</span></button>
           </div>
           <div class="sidebar-foot"><span class="version-dot"></span><span>v0.2 · 本地运行</span></div>
         </aside>
 
-        <main class="main-content">
+        <main class="main-content" data-page="${currentRoute}" tabindex="0" aria-label="游戏辅助内容">
           <section class="topline">
             <div><span class="eyebrow">CURRENT SESSION</span><h1>${escapeHtml(champion)}</h1><p class="phase-copy">${escapeHtml(phaseLabel() || "等待游戏客户端")} <span class="slash">/</span> 皮肤选择</p></div>
-            <div class="connection ${statusClass}" title="${escapeHtml(connectionTitle())}"><span class="connection-dot"></span><span>${connectionLabel()}</span>${icon(snapshot.connection === "ready" ? "radio" : "loader-circle", 15)}</div>
+            <div class="connection ${statusClass}" title="${escapeHtml(connectionTitle())}"><span class="connection-dot"></span><span>${connectionLabel()}</span>${icon(snapshot.connection === "ready" ? "radio" : "wifi", 15)}</div>
           </section>
 
           <section class="hero-panel">
@@ -258,17 +605,146 @@ function render(): void {
             <div class="hero-meta"><div><span>英雄</span><strong>${escapeHtml(champion)}</strong></div><div><span>可用皮肤</span><strong>${availableCount}<em> / ${snapshot.skins.length}</em></strong></div><div><span>同步状态</span><strong class="meta-ready">${ready ? "实时" : "暂停"}</strong></div></div>
           </section>
 
-          <section class="catalog-head"><div><span class="eyebrow">SKIN CATALOG</span><h2>选择一个外观</h2></div><div class="catalog-tools"><div class="segmented">${["可用", "全部"].map((filter) => `<button class="segment ${activeFilter === filter ? "segment--active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}</div><button class="secondary-button" data-action="random" ${canApply ? "" : "disabled"}>${icon("shuffle", 16)}随机一款</button></div></section>
+          <section class="assistant-controls"><div class="assistant-control-head"><div><span class="eyebrow">AUTOMATION</span><h2>游戏辅助</h2></div><span class="assist-status ${ready ? "assist-status--ready" : "assist-status--offline"}"><i></i>${ready ? "客户端已就绪" : "等待客户端"}</span></div><div class="assist-control-grid"><label class="assist-toggle"><span class="assist-toggle-icon">${icon("zap", 16)}</span><span><strong>自动接受对局</strong><small>匹配成功后自动确认</small></span><input class="switch-input" type="checkbox" data-pref="autoAccept" ${autoAccept ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track"></span></label><label class="assist-toggle"><span class="assist-toggle-icon assist-toggle-icon--pink">${icon("sparkles", 16)}</span><span><strong>自动应用皮肤</strong><small>进入选人后应用上次选择</small></span><input class="switch-input" type="checkbox" data-pref="autoSkin" ${autoSkin ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track"></span></label><div class="assist-log"><span class="assist-log-icon">${icon("list-checks", 16)}</span><div><strong>最近动作</strong><small>${assistantLogs[0] ? `${escapeHtml(assistantLogs[0].action)} · ${escapeHtml(assistantLogs[0].time)}` : "暂无执行记录"}</small></div><button class="text-button" data-action="show-logs">${logsOpen ? "收起日志" : "查看日志"} ${icon("chevron-right", 12)}</button></div></div>${logsOpen ? `<div class="operation-log"><div class="operation-log-head"><span>时间</span><span>操作</span><span>详情</span><span>状态</span></div>${assistantLogs.map((log) => `<div class="operation-log-row"><span>${escapeHtml(log.time)}</span><strong>${escapeHtml(log.action)}</strong><span>${escapeHtml(log.detail)}</span><em class="log-status log-status--${log.status}">${log.status === "success" ? "成功" : log.status === "pending" ? "等待确认" : "失败"}</em></div>`).join("")}</div>` : ""}</section>
 
-          <section class="skin-grid">${filtered.length ? filtered.map((skin) => `<button class="skin-card ${skin.id === selectedSkinId ? "skin-card--selected" : ""} ${!skin.available ? "skin-card--locked" : ""}" data-skin-id="${skin.id}" ${busy ? "disabled" : ""}><div class="skin-thumb">${skinImage(skin)}${skin.id === selectedSkinId ? `<span class="selected-mark">${icon("check", 13)}</span>` : ""}${!skin.available ? `<span class="lock-mark">${icon("lock", 13)}</span>` : ""}</div><div class="skin-info"><strong>${escapeHtml(skin.name)}</strong><span>${skin.isBase ? "默认外观" : skin.isChroma ? "炫彩预览" : skin.available ? "可用" : "不可用"}</span></div></button>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的皮肤</span></div>`}</section>
+          <section class="catalog-head"><div><span class="eyebrow">SKIN CATALOG</span><h2>选择一个外观</h2></div><div class="catalog-tools"><label class="search-box">${icon("search", 15)}<input type="search" maxlength="80" value="${escapeHtml(searchQuery)}" placeholder="搜索皮肤" aria-label="搜索皮肤" data-search /></label><div class="segmented">${(["可用", "全部", "收藏"] satisfies CatalogFilter[]).map((filter) => `<button class="segment ${activeFilter === filter ? "segment--active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}</div><button class="secondary-button" data-action="random" ${canApply ? "" : "disabled"}>${icon("shuffle", 16)}随机一款</button></div></section>
+
+          <section class="skin-grid">${filtered.length ? filtered.map(renderSkinCard).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>${activeFilter === "收藏" && favoriteSkinIds.size === 0 ? "还没有收藏皮肤" : "没有符合条件的皮肤"}</span>${searchQuery ? `<button class="text-button" data-action="clear-search">清除搜索</button>` : ""}</div>`}</section>
           <footer class="content-foot"><span>${icon("shield-check", 14)}只通过客户端接口操作，不修改游戏文件</span><span>最后同步 ${formatTime(snapshot.updatedAtMs)}</span></footer>
         </main>
       </div>
-      <div id="toast" class="toast" aria-live="polite"></div>
+      ${renderSettingsDialog()}
+      <div id="toast" class="toast ${toastMessage ? "toast--visible" : ""}" data-kind="${toastKind}" aria-live="polite">${toastMessage ? escapeHtml(toastMessage) : ""}</div>
     </div>`;
   wireEvents();
   refreshIcons();
+  if (restoreSearchFocus) {
+    const input = app.querySelector<HTMLInputElement>("[data-search]");
+    input?.focus();
+    input?.setSelectionRange(input.value.length, input.value.length);
+  }
   void loadSkinImages();
+}
+
+function trendBars(values: Array<number | null>): string {
+  return `<div class="trend-bars" role="img" aria-label="最近七天每日胜率；空白表示暂无对局">${values.map((value) => `<span class="${value === null ? "trend-bar--empty" : ""}" style="height:${value ?? 0}%;min-height:0" title="${value === null ? "暂无对局" : `胜率 ${value}%`}"></span>`).join("")}</div>`;
+}
+
+function renderProfilePage(): string {
+  if (profileLoading && !profileData) {
+    return `<div class="loading-panel"><span class="loading-spinner">${icon("loader-circle", 22)}</span><strong>正在加载召唤师数据</strong><span>正在整理最近对局与资产信息</span></div>`;
+  }
+  if (!profileData) {
+    const connected = snapshot.connection === "ready";
+    return `<section class="page-head"><div><span class="eyebrow">SUMMONER OVERVIEW</span><h1>个人信息</h1><p>连接客户端后自动读取当前登录账号。</p></div></section><div class="loading-panel" role="status">${icon(connected ? "circle-user" : "wifi", 28)}<strong>${connected ? "暂时无法读取个人信息" : "等待英雄联盟客户端"}</strong><span>${escapeHtml(profileError ?? "请启动并登录客户端，连接成功后会自动加载。")}</span><button class="secondary-button" data-action="${connected ? "profile-refresh" : "refresh"}">${icon("refresh-ccw", 15)}${connected ? "重试读取" : "重新连接"}</button></div>`;
+  }
+  const data = profileData;
+  const percent = (value: number | null): string => value === null ? "—" : `${value}%`;
+  const count = (value: number | null): string => value === null ? "—" : String(value);
+  const progress = (owned: number | null, total: number | null): number => owned === null || !total ? 0 : Math.min(100, Math.round(owned / total * 100));
+  const rank = data.rank;
+  const gamesEmpty = data.matchHistoryAvailable ? "暂无近期对局，完成游戏后刷新查看" : "对局记录暂不可用，请稍后刷新";
+  const refreshDisabled = profileLoading ? "disabled" : "";
+  return `
+    <section class="page-head page-head--profile">
+      <div><span class="eyebrow">SUMMONER OVERVIEW</span><h1>个人信息</h1><p>${data.source === "demo" ? "浏览器预览 · 演示数据" : `已连接客户端 · 更新于 ${formatTime(data.updatedAtMs)}`}</p></div>
+      <button class="secondary-button" data-action="profile-refresh" ${refreshDisabled} aria-busy="${profileLoading}">${icon(profileLoading ? "loader-circle" : "refresh-ccw", 15)}${profileLoading ? "正在刷新" : "刷新数据"}</button>
+    </section>
+    ${data.warnings.length ? `<div class="profile-notice" role="status">${icon("info", 16)}<span>${data.warnings.map(escapeHtml).join("；")}。可稍后刷新重试。</span></div>` : ""}
+    <section class="profile-hero">
+      <div class="avatar-badge">${data.summoner.avatarUrl ? `<img src="${escapeHtml(data.summoner.avatarUrl)}" alt="召唤师头像" />` : escapeHtml(data.summoner.avatarLabel)}</div>
+      <div class="profile-identity"><span class="eyebrow">召唤师</span><h2>${escapeHtml(data.summoner.name)}${data.summoner.tag ? `<small>#${escapeHtml(data.summoner.tag)}</small>` : ""}</h2><p>${escapeHtml(data.summoner.region)} <i></i> Lv.${data.summoner.level}</p></div>
+      <div class="profile-rank"><span class="eyebrow">当前段位${rank ? ` · ${escapeHtml(rank.queue)}` : ""}</span><strong><b>${escapeHtml(rank?.tier ?? "暂不可用")}</b> ${escapeHtml(rank?.division ?? "")}</strong><span>${rank ? `${rank.ranked ? `${rank.points} LP` : "尚未完成定级"}<em>${rank.wins} 胜 ${rank.losses} 负</em>` : "请稍后刷新"}</span></div>
+      <div class="rank-badge">${icon("trophy", 24)}<span>${percent(rank?.winRate ?? null)}<small>排位胜率</small></span></div>
+    </section>
+    <section class="metric-grid">
+      <article class="metric-card"><div class="metric-icon metric-icon--mint">${icon("activity", 17)}</div><span>近 5 场胜率</span><strong>${percent(data.recentWinRate)}</strong><small>${data.recentWinRateSampleSize ? `统计 ${data.recentWinRateSampleSize} 场，重开不计入` : "暂无可统计对局"}</small></article>
+      <article class="metric-card"><div class="metric-icon metric-icon--blue">${icon("gauge", 17)}</div><span>排位胜率</span><strong>${percent(rank?.winRate ?? null)}</strong><small>${rank ? `共 ${rank.wins + rank.losses} 场${escapeHtml(rank.queue)}` : "排位信息暂不可用"}</small></article>
+      <article class="metric-card"><div class="metric-icon metric-icon--gold">${icon("swords", 17)}</div><span>常用位置</span><strong>${escapeHtml(data.preferredRole?.name ?? "暂无分路")}</strong><small>${data.preferredRole ? `占比 ${data.preferredRole.share}% · ${data.preferredRole.sampleSize} 场分路对局` : "近期对局无明确分路记录"}</small></article>
+      <article class="metric-card"><div class="metric-icon metric-icon--pink">${icon("heart", 17)}</div><span>收藏皮肤</span><strong>${favoriteSkinIds.size}</strong><small>已保存于当前设备</small></article>
+    </section>
+    <section class="dashboard-grid">
+      <article class="dashboard-panel performance-panel">
+        <header class="panel-heading"><div><span class="eyebrow">RECENT PERFORMANCE</span><h2>近期表现</h2></div><span class="panel-note">近 7 天 · 最多 20 场</span></header>
+        <div class="chart-summary"><div><span>期间胜率</span><strong>${percent(data.trends.averageWinRate)}</strong><small>${data.trends.sampleSize} 场有效对局</small></div><div><span>平均 KDA</span><strong>${data.trends.averageKda?.toFixed(1) ?? "—"}</strong></div></div>
+        <div class="chart-area">${trendBars(data.trends.winRate)}<div class="chart-labels">${data.trends.labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}</div></div>
+      </article>
+      <article class="dashboard-panel asset-panel">
+        <header class="panel-heading"><div><span class="eyebrow">COLLECTION</span><h2>个人资产</h2></div><button class="text-button" data-action="route-assistant">查看皮肤库 ${icon("chevron-right", 13)}</button></header>
+        <div class="asset-list"><div class="asset-row"><span class="asset-glyph asset-glyph--blue">${icon("users", 16)}</span><span>英雄</span><strong>${count(data.assets.championsOwned)}<small> / ${count(data.assets.championsTotal)}</small></strong><div class="progress"><i style="width:${progress(data.assets.championsOwned, data.assets.championsTotal)}%"></i></div></div><div class="asset-row"><span class="asset-glyph asset-glyph--pink">${icon("sparkles", 16)}</span><span>普通皮肤</span><strong>${count(data.assets.skinsOwned)}<small> / ${count(data.assets.skinsTotal)}</small></strong><div class="progress progress--pink"><i style="width:${progress(data.assets.skinsOwned, data.assets.skinsTotal)}%"></i></div></div><p class="asset-note">仅统计永久拥有的资产；皮肤不含默认外观与炫彩。</p></div>
+      </article>
+    </section>
+    <section class="dashboard-grid dashboard-grid--lower">
+      <article class="dashboard-panel games-panel"><header class="panel-heading"><div><span class="eyebrow">MATCH HISTORY</span><h2>最近对局</h2></div><button class="text-button" data-action="profile-refresh" ${refreshDisabled}>更新 ${icon("refresh-ccw", 12)}</button></header><div class="games-list">${data.recentGames.length ? data.recentGames.map((game) => `<div class="game-row"><span class="game-result ${game.result}" title="${game.result === "win" ? "胜利" : game.result === "remake" ? "重开" : "失败"}"></span><span class="champion-token" style="--token-color:${game.result === "win" ? "#70c7a6" : game.result === "remake" ? "#9ba5ad" : "#c47e85"}">${escapeHtml(game.championShort)}</span><div class="game-main"><strong>${escapeHtml(game.champion)}${game.result === "remake" ? " · 重开" : ""}</strong><small>${escapeHtml(game.mode)} · ${escapeHtml(game.playedAt)}</small></div><span class="game-kda">${escapeHtml(game.kda)}<small>${game.cs} CS · ${escapeHtml(game.duration)}</small></span></div>`).join("") : `<div class="empty-state">${icon("swords", 22)}<span>${gamesEmpty}</span></div>`}</div></article>
+      <article class="dashboard-panel champion-panel"><header class="panel-heading"><div><span class="eyebrow">MOST PLAYED</span><h2>常用英雄</h2></div><span class="panel-note">近期 ${data.matchCount} 场</span></header><div class="top-champion-list">${data.topChampions.length ? data.topChampions.map((champion, index) => `<div class="top-champion-row"><b>${String(index + 1).padStart(2, "0")}</b><span class="champion-token" style="--token-color:${champion.color}">${escapeHtml(champion.name.slice(0, 2))}</span><div><strong>${escapeHtml(champion.name)}</strong><small>${champion.role ? `${escapeHtml(champion.role)} · ` : ""}${champion.games} 场</small></div><span class="champion-rate">${champion.winRate}%</span><div class="mini-progress"><i style="width:${champion.winRate}%"></i></div></div>`).join("") : `<div class="empty-state">${icon("users", 22)}<span>${gamesEmpty}</span></div>`}</div></article>
+    </section>`;
+}
+
+function renderNewsPage(): string {
+  if (dashboardLoading) return `<div class="loading-panel"><span class="loading-spinner">${icon("loader-circle", 22)}</span><strong>正在加载游戏资讯</strong></div>`;
+  const roleOptions: ChampionRole[] = ["全部", "上路", "打野", "中路", "下路", "辅助"];
+  const query = newsQuery.trim().toLocaleLowerCase("zh-CN");
+  const champions = championStats.filter((champion) => (championRole === "全部" || champion.role === championRole) && (!query || champion.name.toLocaleLowerCase("zh-CN").includes(query)));
+  const augments = augmentStats.filter((augment) => !query || augment.name.toLocaleLowerCase("zh-CN").includes(query));
+  const detail = newsDetailId === null ? "" : renderNewsDetail();
+  return `
+    <section class="page-head"><div><span class="eyebrow">LIVE DATA DESK</span><h1>游戏资讯</h1><p>用版本统计快速找到更适合当前对局的选择。</p></div><div class="data-freshness"><span class="connection-dot status-ready"></span><span>演示数据 · 14:32 更新</span></div></section>
+    <div class="news-tabs"><button class="news-tab ${newsTab === "champions" ? "news-tab--active" : ""}" data-news-tab="champions">${icon("swords", 16)}英雄数据</button><button class="news-tab ${newsTab === "augments" ? "news-tab--active" : ""}" data-news-tab="augments">${icon("sparkles", 16)}海克斯大乱斗符文</button></div>
+    <section class="news-toolbar"><label class="search-box news-search">${icon("search", 15)}<input type="search" maxlength="40" value="${escapeHtml(newsQuery)}" placeholder="搜索${newsTab === "champions" ? "英雄" : "符文"}" aria-label="搜索资讯" data-news-search /></label>${newsTab === "champions" ? `<div class="segmented role-segmented">${roleOptions.map((role) => `<button class="segment ${championRole === role ? "segment--active" : ""}" data-role="${role}">${role}</button>`).join("")}</div>` : `<span class="filter-caption">极地大乱斗 · 全段位 · 最近 30 天</span>`}</section>
+    ${newsTab === "champions" ? `<section class="news-summary-row"><article><span>S+ 强势英雄</span><strong>${championStats.filter((item) => item.tier === "S+").length}</strong><small>较上个版本 +2</small></article><article><span>平均胜率</span><strong>${(championStats.reduce((sum, item) => sum + item.winRate, 0) / Math.max(championStats.length, 1)).toFixed(1)}%</strong><small>统计样本 1.2M</small></article><article><span>数据覆盖</span><strong>171</strong><small>全部英雄</small></article></section><section class="news-table-panel"><div class="news-table news-table--champions"><div class="news-table-head"><span>#</span><span>英雄</span><span>位置</span><span>评级</span><span>胜率</span><span>登场率</span><span>趋势</span><span></span></div>${champions.length ? champions.map((champion, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="champion-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><strong>${escapeHtml(champion.name)}<small>KDA ${champion.kda.toFixed(1)}</small></strong></span><span>${escapeHtml(champion.role)}</span><span class="tier tier--${champion.tier.replace("+", "plus")}">${escapeHtml(champion.tier)}</span><span class="stat-strong">${champion.winRate.toFixed(1)}%</span><span>${champion.pickRate.toFixed(1)}%</span><span class="trend trend--${champion.trend}">${champion.trend === "up" ? "↑" : champion.trend === "down" ? "↓" : "—"}</span><button class="icon-button table-arrow" data-news-detail="${champion.id}" aria-label="查看${escapeHtml(champion.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的英雄</span></div>`}</div></section>` : `<section class="news-summary-row"><article><span>高胜率符文</span><strong>${augmentStats.filter((item) => item.winRate >= 60).length}</strong><small>胜率超过 60%</small></article><article><span>最高胜率</span><strong>${Math.max(...augmentStats.map((item) => item.winRate), 0).toFixed(1)}%</strong><small>终极刷新</small></article><article><span>统计样本</span><strong>9.4M</strong><small>极地大乱斗对局</small></article></section><section class="news-table-panel"><div class="news-table news-table--augments"><div class="news-table-head"><span>#</span><span>符文</span><span>评级</span><span>胜率</span><span>选择率</span><span>样本</span><span></span></div>${augments.length ? augments.map((augment, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="augment-token" style="--token-color:${augment.color}">${icon("sparkles", 15)}</span><strong>${escapeHtml(augment.name)}<small>${escapeHtml(augment.description)}</small></strong></span><span class="tier tier--${augment.tier.replace("+", "plus")}">${escapeHtml(augment.tier)}</span><span class="stat-strong">${augment.winRate.toFixed(1)}%</span><span>${augment.pickRate.toFixed(1)}%</span><span>${augment.sampleSize.toLocaleString("zh-CN")}</span><button class="icon-button table-arrow" data-news-detail="${escapeHtml(augment.id)}" aria-label="查看${escapeHtml(augment.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的符文</span></div>`}</div></section>`}${detail}`;
+}
+
+function renderNewsDetail(): string {
+  if (newsDetailId === null) return "";
+  if (newsTab === "champions") {
+    const champion = championStats.find((item) => String(item.id) === newsDetailId);
+    if (!champion) return "";
+    return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">CHAMPION DETAIL</span><h2>${escapeHtml(champion.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="champion-token detail-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><div><strong>${escapeHtml(champion.role)} · ${escapeHtml(champion.tier)} 级</strong><p>当前版本表现稳定，适合作为主要上分选择。</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${champion.winRate.toFixed(1)}%</strong></div><div><span>登场率</span><strong>${champion.pickRate.toFixed(1)}%</strong></div><div><span>禁用率</span><strong>${champion.banRate.toFixed(1)}%</strong></div><div><span>KDA</span><strong>${champion.kda.toFixed(1)}</strong></div></div><div class="detail-copy"><span class="eyebrow">推荐思路</span><h3>稳健发育，围绕强势期接团</h3><p>优先保证核心装备节奏；面对高爆发阵容时保留位移与关键控制，避免提前进入正面战场。</p></div><footer>演示统计 · 数据更新时间 14:32</footer></aside></div>`;
+  }
+  const augment = augmentStats.find((item) => item.id === newsDetailId);
+  if (!augment) return "";
+  return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">AUGMENT DETAIL</span><h2>${escapeHtml(augment.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="augment-token detail-token" style="--token-color:${augment.color}">${icon("sparkles", 18)}</span><div><strong>${escapeHtml(augment.tier)} 级符文</strong><p>${escapeHtml(augment.description)}</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${augment.winRate.toFixed(1)}%</strong></div><div><span>选择率</span><strong>${augment.pickRate.toFixed(1)}%</strong></div><div><span>样本数</span><strong>${augment.sampleSize.toLocaleString("zh-CN")}</strong></div><div><span>模式</span><strong>大乱斗</strong></div></div><div class="detail-copy"><span class="eyebrow">搭配建议</span><h3>优先匹配高频技能与持续输出英雄</h3><p>符文强度会受到英雄、阵容和装备影响，胜率仅用于辅助判断，不代表单局结果。</p></div><footer>演示统计 · 数据更新时间 14:32</footer></aside></div>`;
+}
+
+function preferenceRow(key: string, title: string, description: string, checked: boolean): string {
+  return `<label class="preference-row"><span><strong>${title}</strong><small>${description}</small></span><input class="switch-input" type="checkbox" data-pref="${key}" ${checked ? "checked" : ""} /><span class="switch-track" aria-hidden="true"></span></label>`;
+}
+
+function renderSettingsPage(): string {
+  const colors = ["mint", "blue", "gold", "rose"];
+  return `
+    <section class="page-head"><div><span class="eyebrow">APP CONTROL CENTER</span><h1>应用设置</h1><p>调整外观、自动化行为和本地数据偏好。</p></div><span class="settings-saved">${icon("check-circle-2", 14)}设置自动保存</span></section>
+    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("alwaysOnTop", "窗口置顶", "让辅助窗口保持在游戏客户端上方", alwaysOnTop)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>个人信息和皮肤选择可读取已登录客户端的数据；游戏资讯目前使用演示统计。</p></div></div></article></div></section>`;
+}
+
+function renderDashboardShell(): void {
+  const routeTitle = currentRoute === "profile" ? "个人信息" : currentRoute === "news" ? "游戏资讯" : "应用设置";
+  const content = currentRoute === "profile" ? renderProfilePage() : currentRoute === "news" ? renderNewsPage() : renderSettingsPage();
+  app.innerHTML = `
+    <div class="shell">
+      <header class="titlebar"><div class="brand" data-route="profile"><img class="brand-mark" src="/app-mark.svg" alt="" /><div><strong>峡谷换肤助手</strong><span>SUMMONER DESK · ${routeTitle.toUpperCase()}</span></div></div><div class="window-actions"><button class="icon-button" title="置顶窗口" aria-label="置顶窗口" data-action="top" data-active="${alwaysOnTop}">${icon("pin", 16)}</button><button class="icon-button" title="最小化" aria-label="最小化" data-action="minimize">${icon("minus", 17)}</button><button class="icon-button icon-button--close" title="隐藏窗口" aria-label="隐藏窗口" data-action="close">${icon("x", 17)}</button></div></header>
+      <div class="workspace"><aside class="sidebar"><div class="sidebar-section"><span class="eyebrow">WORKSPACE</span><button class="nav-item ${currentRoute === "profile" ? "nav-item--active" : ""}" data-route="profile">${icon("circle-user", 17)}<span>个人信息</span></button><button class="nav-item ${currentRoute === "assistant" ? "nav-item--active" : ""}" data-route="assistant">${icon("gamepad-2", 17)}<span>游戏辅助</span><b>${snapshot.skins.length}</b></button><button class="nav-item ${currentRoute === "news" ? "nav-item--active" : ""}" data-route="news">${icon("book-open", 17)}<span>游戏资讯</span></button></div><div class="sidebar-section sidebar-section--bottom"><span class="eyebrow">SYSTEM</span><button class="nav-item" data-action="refresh">${icon("refresh-cw", 17)}<span>重新连接</span></button><button class="nav-item ${currentRoute === "settings" ? "nav-item--active" : ""}" data-route="settings">${icon("settings-2", 17)}<span>应用设置</span></button></div><div class="sidebar-foot"><span class="version-dot"></span><span>v0.3 · 本地运行</span></div></aside><main class="main-content main-content--dashboard" data-page="${currentRoute}" tabindex="0" aria-label="${routeTitle}内容">${content}</main></div><div id="toast" class="toast ${toastMessage ? "toast--visible" : ""}" data-kind="${toastKind}" aria-live="polite">${toastMessage ? escapeHtml(toastMessage) : ""}</div>
+    </div>`;
+  wireEvents();
+  applyAppearance();
+  refreshIcons();
+}
+
+function render(): void {
+  const previousContent = app.querySelector<HTMLElement>(".main-content");
+  const scrollTop = previousContent?.scrollTop ?? 0;
+  const previousPage = previousContent?.dataset.page;
+  const restoreContentFocus = previousContent === document.activeElement;
+  applyAppearance();
+  if (currentRoute === "assistant") renderSkinWorkspace();
+  else renderDashboardShell();
+  if (previousPage === currentRoute) {
+    const content = app.querySelector<HTMLElement>(".main-content");
+    if (content) {
+      content.scrollTop = scrollTop;
+      if (restoreContentFocus) content.focus({ preventScroll: true });
+    }
+  }
 }
 
 function formatTime(timestamp: number): string {
@@ -311,7 +787,7 @@ async function loadSkinImages(): Promise<void> {
     imageRequests.add(path);
     try {
       const dataUrl = await invokeCommand<string>("get_skin_image", { path });
-      imageCache.set(path, dataUrl);
+      cacheImage(path, dataUrl);
       render();
     } catch (error) {
       imageFailures.add(path);
@@ -333,13 +809,18 @@ async function loadSkinImages(): Promise<void> {
 }
 
 function showToast(message: string, kind: "info" | "error" = "info"): void {
+  toastMessage = message;
+  toastKind = kind;
   const toast = document.querySelector<HTMLDivElement>("#toast");
   if (!toast) return;
   window.clearTimeout(toastTimer);
   toast.textContent = message;
   toast.dataset.kind = kind;
   toast.classList.add("toast--visible");
-  toastTimer = window.setTimeout(() => toast.classList.remove("toast--visible"), 2800);
+  toastTimer = window.setTimeout(() => {
+    toastMessage = null;
+    document.querySelector<HTMLDivElement>("#toast")?.classList.remove("toast--visible");
+  }, 2800);
 }
 
 async function invokeCommand<T>(command: string, args: Record<string, unknown>): Promise<T> {
@@ -434,14 +915,80 @@ async function startWindowDrag(event: MouseEvent): Promise<void> {
   }
 }
 
+function isCatalogFilter(value: string | undefined): value is CatalogFilter {
+  return value === "可用" || value === "全部" || value === "收藏";
+}
+
+async function clearImageCache(): Promise<void> {
+  imageCache.clear();
+  imageRequests.clear();
+  imageFailures.clear();
+  imageErrorNotice = null;
+  if (isTauri) {
+    try {
+      await invokeCommand("clear_image_cache", {});
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "无法清理图片缓存", "error");
+      return;
+    }
+  }
+  render();
+  showToast("图片缓存已清除，正在重新加载");
+}
+
+async function updateAlwaysOnTop(enabled: boolean): Promise<void> {
+  if (settingsBusy) return;
+  settingsBusy = true;
+  render();
+  try {
+    await windowApi.top(enabled);
+    alwaysOnTop = enabled;
+    persistWindowPreferences();
+    persistAppPreferences();
+    showToast(enabled ? "窗口已保持置顶" : "窗口已取消置顶");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "无法修改窗口置顶状态", "error");
+  } finally {
+    settingsBusy = false;
+    render();
+  }
+}
+
+async function updateLaunchAtStartup(enabled: boolean): Promise<void> {
+  if (settingsBusy) return;
+  settingsBusy = true;
+  render();
+  try {
+    launchAtStartup = isTauri
+      ? await invokeCommand<boolean>("set_launch_at_startup", { enabled })
+      : enabled;
+    persistAppPreferences();
+    showToast(launchAtStartup ? "已开启开机自动启动" : "已关闭开机自动启动");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "无法修改开机启动设置", "error");
+  } finally {
+    settingsBusy = false;
+    render();
+  }
+}
+
 function wireEvents(): void {
   app.querySelector<HTMLElement>(".titlebar")?.addEventListener("mousedown", (event) => {
     void startWindowDrag(event);
   });
   app.querySelectorAll<HTMLElement>("[data-filter]").forEach((element) => element.addEventListener("click", () => {
-    activeFilter = element.dataset.filter ?? "全部";
+    if (!isCatalogFilter(element.dataset.filter)) return;
+    activeFilter = element.dataset.filter;
+    persistCatalogState();
     render();
   }));
+  app.querySelector<HTMLInputElement>("[data-search]")?.addEventListener("input", (event) => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) return;
+    searchQuery = input.value;
+    persistCatalogState();
+    render();
+  });
   app.querySelectorAll<HTMLElement>("[data-skin-id]").forEach((element) => element.addEventListener("click", () => {
     const id = Number(element.dataset.skinId);
     if (!Number.isNaN(id)) {
@@ -455,19 +1002,134 @@ function wireEvents(): void {
       }
     }
   }));
-  app.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => element.addEventListener("click", () => {
+  app.querySelectorAll<HTMLElement>("[data-favorite-id]").forEach((element) => element.addEventListener("click", () => {
+    const id = Number(element.dataset.favoriteId);
+    if (!Number.isNaN(id)) toggleFavorite(id);
+  }));
+  app.querySelectorAll<HTMLInputElement>("[data-setting]").forEach((element) => element.addEventListener("change", () => {
+    if (element.dataset.setting === "launch-at-startup") void updateLaunchAtStartup(element.checked);
+    if (element.dataset.setting === "always-on-top") void updateAlwaysOnTop(element.checked);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-route]").forEach((element) => element.addEventListener("click", () => {
+    const route = element.dataset.route;
+    if (route !== "profile" && route !== "assistant" && route !== "news" && route !== "settings") return;
+    currentRoute = route;
+    window.history.replaceState(null, "", `#${route}`);
+    settingsOpen = false;
+    render();
+    refreshProfileIfNeeded();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-news-tab]").forEach((element) => element.addEventListener("click", () => {
+    const tab = element.dataset.newsTab;
+    if (tab !== "champions" && tab !== "augments") return;
+    newsTab = tab;
+    newsQuery = "";
+    render();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-role]").forEach((element) => element.addEventListener("click", () => {
+    const role = element.dataset.role as ChampionRole | undefined;
+    if (!role || !["全部", "上路", "打野", "中路", "下路", "辅助"].includes(role)) return;
+    championRole = role;
+    render();
+  }));
+  app.querySelector<HTMLInputElement>("[data-news-search]")?.addEventListener("input", (event) => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) return;
+    newsQuery = input.value;
+    render();
+    window.setTimeout(() => app.querySelector<HTMLInputElement>("[data-news-search]")?.focus(), 0);
+  });
+  app.querySelectorAll<HTMLInputElement>("[data-pref]").forEach((element) => element.addEventListener("change", (event) => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) return;
+    const key = input.dataset.pref;
+    if (key === "autoAccept") autoAccept = input.checked;
+    if (key === "autoSkin") autoSkin = input.checked;
+    if (key === "notify") notifyEnabled = input.checked;
+    if (key === "alwaysOnTop") void updateAlwaysOnTop(input.checked);
+    if (key === "launchAtStartup") void updateLaunchAtStartup(input.checked);
+    if (key === "compact") compactMode = input.checked;
+    if (key === "animations") animationsEnabled = input.checked;
+    persistAppPreferences();
+    render();
+    showToast(input.checked ? "偏好已开启" : "偏好已关闭");
+  }));
+  app.querySelectorAll<HTMLElement>("[data-theme]").forEach((element) => element.addEventListener("click", () => {
+    const mode = element.dataset.theme;
+    if (mode !== "dark" && mode !== "light") return;
+    themeMode = mode;
+    persistAppPreferences();
+    render();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-accent]").forEach((element) => element.addEventListener("click", () => {
+    const color = element.dataset.accent;
+    if (!color) return;
+    accentColor = color;
+    persistAppPreferences();
+    render();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => element.addEventListener("click", (event) => {
     const action = element.dataset.action;
+    if (action === "close-settings" && element.classList.contains("modal-backdrop") && event.target !== element) return;
     if (action === "apply" && selectedSkinId !== null) void applySkin(selectedSkinId);
     if (action === "random") void applyRandom();
     if (action === "minimize") void windowApi.minimize();
     if (action === "close") void windowApi.close();
-    if (action === "top") {
-      alwaysOnTop = !alwaysOnTop;
-      void windowApi.top(alwaysOnTop);
+    if (action === "top") void updateAlwaysOnTop(!alwaysOnTop);
+    if (action === "refresh") void reconnectClient();
+    if (action === "settings") {
+      currentRoute = "settings";
+      settingsOpen = true;
       render();
     }
-    if (action === "refresh") void reconnectClient();
-    if (action === "settings") showToast("偏好设置将在后续版本开放");
+    if (action === "home") {
+      currentRoute = "profile";
+      settingsOpen = false;
+      render();
+    }
+    if (action === "close-settings") {
+      settingsOpen = false;
+      render();
+    }
+    if (action === "clear-image-cache") void clearImageCache();
+    if (action === "clear-search") {
+      searchQuery = "";
+      persistCatalogState();
+      render();
+    }
+    if (action === "route-assistant") {
+      currentRoute = "assistant";
+      window.history.replaceState(null, "", "#assistant");
+      render();
+    }
+    if (action === "profile-refresh") void hydrateProfileData();
+    if (action === "reset-preferences") {
+      themeMode = DEFAULT_PREFERENCES.themeMode;
+      accentColor = DEFAULT_PREFERENCES.accentColor;
+      compactMode = DEFAULT_PREFERENCES.compactMode;
+      animationsEnabled = DEFAULT_PREFERENCES.animations;
+      autoAccept = DEFAULT_PREFERENCES.autoAccept;
+      autoSkin = DEFAULT_PREFERENCES.autoSkin;
+      notifyEnabled = DEFAULT_PREFERENCES.notify;
+      persistAppPreferences();
+      render();
+      showToast("已恢复默认设置");
+    }
+    if (action === "show-logs") {
+      logsOpen = !logsOpen;
+      render();
+    }
+    if (action === "close-news-detail") {
+      if (element.classList.contains("detail-backdrop") && event.target !== element) return;
+      newsDetailId = null;
+      render();
+    }
+  }));
+  app.querySelectorAll<HTMLElement>("[data-news-detail]").forEach((element) => element.addEventListener("click", () => {
+    const id = element.dataset.newsDetail;
+    if (!id) return;
+    newsDetailId = id;
+    render();
   }));
 }
 
@@ -477,59 +1139,116 @@ async function reconnectClient(): Promise<void> {
     return;
   }
   try {
+    clearProfileData();
+    render();
     await invokeCommand("reconnect_client", {});
     imageCache.clear();
     imageRequests.clear();
     imageFailures.clear();
     imageErrorNotice = null;
-    showToast("正在重新连接客户端…");
+    showToast("已请求重新连接，客户端将在后台检测");
   } catch (error) {
     showToast(error instanceof Error ? error.message : "重新连接失败", "error");
   }
 }
 
-async function bootstrap(): Promise<void> {
-  render();
+async function hydrateNativePreferences(): Promise<void> {
   if (!isTauri) return;
   try {
-    snapshot = await invokeCommand<Snapshot>("get_snapshot", {});
-    selectedSkinId = snapshot.selectedSkinId;
+    launchAtStartup = await invokeCommand<boolean>("get_launch_at_startup", {});
+  } catch (error) {
+    console.error("Failed to read launch-at-startup preference", error);
+  }
+  if (alwaysOnTop) {
+    try {
+      await windowApi.top(true);
+    } catch (error) {
+      alwaysOnTop = false;
+      persistWindowPreferences();
+      console.error("Failed to restore always-on-top preference", error);
+    }
+  }
+  render();
+}
+
+function receiveSnapshot(next: Snapshot): void {
+  if (next.revision < snapshot.revision) return;
+  const previous = snapshot;
+  snapshot = next;
+  if (snapshot.contextId !== previous.contextId) {
+    imageCache.clear();
+    imageRequests.clear();
+    imageFailures.clear();
+    imageErrorNotice = null;
     previewOnlySelectionId = null;
-    render();
-    cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => {
-      const previousContextId = snapshot.contextId;
-      const previousSelectedSkinId = snapshot.selectedSkinId;
-      snapshot = event.payload;
-      if (snapshot.contextId !== previousContextId) {
-        imageCache.clear();
-        imageRequests.clear();
-        imageFailures.clear();
-        imageErrorNotice = null;
-        previewOnlySelectionId = null;
-        selectedSkinId = snapshot.selectedSkinId;
-      }
-      if (previewOnlySelectionId !== null && snapshot.selectedSkinId !== previousSelectedSkinId && snapshot.selectedSkinId !== previewOnlySelectionId) {
-        previewOnlySelectionId = null;
-      }
-      if (snapshot.selectedSkinId !== null && !busy && previewOnlySelectionId === null) selectedSkinId = snapshot.selectedSkinId;
-      render();
-    });
+    selectedSkinId = snapshot.selectedSkinId;
+  }
+  if (previewOnlySelectionId !== null && snapshot.selectedSkinId !== previous.selectedSkinId && snapshot.selectedSkinId !== previewOnlySelectionId) {
+    previewOnlySelectionId = null;
+  }
+  if (snapshot.selectedSkinId !== null && !busy && previewOnlySelectionId === null) selectedSkinId = snapshot.selectedSkinId;
+  if (snapshot.connection !== "ready") {
+    clearProfileData();
+  } else if (previous.connection !== "ready" || (previous.phase !== snapshot.phase
+    && ["PreEndOfGame", "EndOfGame"].includes(snapshot.phase))) {
+    void hydrateProfileData();
+  }
+  render();
+}
+
+async function bootstrap(): Promise<void> {
+  loadLocalPreferences();
+  render();
+  void hydrateDashboardData();
+  if (!isTauri) {
+    void hydrateProfileData();
+    return;
+  }
+  void hydrateNativePreferences();
+  try {
+    // Listen first so a connection established during startup cannot be missed.
+    cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => receiveSnapshot(event.payload));
+    receiveSnapshot(await invokeCommand<Snapshot>("get_snapshot", {}));
+    profileRefreshTimer = window.setInterval(refreshProfileIfNeeded, 5_000);
   } catch {
     showToast("暂时无法读取客户端状态", "error");
   }
 }
 
-window.addEventListener("beforeunload", () => cleanupListener?.());
-window.addEventListener("scroll", () => {
+window.addEventListener("beforeunload", () => {
+  cleanupListener?.();
+  window.clearInterval(profileRefreshTimer);
+});
+window.addEventListener("focus", refreshProfileIfNeeded);
+document.addEventListener("visibilitychange", refreshProfileIfNeeded);
+app.addEventListener("scroll", () => {
+  if (currentRoute !== "assistant") return;
   if (imageLoadFrame) return;
   imageLoadFrame = window.requestAnimationFrame(() => {
     imageLoadFrame = 0;
     void loadSkinImages();
   });
-}, { passive: true });
+}, { capture: true, passive: true });
 window.addEventListener("keydown", (event) => {
-  if (event.key.toLowerCase() === "r" && !event.ctrlKey && !event.metaKey) void applyRandom();
-  if (event.key === "Escape") void windowApi.close();
+  const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+  if ((event.key === "/" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f")) && !settingsOpen) {
+    event.preventDefault();
+    app.querySelector<HTMLInputElement>("[data-search]")?.focus();
+    return;
+  }
+  if (event.key.toLowerCase() === "r" && !event.ctrlKey && !event.metaKey && !typing && !settingsOpen) void applyRandom();
+  if (event.key === "Escape") {
+    if (settingsOpen) {
+      settingsOpen = false;
+      render();
+    } else if (searchQuery && typing) {
+      searchQuery = "";
+      persistCatalogState();
+      render();
+    } else {
+      void windowApi.close();
+    }
+  }
 });
 
 void bootstrap();

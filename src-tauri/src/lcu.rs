@@ -86,12 +86,24 @@ impl LcuClient {
         endpoint: &str,
         body: Option<&Value>,
     ) -> Result<Value, LcuError> {
+        self.request_json_with_timeout(method, endpoint, body, Duration::from_millis(900))
+            .await
+    }
+
+    async fn request_json_with_timeout(
+        &self,
+        method: Method,
+        endpoint: &str,
+        body: Option<&Value>,
+        timeout: Duration,
+    ) -> Result<Value, LcuError> {
         let mut request = self
             .http
             .request(method, self.url(endpoint)?)
             .basic_auth("riot", Some(&self.credentials.token))
             .header("Accept", "application/json")
-            .header("User-Agent", "lol-skin-assistant-m1");
+            .header("User-Agent", "lol-skin-assistant-m1")
+            .timeout(timeout);
         if let Some(body) = body {
             request = request.json(body);
         }
@@ -110,6 +122,12 @@ impl LcuClient {
         }
         serde_json::from_slice(&bytes)
             .map_err(|_| LcuError::Protocol(format!("malformed JSON from {endpoint}")))
+    }
+
+    pub(crate) async fn profile_json(&self, endpoint: &str) -> Result<Value, LcuError> {
+        // History and inventory reads can take longer than a champion-select update.
+        self.request_json_with_timeout(Method::GET, endpoint, None, Duration::from_secs(6))
+            .await
     }
 
     async fn optional_json(&self, endpoint: &str) -> Result<Option<Value>, LcuError> {

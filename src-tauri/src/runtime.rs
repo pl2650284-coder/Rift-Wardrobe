@@ -2,6 +2,7 @@ use crate::{
     discovery,
     lcu::LcuClient,
     models::{AppSnapshot, ApplyResult},
+    profile::PlayerProfile,
 };
 use rand::seq::SliceRandom;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -18,7 +19,7 @@ pub struct RuntimeState {
 impl RuntimeState {
     pub fn new() -> Self {
         Self {
-            snapshot: RwLock::new(AppSnapshot::connecting()),
+            snapshot: RwLock::new(AppSnapshot::disconnected(None)),
             client: RwLock::new(None),
             write_guard: Mutex::new(()),
             image_cache: RwLock::new(HashMap::new()),
@@ -27,6 +28,18 @@ impl RuntimeState {
 
     pub async fn snapshot(&self) -> AppSnapshot {
         self.snapshot.read().await.clone()
+    }
+
+    pub async fn profile(&self) -> Result<PlayerProfile, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let profile = client.get_profile().await?;
+        if !self.client().await.is_some_and(|current| Arc::ptr_eq(&client, &current)) {
+            return Err("CLIENT_DISCONNECTED: 客户端连接已变化，请重新读取个人信息".to_string());
+        }
+        Ok(profile)
     }
 
     async fn client(&self) -> Option<Arc<LcuClient>> {
@@ -42,6 +55,10 @@ impl RuntimeState {
 
     pub async fn reconnect(&self) {
         self.set_client(None).await;
+    }
+
+    pub async fn clear_image_cache(&self) {
+        self.image_cache.write().await.clear();
     }
 
     pub async fn apply_skin(
@@ -125,8 +142,10 @@ pub fn start_monitor(app: AppHandle) {
             let client = match state.client().await {
                 Some(client) => client,
                 None => {
-                    publish_snapshot(&app, &state, AppSnapshot::connecting()).await;
-                    let discovered = tauri::async_runtime::spawn_blocking(discovery::discover).await;
+                    // Automatic discovery and retries stay in the background. Keep the
+                    // last disconnected snapshot visible until a client responds.
+                    let discovered =
+                        tauri::async_runtime::spawn_blocking(discovery::discover).await;
                     match discovered {
                         Ok(Ok(credentials)) => match LcuClient::new(credentials) {
                             Ok(client) => {
@@ -185,11 +204,7 @@ pub fn start_monitor(app: AppHandle) {
     });
 }
 
-async fn publish_snapshot(
-    app: &AppHandle,
-    state: &RuntimeState,
-    mut next: AppSnapshot,
-) {
+async fn publish_snapshot(app: &AppHandle, state: &RuntimeState, mut next: AppSnapshot) {
     let mut current = state.snapshot.write().await;
     if current.same_content(&next) {
         return;
@@ -216,4 +231,31 @@ async fn publish_snapshot(
 fn show_without_focus(window: &tauri::WebviewWindow) {
     // Tauri's window configuration keeps automatic showing from taking focus.
     let _ = window.show();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::ConnectionState;
+
+    #[tokio::test]
+    async fn startup_does_not_publish_a_connecting_state() {
+        let state = RuntimeState::new();
+        let snapshot = state.snapshot().await;
+
+        assert_eq!(snapshot.connection, ConnectionState::Disconnected);
+        assert!(!snapshot.active);
+        assert!(!snapshot.write_enabled);
+    }
+
+    #[tokio::test]
+    async fn reconnect_preserves_the_failed_state_until_a_client_responds() {
+        let state = RuntimeState::new();
+        let failed = AppSnapshot::disconnected(Some("league-client-not-found"));
+        *state.snapshot.write().await = failed.clone();
+
+        state.reconnect().await;
+
+        assert!(state.snapshot().await.same_content(&failed));
+    }
 }

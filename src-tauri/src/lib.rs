@@ -1,9 +1,11 @@
 mod discovery;
 mod lcu;
 mod models;
+mod profile;
 mod runtime;
 
 use models::{AppSnapshot, ApplyResult};
+use profile::PlayerProfile;
 use runtime::RuntimeState;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -14,6 +16,11 @@ use tauri::{
 #[tauri::command]
 async fn get_snapshot(state: State<'_, RuntimeState>) -> Result<AppSnapshot, String> {
     Ok(state.snapshot().await)
+}
+
+#[tauri::command]
+async fn get_profile(state: State<'_, RuntimeState>) -> Result<PlayerProfile, String> {
+    state.profile().await
 }
 
 #[tauri::command]
@@ -51,6 +58,12 @@ async fn get_skin_image(
     path: String,
 ) -> Result<String, String> {
     state.image_data_url(&path).await
+}
+
+#[tauri::command]
+async fn clear_image_cache(state: State<'_, RuntimeState>) -> Result<(), String> {
+    state.clear_image_cache().await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -93,9 +106,11 @@ fn startup_enabled() -> Result<bool, String> {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let current_user = RegKey::predef(HKEY_CURRENT_USER);
-    let key = current_user
-        .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
-        .map_err(|error| error.to_string())?;
+    let key = match current_user.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run") {
+        Ok(key) => key,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.to_string()),
+    };
     Ok(key.get_value::<String, _>("LolSkinAssistant").is_ok())
 }
 
@@ -167,10 +182,12 @@ pub fn run() {
         .manage(RuntimeState::new())
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
+            get_profile,
             reconnect_client,
             apply_skin,
             apply_random_skin,
             get_skin_image,
+            clear_image_cache,
             hide_main_window,
             minimize_main_window,
             set_always_on_top,
@@ -181,7 +198,7 @@ pub fn run() {
             let show_item = MenuItem::with_id(app, "show", "显示助手", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-            let mut tray = TrayIconBuilder::with_id("main-tray")
+            let tray = TrayIconBuilder::with_id("main-tray")
                 .icon(tray_icon())
                 .tooltip("英雄联盟皮肤助手")
                 .menu(&menu)

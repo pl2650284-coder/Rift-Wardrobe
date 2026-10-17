@@ -4,7 +4,6 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub enum ConnectionState {
     Disconnected,
-    Connecting,
     Ready,
 }
 
@@ -57,14 +56,6 @@ impl AppSnapshot {
             revision: 0,
             updated_at_ms: now_ms(),
         }
-    }
-
-    pub fn connecting() -> Self {
-        let mut snapshot = Self::disconnected(None);
-        snapshot.connection = ConnectionState::Connecting;
-        snapshot.phase = "Connecting".to_string();
-        snapshot.write_block_reason = Some("connecting".to_string());
-        snapshot
     }
 
     pub fn inactive(phase: impl Into<String>) -> Self {
@@ -125,4 +116,28 @@ pub fn now_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_connection_failures_do_not_change_visible_content() {
+        let first = AppSnapshot::disconnected(Some("league-client-not-found"));
+        let mut retry = first.clone();
+        retry.updated_at_ms = first.updated_at_ms.saturating_add(2_000);
+        retry.revision = first.revision.saturating_add(1);
+
+        assert!(first.same_content(&retry));
+    }
+
+    #[test]
+    fn successful_connection_changes_visible_content() {
+        let failed = AppSnapshot::disconnected(Some("league-client-not-found"));
+        let ready = AppSnapshot::inactive("Lobby");
+
+        assert!(!failed.same_content(&ready));
+        assert_eq!(ready.connection, ConnectionState::Ready);
+    }
 }
