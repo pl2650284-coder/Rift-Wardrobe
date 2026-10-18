@@ -47,8 +47,8 @@ import {
   Zap,
 } from "lucide";
 import { DEFAULT_PREFERENCES } from "./data/mock";
-import type { AppPreferences, AssistantLog, AugmentStat, ChampionStat, ProfileSummary } from "./data/types";
-import { getAssistantLogs, getAugmentStats, getChampionStats } from "./services/mock";
+import type { AppPreferences, AssistantLog, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary } from "./data/types";
+import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
 import { getProfileSummary } from "./services/profile";
 import "./styles.css";
 
@@ -214,6 +214,15 @@ let profileLastAttemptMs = 0;
 let profileRefreshTimer: number | undefined;
 let championStats: ChampionStat[] = [];
 let augmentStats: AugmentStat[] = [];
+let augmentCombos: AugmentCombo[] = [];
+let newsMeta: NewsDataMeta = {
+  patch: null,
+  updatedAtMs: 0,
+  officialSource: "",
+  statsSource: null,
+  warnings: [],
+  source: "unavailable",
+};
 let assistantLogs: AssistantLog[] = [];
 let dashboardLoading = true;
 let logsOpen = false;
@@ -318,20 +327,37 @@ function applyAppearance(): void {
   app.dataset.motion = String(animationsEnabled);
 }
 
-async function hydrateDashboardData(): Promise<void> {
+async function hydrateDashboardData(force = false): Promise<void> {
   dashboardLoading = true;
   render();
   try {
-    const [champions, augments, logs] = await Promise.all([
-      getChampionStats(),
-      getAugmentStats(),
-      getAssistantLogs(),
-    ]);
-    championStats = champions;
-    augmentStats = augments;
+    const newsLoader = typeof getNewsData === "function"
+      ? getNewsData(isTauri, force)
+      : Promise.all([getChampionStats(), getAugmentStats()]).then(([champions, augments]) => ({
+        champions,
+        augments,
+        combos: [],
+        meta: {
+          patch: null,
+          updatedAtMs: Date.now(),
+          officialSource: "演示数据",
+          statsSource: "演示数据",
+          warnings: [],
+          source: "demo" as const,
+        },
+      }));
+    const [news, logs] = await Promise.all([newsLoader, getAssistantLogs()]);
+    championStats = news.champions;
+    augmentStats = news.augments;
+    augmentCombos = news.combos;
+    newsMeta = news.meta;
     assistantLogs = logs;
   } catch (error) {
-    showToast(error instanceof Error ? error.message : "暂时无法加载演示数据", "error");
+    championStats = [];
+    augmentStats = [];
+    augmentCombos = [];
+    newsMeta = { ...newsMeta, source: "unavailable", warnings: [error instanceof Error ? error.message : String(error)] };
+    showToast(error instanceof Error ? error.message : "暂时无法加载游戏资讯", "error");
   } finally {
     dashboardLoading = false;
     render();
@@ -680,18 +706,55 @@ function renderProfilePage(): string {
     </section>`;
 }
 
+function newsPercent(value: number | null): string {
+  return value === null ? "未提供" : `${value.toFixed(1)}%`;
+}
+
+function newsSourceLabel(): string {
+  const updated = newsMeta.updatedAtMs > 0 ? ` · ${formatTime(newsMeta.updatedAtMs)} 更新` : "";
+  if (newsMeta.source === "demo") return "演示数据";
+  if (newsMeta.source === "third-party") return `${newsMeta.statsSource ?? "第三方统计"} · ${newsMeta.patch ?? "当前版本"}${updated}`;
+  if (newsMeta.source === "official") return `${newsMeta.officialSource} · ${newsMeta.patch ?? "当前版本"}${updated}`;
+  return "官方数据暂时不可用";
+}
+
+function championCombos(championId: number): AugmentCombo[] {
+  return augmentCombos.filter((combo) => combo.championId === championId);
+}
+
+function renderChampionComboSummary(championId: number): string {
+  const combos = championCombos(championId);
+  if (!combos.length) return "当前数据源没有返回该英雄的海克斯组合目录。";
+  const names = [...new Set(combos.flatMap((combo) => combo.augmentIds)
+    .map((id) => augmentStats.find((augment) => augment.id === id))
+    .filter((augment): augment is AugmentStat => Boolean(augment))
+    .map((augment) => `${augment.name}（全局选取率 ${newsPercent(augment.pickRate)}）`))].slice(0, 8);
+  return names.length
+    ? `可查组合：${names.map(escapeHtml).join("、")}。组合目录没有逐英雄选取率或胜率。`
+    : "已返回组合目录，但海克斯名称暂时无法匹配。";
+}
+
+function renderNewsWarning(): string {
+  if (!newsMeta.warnings.length) return "";
+  return `<div class="profile-notice news-notice" role="status">${icon("info", 16)}<span>${newsMeta.warnings.map(escapeHtml).join("；")}</span></div>`;
+}
+
 function renderNewsPage(): string {
-  if (dashboardLoading) return `<div class="loading-panel"><span class="loading-spinner">${icon("loader-circle", 22)}</span><strong>正在加载游戏资讯</strong></div>`;
   const roleOptions: ChampionRole[] = ["全部", "上路", "打野", "中路", "下路", "辅助"];
   const query = newsQuery.trim().toLocaleLowerCase("zh-CN");
   const champions = championStats.filter((champion) => (championRole === "全部" || champion.role === championRole) && (!query || champion.name.toLocaleLowerCase("zh-CN").includes(query)));
   const augments = augmentStats.filter((augment) => !query || augment.name.toLocaleLowerCase("zh-CN").includes(query));
   const detail = newsDetailId === null ? "" : renderNewsDetail();
+  const loadingNotice = dashboardLoading
+    ? `<div class="profile-notice news-notice" role="status">${icon("loader-circle", 16)}<span>正在读取官方资料和海克斯数据，页面可以先浏览。</span></div>`
+    : "";
   return `
-    <section class="page-head"><div><span class="eyebrow">LIVE DATA DESK</span><h1>游戏资讯</h1><p>用版本统计快速找到更适合当前对局的选择。</p></div><div class="data-freshness"><span class="connection-dot status-ready"></span><span>演示数据 · 14:32 更新</span></div></section>
+    <section class="page-head"><div><span class="eyebrow">LIVE DATA DESK</span><h1>游戏资讯</h1><p>官方静态资料与可验证的海克斯大乱斗选取率。</p></div><div><div class="data-freshness"><span class="connection-dot ${newsMeta.source === "unavailable" ? "status-error" : "status-ready"}"></span><span>${escapeHtml(newsSourceLabel())}</span></div><button class="secondary-button news-refresh" data-action="news-refresh" ${dashboardLoading ? "disabled" : ""}>${icon("refresh-ccw", 15)}刷新数据</button></div></section>
+    ${loadingNotice}
+    ${renderNewsWarning()}
     <div class="news-tabs"><button class="news-tab ${newsTab === "champions" ? "news-tab--active" : ""}" data-news-tab="champions">${icon("swords", 16)}英雄数据</button><button class="news-tab ${newsTab === "augments" ? "news-tab--active" : ""}" data-news-tab="augments">${icon("sparkles", 16)}海克斯大乱斗符文</button></div>
     <section class="news-toolbar"><label class="search-box news-search">${icon("search", 15)}<input type="search" maxlength="40" value="${escapeHtml(newsQuery)}" placeholder="搜索${newsTab === "champions" ? "英雄" : "符文"}" aria-label="搜索资讯" data-news-search /></label>${newsTab === "champions" ? `<div class="segmented role-segmented">${roleOptions.map((role) => `<button class="segment ${championRole === role ? "segment--active" : ""}" data-role="${role}">${role}</button>`).join("")}</div>` : `<span class="filter-caption">极地大乱斗 · 全段位 · 最近 30 天</span>`}</section>
-    ${newsTab === "champions" ? `<section class="news-summary-row"><article><span>S+ 强势英雄</span><strong>${championStats.filter((item) => item.tier === "S+").length}</strong><small>较上个版本 +2</small></article><article><span>平均胜率</span><strong>${(championStats.reduce((sum, item) => sum + item.winRate, 0) / Math.max(championStats.length, 1)).toFixed(1)}%</strong><small>统计样本 1.2M</small></article><article><span>数据覆盖</span><strong>171</strong><small>全部英雄</small></article></section><section class="news-table-panel"><div class="news-table news-table--champions"><div class="news-table-head"><span>#</span><span>英雄</span><span>位置</span><span>评级</span><span>胜率</span><span>登场率</span><span>趋势</span><span></span></div>${champions.length ? champions.map((champion, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="champion-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><strong>${escapeHtml(champion.name)}<small>KDA ${champion.kda.toFixed(1)}</small></strong></span><span>${escapeHtml(champion.role)}</span><span class="tier tier--${champion.tier.replace("+", "plus")}">${escapeHtml(champion.tier)}</span><span class="stat-strong">${champion.winRate.toFixed(1)}%</span><span>${champion.pickRate.toFixed(1)}%</span><span class="trend trend--${champion.trend}">${champion.trend === "up" ? "↑" : champion.trend === "down" ? "↓" : "—"}</span><button class="icon-button table-arrow" data-news-detail="${champion.id}" aria-label="查看${escapeHtml(champion.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的英雄</span></div>`}</div></section>` : `<section class="news-summary-row"><article><span>高胜率符文</span><strong>${augmentStats.filter((item) => item.winRate >= 60).length}</strong><small>胜率超过 60%</small></article><article><span>最高胜率</span><strong>${Math.max(...augmentStats.map((item) => item.winRate), 0).toFixed(1)}%</strong><small>终极刷新</small></article><article><span>统计样本</span><strong>9.4M</strong><small>极地大乱斗对局</small></article></section><section class="news-table-panel"><div class="news-table news-table--augments"><div class="news-table-head"><span>#</span><span>符文</span><span>评级</span><span>胜率</span><span>选择率</span><span>样本</span><span></span></div>${augments.length ? augments.map((augment, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="augment-token" style="--token-color:${augment.color}">${icon("sparkles", 15)}</span><strong>${escapeHtml(augment.name)}<small>${escapeHtml(augment.description)}</small></strong></span><span class="tier tier--${augment.tier.replace("+", "plus")}">${escapeHtml(augment.tier)}</span><span class="stat-strong">${augment.winRate.toFixed(1)}%</span><span>${augment.pickRate.toFixed(1)}%</span><span>${augment.sampleSize.toLocaleString("zh-CN")}</span><button class="icon-button table-arrow" data-news-detail="${escapeHtml(augment.id)}" aria-label="查看${escapeHtml(augment.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的符文</span></div>`}</div></section>`}${detail}`;
+    ${newsTab === "champions" ? `<section class="news-summary-row"><article><span>官方英雄资料</span><strong>${championStats.length || "—"}</strong><small>${newsMeta.officialSource || "暂无"}</small></article><article><span>英雄选取率</span><strong>${championStats.filter((item) => item.pickRate !== null).length || "—"}</strong><small>${newsMeta.statsSource ? "第三方有限样本" : "官方未提供"}</small></article><article><span>胜率</span><strong>未提供</strong><small>官方接口未开放</small></article></section><section class="news-table-panel"><div class="news-table news-table--champions"><div class="news-table-head"><span>#</span><span>英雄</span><span>位置</span><span>评级</span><span>胜率</span><span>登场率</span><span>趋势</span><span></span></div>${champions.length ? champions.map((champion, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="champion-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><strong>${escapeHtml(champion.name)}<small>KDA ${champion.kda === null ? "官方未提供" : champion.kda.toFixed(1)}</small></strong></span><span>${escapeHtml(champion.role)}</span><span class="tier tier--${champion.tier.replace("+", "plus")}">${escapeHtml(champion.tier)}</span><span class="stat-strong">${newsPercent(champion.winRate)}</span><span>${newsPercent(champion.pickRate)}</span><span class="trend trend--${champion.trend}">${champion.trend === "up" ? "↑" : champion.trend === "down" ? "↓" : "—"}</span><button class="icon-button table-arrow" data-news-detail="${champion.id}" aria-label="查看${escapeHtml(champion.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的英雄</span></div>`}</div></section>` : `<section class="news-summary-row"><article><span>可查海克斯</span><strong>${augmentStats.length || "—"}</strong><small>第三方选取率数据</small></article><article><span>最高选取率</span><strong>${newsPercent(Math.max(...augmentStats.map((item) => item.pickRate ?? 0), 0) || null)}</strong><small>胜率官方未提供</small></article><article><span>组合推荐</span><strong>${augmentCombos.length || "—"}</strong><small>仅展示组合目录</small></article></section><section class="news-table-panel"><div class="news-table news-table--augments"><div class="news-table-head"><span>#</span><span>符文</span><span>评级</span><span>胜率</span><span>选择率</span><span>样本</span><span></span></div>${augments.length ? augments.map((augment, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="augment-token" style="--token-color:${augment.color}">${icon("sparkles", 15)}</span><strong>${escapeHtml(augment.name)}<small>${escapeHtml(augment.description || "暂无官方描述")}</small></strong></span><span class="tier tier--${augment.tier.replace("+", "plus")}">${escapeHtml(augment.tier)}</span><span class="stat-strong">${newsPercent(augment.winRate)}</span><span>${newsPercent(augment.pickRate)}</span><span>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</span><button class="icon-button table-arrow" data-news-detail="${escapeHtml(augment.id)}" aria-label="查看${escapeHtml(augment.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的符文</span></div>`}</div></section>`}${detail}`;
 }
 
 function renderNewsDetail(): string {
@@ -699,11 +762,11 @@ function renderNewsDetail(): string {
   if (newsTab === "champions") {
     const champion = championStats.find((item) => String(item.id) === newsDetailId);
     if (!champion) return "";
-    return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">CHAMPION DETAIL</span><h2>${escapeHtml(champion.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="champion-token detail-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><div><strong>${escapeHtml(champion.role)} · ${escapeHtml(champion.tier)} 级</strong><p>当前版本表现稳定，适合作为主要上分选择。</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${champion.winRate.toFixed(1)}%</strong></div><div><span>登场率</span><strong>${champion.pickRate.toFixed(1)}%</strong></div><div><span>禁用率</span><strong>${champion.banRate.toFixed(1)}%</strong></div><div><span>KDA</span><strong>${champion.kda.toFixed(1)}</strong></div></div><div class="detail-copy"><span class="eyebrow">推荐思路</span><h3>稳健发育，围绕强势期接团</h3><p>优先保证核心装备节奏；面对高爆发阵容时保留位移与关键控制，避免提前进入正面战场。</p></div><footer>演示统计 · 数据更新时间 14:32</footer></aside></div>`;
+    return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">CHAMPION DETAIL</span><h2>${escapeHtml(champion.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="champion-token detail-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><div><strong>${escapeHtml(champion.role)} · ${escapeHtml(champion.tier)} 级</strong><p>英雄名称与基础分类来自 Riot Data Dragon。</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(champion.winRate)}</strong></div><div><span>登场率</span><strong>${newsPercent(champion.pickRate)}</strong></div><div><span>禁用率</span><strong>${newsPercent(champion.banRate)}</strong></div><div><span>KDA</span><strong>${champion.kda === null ? "未提供" : champion.kda.toFixed(1)}</strong></div></div><div class="detail-copy"><span class="eyebrow">海克斯组合</span><h3>只展示可验证的组合目录</h3><p>${renderChampionComboSummary(champion.id)}</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
   }
   const augment = augmentStats.find((item) => item.id === newsDetailId);
   if (!augment) return "";
-  return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">AUGMENT DETAIL</span><h2>${escapeHtml(augment.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="augment-token detail-token" style="--token-color:${augment.color}">${icon("sparkles", 18)}</span><div><strong>${escapeHtml(augment.tier)} 级符文</strong><p>${escapeHtml(augment.description)}</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${augment.winRate.toFixed(1)}%</strong></div><div><span>选择率</span><strong>${augment.pickRate.toFixed(1)}%</strong></div><div><span>样本数</span><strong>${augment.sampleSize.toLocaleString("zh-CN")}</strong></div><div><span>模式</span><strong>大乱斗</strong></div></div><div class="detail-copy"><span class="eyebrow">搭配建议</span><h3>优先匹配高频技能与持续输出英雄</h3><p>符文强度会受到英雄、阵容和装备影响，胜率仅用于辅助判断，不代表单局结果。</p></div><footer>演示统计 · 数据更新时间 14:32</footer></aside></div>`;
+  return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">AUGMENT DETAIL</span><h2>${escapeHtml(augment.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="augment-token detail-token" style="--token-color:${augment.color}">${icon("sparkles", 18)}</span><div><strong>${escapeHtml(augment.tier)} 级符文</strong><p>${escapeHtml(augment.description || "暂无官方描述")}</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(augment.winRate)}</strong></div><div><span>选择率</span><strong>${newsPercent(augment.pickRate)}</strong></div><div><span>样本数</span><strong>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</strong></div><div><span>模式</span><strong>海克斯大乱斗</strong></div></div><div class="detail-copy"><span class="eyebrow">数据说明</span><h3>选取率来自第三方有限样本</h3><p>Riot 官方公开接口未提供海克斯胜率，应用不会从选取率推导胜率。</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
 }
 
 function preferenceRow(key: string, title: string, description: string, checked: boolean): string {
@@ -714,7 +777,7 @@ function renderSettingsPage(): string {
   const colors = ["mint", "blue", "gold", "rose"];
   return `
     <section class="page-head"><div><span class="eyebrow">APP CONTROL CENTER</span><h1>应用设置</h1><p>调整外观、自动化行为和本地数据偏好。</p></div><span class="settings-saved">${icon("check-circle-2", 14)}设置自动保存</span></section>
-    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("alwaysOnTop", "窗口置顶", "让辅助窗口保持在游戏客户端上方", alwaysOnTop)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>个人信息和皮肤选择可读取已登录客户端的数据；游戏资讯目前使用演示统计。</p></div></div></article></div></section>`;
+    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("alwaysOnTop", "窗口置顶", "让辅助窗口保持在游戏客户端上方", alwaysOnTop)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>游戏资讯优先读取 Riot Data Dragon；海克斯大乱斗选取率会标注第三方有限样本，官方未提供的胜率不会显示。</p></div></div></article></div></section>`;
 }
 
 function renderDashboardShell(): void {
@@ -1077,6 +1140,7 @@ function wireEvents(): void {
     if (action === "close") void windowApi.close();
     if (action === "top") void updateAlwaysOnTop(!alwaysOnTop);
     if (action === "refresh") void reconnectClient();
+    if (action === "news-refresh") void hydrateDashboardData(true);
     if (action === "settings") {
       currentRoute = "settings";
       settingsOpen = true;

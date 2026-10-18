@@ -40,21 +40,21 @@ export const demoProfile: ProfileSummary = {
 };
 
 export const demoChampions: ChampionStat[] = [
-  { id: 1, name: "厄塔汗", shortName: "ET", role: "上路", tier: "S+", winRate: 54.8, pickRate: 7.2, banRate: 18.1, kda: 3.4, trend: "up", color: "#d6a36f" },
-  { id: 2, name: "卡莎", shortName: "KA", role: "下路", tier: "S", winRate: 53.9, pickRate: 12.4, banRate: 9.8, kda: 3.7, trend: "up", color: "#8f9ee9" },
-  { id: 3, name: "翠神", shortName: "IV", role: "打野", tier: "S", winRate: 53.5, pickRate: 4.1, banRate: 6.3, kda: 3.9, trend: "flat", color: "#79c9a0" },
-  { id: 4, name: "丽桑卓", shortName: "LI", role: "中路", tier: "A+", winRate: 52.8, pickRate: 6.8, banRate: 7.4, kda: 3.1, trend: "up", color: "#9cabe9" },
-  { id: 5, name: "蕾欧娜", shortName: "LE", role: "辅助", tier: "A+", winRate: 52.4, pickRate: 9.5, banRate: 8.9, kda: 2.8, trend: "down", color: "#e0b476" },
-  { id: 6, name: "薇恩", shortName: "VN", role: "下路", tier: "A", winRate: 51.9, pickRate: 5.8, banRate: 4.2, kda: 3.2, trend: "flat", color: "#7bcfb0" },
-  { id: 7, name: "奥恩", shortName: "OR", role: "上路", tier: "A", winRate: 51.4, pickRate: 5.4, banRate: 5.1, kda: 2.9, trend: "down", color: "#b78d72" },
+  { id: 1, name: "厄塔汗", shortName: "ET", role: "上路", tier: "S+", winRate: 54.8, pickRate: 7.2, banRate: 18.1, kda: 3.4, trend: "up", color: "#d6a36f", source: "demo" },
+  { id: 2, name: "卡莎", shortName: "KA", role: "下路", tier: "S", winRate: 53.9, pickRate: 12.4, banRate: 9.8, kda: 3.7, trend: "up", color: "#8f9ee9", source: "demo" },
+  { id: 3, name: "翠神", shortName: "IV", role: "打野", tier: "S", winRate: 53.5, pickRate: 4.1, banRate: 6.3, kda: 3.9, trend: "flat", color: "#79c9a0", source: "demo" },
+  { id: 4, name: "丽桑卓", shortName: "LI", role: "中路", tier: "A+", winRate: 52.8, pickRate: 6.8, banRate: 7.4, kda: 3.1, trend: "up", color: "#9cabe9", source: "demo" },
+  { id: 5, name: "蕾欧娜", shortName: "LE", role: "辅助", tier: "A+", winRate: 52.4, pickRate: 9.5, banRate: 8.9, kda: 2.8, trend: "down", color: "#e0b476", source: "demo" },
+  { id: 6, name: "薇恩", shortName: "VN", role: "下路", tier: "A", winRate: 51.9, pickRate: 5.8, banRate: 4.2, kda: 3.2, trend: "flat", color: "#7bcfb0", source: "demo" },
+  { id: 7, name: "奥恩", shortName: "OR", role: "上路", tier: "A", winRate: 51.4, pickRate: 5.4, banRate: 5.1, kda: 2.9, trend: "down", color: "#b78d72", source: "demo" },
 ];
 
 export const demoAugments: AugmentStat[] = [
-  { id: "a-1", name: "终极刷新", description: "终极技能急速与额外伤害提升。", winRate: 61.8, pickRate: 12.6, sampleSize: 18420, tier: "S", color: "#d8af70" },
-  { id: "a-2", name: "珠光护手", description: "技能暴击并强化法术伤害。", winRate: 60.4, pickRate: 8.9, sampleSize: 12940, tier: "S", color: "#d58aba" },
-  { id: "a-3", name: "魔法飞弹", description: "技能命中后发射追踪魔法飞弹。", winRate: 59.7, pickRate: 14.1, sampleSize: 20580, tier: "A+", color: "#8aa4e5" },
-  { id: "a-4", name: "不倒翁", description: "生命值较低时获得护盾和韧性。", winRate: 57.9, pickRate: 10.4, sampleSize: 15110, tier: "A", color: "#7fc6a5" },
-  { id: "a-5", name: "雪球大作战", description: "雪球命中后获得额外突进与伤害。", winRate: 56.8, pickRate: 18.7, sampleSize: 27100, tier: "A", color: "#8eb7d9" },
+  { id: "a-1", name: "终极刷新", description: "终极技能急速与额外伤害提升。", winRate: 61.8, pickRate: 12.6, sampleSize: 18420, tier: "S", color: "#d8af70", source: "demo" },
+  { id: "a-2", name: "珠光护手", description: "技能暴击并强化法术伤害。", winRate: 60.4, pickRate: 8.9, sampleSize: 12940, tier: "S", color: "#d58aba", source: "demo" },
+  { id: "a-3", name: "魔法飞弹", description: "技能命中后发射追踪魔法飞弹。", winRate: 59.7, pickRate: 14.1, sampleSize: 20580, tier: "A+", color: "#8aa4e5", source: "demo" },
+  { id: "a-4", name: "不倒翁", description: "生命值较低时获得护盾和韧性。", winRate: 57.9, pickRate: 10.4, sampleSize: 15110, tier: "A", color: "#7fc6a5", source: "demo" },
+  { id: "a-5", name: "雪球大作战", description: "雪球命中后获得额外突进与伤害。", winRate: 56.8, pickRate: 18.7, sampleSize: 27100, tier: "A", color: "#8eb7d9", source: "demo" },
 ];
 
 export const demoAssistantLogs: AssistantLog[] = [

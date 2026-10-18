@@ -1,10 +1,12 @@
 mod discovery;
 mod lcu;
 mod models;
+mod official_data;
 mod profile;
 mod runtime;
 
 use models::{AppSnapshot, ApplyResult};
+use official_data::NewsDataSnapshot;
 use profile::PlayerProfile;
 use runtime::RuntimeState;
 use tauri::{
@@ -21,6 +23,11 @@ async fn get_snapshot(state: State<'_, RuntimeState>) -> Result<AppSnapshot, Str
 #[tauri::command]
 async fn get_profile(state: State<'_, RuntimeState>) -> Result<PlayerProfile, String> {
     state.profile().await
+}
+
+#[tauri::command]
+async fn get_news_data() -> Result<NewsDataSnapshot, String> {
+    official_data::get_news_data().await
 }
 
 #[tauri::command]
@@ -183,6 +190,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
             get_profile,
+            get_news_data,
             reconnect_client,
             apply_skin,
             apply_random_skin,

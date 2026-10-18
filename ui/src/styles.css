@@ -63,6 +63,8 @@ h1 { margin-top: 8px; color: var(--text); font-size: 32px; font-weight: 700; let
 .slash { padding: 0 7px; color: var(--muted-2); }
 .connection { display: flex; align-items: center; gap: 8px; padding-top: 6px; color: var(--muted); font-size: var(--font-small); white-space: nowrap; }
 .connection-dot { width: 7px; height: 7px; border-radius: 50%; background: #66747f; }
+.data-freshness > .connection-dot.status-ready { background: #64d4a0; box-shadow: 0 0 9px #64d4a0; }
+.data-freshness > .connection-dot.status-error { background: #db756e; box-shadow: 0 0 9px #db756e; }
 .status-ready .connection-dot { background: #64d4a0; box-shadow: 0 0 9px #64d4a0; }.status-ready { color: var(--positive); }.status-connecting .connection-dot { background: #eccb74; box-shadow: 0 0 9px #eccb74; }.status-offline .connection-dot { background: #db756e; }
 .hero-panel { position: relative; min-height: 228px; display: grid; grid-template-columns: 1.15fr 1fr .7fr; gap: 25px; margin-top: 29px; padding: 28px 31px; overflow: hidden; border: 1px solid #27343d; border-radius: 9px; background: linear-gradient(105deg, #151e27 5%, #17252b 53%, #142027); }
 .hero-panel::before { content: ""; position: absolute; inset: 0; opacity: .36; background: linear-gradient(135deg, transparent 40%, rgba(113, 214, 173, .08)); pointer-events: none; }

@@ -70,23 +70,48 @@ export type ChampionStat = {
   shortName: string;
   role: string;
   tier: string;
-  winRate: number;
-  pickRate: number;
-  banRate: number;
-  kda: number;
+  winRate: number | null;
+  pickRate: number | null;
+  banRate: number | null;
+  kda: number | null;
   trend: "up" | "down" | "flat";
   color: string;
+  source: "official" | "third-party" | "demo" | "unavailable";
 };
 
 export type AugmentStat = {
   id: string;
   name: string;
   description: string;
-  winRate: number;
-  pickRate: number;
-  sampleSize: number;
+  winRate: number | null;
+  pickRate: number | null;
+  sampleSize: number | null;
   tier: string;
   color: string;
+  source: "official" | "third-party" | "demo" | "unavailable";
+};
+
+export type AugmentCombo = {
+  championId: number;
+  augmentIds: string[];
+  types: string[];
+  url: string | null;
+};
+
+export type NewsDataMeta = {
+  patch: string | null;
+  updatedAtMs: number;
+  officialSource: string;
+  statsSource: string | null;
+  warnings: string[];
+  source: "official" | "third-party" | "demo" | "unavailable";
+};
+
+export type NewsData = {
+  champions: ChampionStat[];
+  augments: AugmentStat[];
+  combos: AugmentCombo[];
+  meta: NewsDataMeta;
 };
 
 export type AppPreferences = {
