@@ -29,7 +29,16 @@ export async function getNewsData(native = false, force = false): Promise<NewsDa
   }
   if (force) nativeNewsData = null;
   if (!nativeNewsData) {
-    nativeNewsData = invoke<NewsData>("get_news_data").catch((error) => {
+    nativeNewsData = invoke<NewsData>("get_news_data").then((data) => {
+      // TypeScript cannot enforce the shape of a native IPC response at runtime.
+      if (!data || !Array.isArray(data.champions) || !Array.isArray(data.augments)
+        || !Array.isArray(data.combos) || !data.meta
+        || !Array.isArray(data.meta.warnings) || typeof data.meta.updatedAtMs !== "number"
+        || typeof data.meta.officialSource !== "string" || typeof data.meta.source !== "string") {
+        throw new Error("游戏资讯数据格式不兼容，请重启应用后重试");
+      }
+      return data;
+    }).catch((error) => {
       nativeNewsData = null;
       throw error;
     });

@@ -15,6 +15,8 @@ const MAYHEM_COMBOS_URL: &str = "https://arammayhem.com/data/v1/latest/combos.js
 #[serde(rename_all = "camelCase")]
 pub struct NewsChampion {
     pub id: i64,
+    #[serde(skip)]
+    dragon_key: String,
     pub name: String,
     pub short_name: String,
     pub role: String,
@@ -57,6 +59,12 @@ pub struct NewsDataSnapshot {
     pub champions: Vec<NewsChampion>,
     pub augments: Vec<NewsAugment>,
     pub combos: Vec<NewsCombo>,
+    pub meta: NewsDataMeta,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewsDataMeta {
     pub patch: Option<String>,
     pub updated_at_ms: u64,
     pub official_source: String,
@@ -132,7 +140,7 @@ pub async fn get_news_data() -> Result<NewsDataSnapshot, String> {
         Err(error) => warnings.push(format!("海克斯选取率暂时无法读取: {error}")),
     }
     match mayhem_combos {
-        Ok(value) => combos = parse_mayhem_combos(&value),
+        Ok(value) => combos = parse_mayhem_combos(&value, &champions),
         Err(error) => warnings.push(format!("英雄与海克斯组合暂时无法读取: {error}")),
     }
 
@@ -140,20 +148,25 @@ pub async fn get_news_data() -> Result<NewsDataSnapshot, String> {
         || champions
             .iter()
             .any(|champion| champion.pick_rate.is_some());
+    let source = if has_stats {
+        "third-party"
+    } else if !champions.is_empty() {
+        "official"
+    } else {
+        "unavailable"
+    };
     Ok(NewsDataSnapshot {
         champions,
         augments,
         combos,
-        patch,
-        updated_at_ms: now_ms(),
-        official_source: "Riot Games Data Dragon".to_string(),
-        stats_source,
-        source: if has_stats {
-            "third-party".to_string()
-        } else {
-            "official".to_string()
+        meta: NewsDataMeta {
+            patch,
+            updated_at_ms: now_ms(),
+            official_source: "Riot Games Data Dragon".to_string(),
+            stats_source,
+            source: source.to_string(),
+            warnings,
         },
-        warnings,
     })
 }
 
@@ -193,6 +206,7 @@ fn parse_dragon_champions(value: &Value) -> Result<Vec<NewsChampion>, String> {
                 .unwrap_or_default();
             Some(NewsChampion {
                 id,
+                dragon_key: text(raw, &["id"]).unwrap_or_default(),
                 short_name: name.chars().take(2).collect(),
                 name,
                 role: role_for_tags(&tags),
@@ -215,7 +229,7 @@ fn merge_mayhem_champion_rates(champions: &mut [NewsChampion], value: &Value) {
     let rates = rows(value)
         .into_iter()
         .filter_map(|row| {
-            let id = number(row, &["championId", "champion_id", "id"])? as i64;
+            let id = champion_id(row, champions)?;
             Some((id, number(row, &["pickRate", "pick_rate"])))
         })
         .collect::<HashMap<_, _>>();
@@ -233,12 +247,12 @@ fn parse_mayhem_augments(value: &Value) -> Vec<NewsAugment> {
         .into_iter()
         .filter_map(|row| {
             let id = text(row, &["augmentId", "augment_id", "id"])?;
-            let name = text(row, &["name", "displayName"])?;
+            let name = localized_text(row, &["name_zh-CN", "name_zh_CN", "name", "displayName"])?;
             let rarity = text(row, &["rarity", "tier"]).unwrap_or_default();
             Some(NewsAugment {
                 id,
                 name,
-                description: text(row, &["description", "desc"]).unwrap_or_default(),
+                description: localized_text(row, &["description", "desc"]).unwrap_or_default(),
                 win_rate: None,
                 pick_rate: number(row, &["pickRate", "pick_rate"]),
                 sample_size: integer(row, &["sampleSize", "sample_size", "games", "matches"]),
@@ -257,11 +271,11 @@ fn parse_mayhem_augments(value: &Value) -> Vec<NewsAugment> {
     augments
 }
 
-fn parse_mayhem_combos(value: &Value) -> Vec<NewsCombo> {
+fn parse_mayhem_combos(value: &Value, champions: &[NewsChampion]) -> Vec<NewsCombo> {
     rows(value)
         .into_iter()
         .filter_map(|row| {
-            let champion_id = number(row, &["championId", "champion_id"])? as i64;
+            let champion_id = champion_id(row, champions)?;
             let augment_ids = row
                 .get("augmentIds")
                 .or_else(|| row.get("augment_ids"))
@@ -299,7 +313,7 @@ fn rows<'a>(value: &'a Value) -> Vec<&'a Map<String, Value>> {
     {
         return vec![object];
     }
-    for key in ["data", "champions", "augments", "results", "items"] {
+    for key in ["rows", "data", "champions", "augments", "results", "items"] {
         if let Some(nested) = object.get(key) {
             let nested_rows = rows(nested);
             if !nested_rows.is_empty() {
@@ -313,6 +327,27 @@ fn rows<'a>(value: &'a Value) -> Vec<&'a Map<String, Value>> {
 fn text(value: &Map<String, Value>, keys: &[&str]) -> Option<String> {
     keys.iter()
         .find_map(|key| value.get(*key).and_then(value_text))
+}
+
+fn localized_text(value: &Map<String, Value>, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        let raw = value.get(*key)?;
+        value_text(raw).or_else(|| {
+            raw.as_object()
+                .and_then(|locales| text(locales, &["zh-CN", "zh_CN", "en"]))
+        })
+    })
+}
+
+fn champion_id(row: &Map<String, Value>, champions: &[NewsChampion]) -> Option<i64> {
+    if let Some(id) = number(row, &["championId", "champion_id", "id"]) {
+        return Some(id as i64);
+    }
+    let key = text(row, &["championId", "champion_id", "id"])?;
+    champions
+        .iter()
+        .find(|champion| champion.dragon_key.eq_ignore_ascii_case(&key))
+        .map(|champion| champion.id)
 }
 
 fn value_text(value: &Value) -> Option<String> {
@@ -373,6 +408,46 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn news_ipc_matches_frontend_contract() {
+        // Shared with the frontend tests: a flat metadata payload crashed the news page.
+        let expected: Value =
+            serde_json::from_str(include_str!("../../test/fixtures/news-data.json")).unwrap();
+        let mut champions = parse_dragon_champions(&json!({
+            "data": { "Ashe": { "id": "Ashe", "key": "22", "name": "寒冰射手", "tags": ["Marksman"] } }
+        }))
+        .unwrap();
+        merge_mayhem_champion_rates(
+            &mut champions,
+            &json!({ "schemaVersion": 1, "rows": [{ "championId": "Ashe", "pickRate": 14.51 }] }),
+        );
+        let snapshot = NewsDataSnapshot {
+            augments: parse_mayhem_augments(&json!({ "schemaVersion": 1, "rows": [{
+                "augmentId": "a-1", "name": { "en": "Test augment", "zh-CN": "测试海克斯" },
+                "description": { "zh-CN": "回归测试符文" },
+                "pickRate": 4.2, "sampleSize": 100
+            }] })),
+            combos: parse_mayhem_combos(
+                &json!({ "schemaVersion": 1, "rows": [{
+                "championId": "Ashe", "augmentIds": ["a-1"]
+            }] }),
+                &champions,
+            ),
+            champions,
+            meta: NewsDataMeta {
+                patch: Some("26.1.1".to_string()),
+                updated_at_ms: 1,
+                official_source: "Riot Games Data Dragon".to_string(),
+                stats_source: Some("ARAM Mayhem（第三方有限样本）".to_string()),
+                warnings: vec![
+                    "Riot 官方公开接口未提供海克斯胜率，胜率字段不会被推测或填充。".to_string(),
+                ],
+                source: "third-party".to_string(),
+            },
+        };
+        assert_eq!(serde_json::to_value(snapshot).unwrap(), expected);
+    }
+
+    #[test]
     fn parses_percent_values_and_nested_rows() {
         let value = json!({
             "data": {
@@ -391,5 +466,49 @@ mod tests {
         let parsed = parse_mayhem_augments(&value);
         assert_eq!(parsed[0].pick_rate, Some(4.2));
         assert_eq!(parsed[0].win_rate, None);
+    }
+
+    #[test]
+    fn localized_augments_prefer_chinese_and_fall_back_to_english() {
+        let parsed = parse_mayhem_augments(&json!({
+            "fields": [{ "field": "augmentId" }],
+            "rows": [
+                { "augmentId": "cn", "name": { "zh-CN": "中文名称", "en": "English" }, "rarity": "gold" },
+                { "augmentId": "en", "name": { "en": "English only" }, "rarity": "silver" }
+            ]
+        }));
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].name, "中文名称");
+        assert_eq!(parsed[0].tier, "A");
+        assert_eq!(parsed[1].name, "English only");
+        assert_eq!(parsed[1].tier, "B");
+    }
+
+    #[test]
+    fn champion_rates_and_combos_resolve_dragon_keys_and_numeric_ids() {
+        let mut champions = parse_dragon_champions(&json!({
+            "data": { "Ashe": { "id": "Ashe", "key": "22", "name": "寒冰射手" } }
+        }))
+        .unwrap();
+        for id in [json!("Ashe"), json!(22)] {
+            merge_mayhem_champion_rates(
+                &mut champions,
+                &json!({
+                    "rows": [{ "championId": id, "pickRate": 14.5 }]
+                }),
+            );
+            assert_eq!(champions[0].pick_rate, Some(14.5));
+            let combos = parse_mayhem_combos(
+                &json!({
+                    "rows": [
+                        { "championId": id, "augmentIds": ["one"] },
+                        { "championId": "Unknown", "augmentIds": ["two"] }
+                    ]
+                }),
+                &champions,
+            );
+            assert_eq!(combos.len(), 1);
+            assert_eq!(combos[0].champion_id, 22);
+        }
     }
 }

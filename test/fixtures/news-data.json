@@ -1,0 +1,40 @@
+{
+  "champions": [
+    {
+      "id": 22,
+      "name": "寒冰射手",
+      "shortName": "寒冰",
+      "role": "下路",
+      "tier": "—",
+      "winRate": null,
+      "pickRate": 14.51,
+      "banRate": null,
+      "kda": null,
+      "trend": "flat",
+      "color": "#d99bca",
+      "source": "third-party"
+    }
+  ],
+  "augments": [
+    {
+      "id": "a-1",
+      "name": "测试海克斯",
+      "description": "回归测试符文",
+      "winRate": null,
+      "pickRate": 4.2,
+      "sampleSize": 100,
+      "tier": "—",
+      "color": "#d8af70",
+      "source": "third-party"
+    }
+  ],
+  "combos": [{ "championId": 22, "augmentIds": ["a-1"], "types": [], "url": null }],
+  "meta": {
+    "patch": "26.1.1",
+    "updatedAtMs": 1,
+    "officialSource": "Riot Games Data Dragon",
+    "statsSource": "ARAM Mayhem（第三方有限样本）",
+    "warnings": ["Riot 官方公开接口未提供海克斯胜率，胜率字段不会被推测或填充。"],
+    "source": "third-party"
+  }
+}
