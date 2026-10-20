@@ -48,6 +48,7 @@ import { DEFAULT_PREFERENCES } from "./data/mock";
 import type { AppPreferences, AssistantLog, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary } from "./data/types";
 import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
 import { getProfileSummary } from "./services/profile";
+import { createHextechView } from "./hextech-view";
 import "./styles.css";
 
 type ConnectionState = "disconnected" | "ready";
@@ -175,7 +176,7 @@ const disconnectedSnapshot: Snapshot = {
 let snapshot: Snapshot = isTauri ? disconnectedSnapshot : demoSnapshot;
 type CatalogFilter = "可用" | "全部" | "收藏";
 type AppRoute = "profile" | "assistant" | "news" | "settings";
-type NewsTab = "champions" | "augments";
+type NewsTab = "hextech" | "champions" | "augments";
 type ChampionRole = "全部" | "上路" | "打野" | "中路" | "下路" | "辅助";
 
 function isAppRoute(value: string): value is AppRoute {
@@ -198,7 +199,7 @@ let settingsOpen = false;
 let settingsBusy = false;
 const initialRoute = window.location.hash.slice(1);
 let currentRoute: AppRoute = isAppRoute(initialRoute) ? initialRoute : "profile";
-let newsTab: NewsTab = "champions";
+let newsTab: NewsTab = "hextech";
 let championRole: ChampionRole = "全部";
 let newsQuery = "";
 let profileData: ProfileSummary | null = null;
@@ -222,6 +223,7 @@ let assistantLogs: AssistantLog[] = [];
 let dashboardLoading = true;
 let logsOpen = false;
 let newsDetailId: string | null = null;
+const hextech = createHextechView({ isNative: isTauri, render, escape: escapeHtml, icon, image: renderGameIcon });
 let autoAccept = DEFAULT_PREFERENCES.autoAccept;
 let autoSkin = DEFAULT_PREFERENCES.autoSkin;
 let notifyEnabled = DEFAULT_PREFERENCES.notify;
@@ -744,7 +746,8 @@ function renderChampionIcon(id: number | undefined, name: string, color: string,
 
 function loadGameIcons(): void {
   if (!isTauri) return;
-  const elements = [...app.querySelectorAll<HTMLElement>("[data-game-icon]")];
+  const iconRoot = app.querySelector<HTMLElement>(".hex-detail, .detail-drawer") ?? app;
+  const elements = [...iconRoot.querySelectorAll<HTMLElement>("[data-game-icon]")];
   for (const element of elements) {
     const cached = gameIconCache.get(element.dataset.gameIcon!);
     if (cached && !element.querySelector("img")) element.innerHTML = `<img src="${cached}" alt="" />`;
@@ -808,7 +811,12 @@ function renderNewsWarning(): string {
   return `<div class="profile-notice news-notice" role="status">${icon("info", 16)}<span>${newsMeta.warnings.map(escapeHtml).join("；")}</span></div>`;
 }
 
+function renderNewsTabs(): string {
+  return `<div class="news-tabs"><button class="news-tab ${newsTab === "hextech" ? "news-tab--active" : ""}" data-news-tab="hextech">${icon("swords", 16)}海克斯大乱斗 · 英雄榜</button><button class="news-tab ${newsTab === "champions" ? "news-tab--active" : ""}" data-news-tab="champions">英雄资料</button><button class="news-tab ${newsTab === "augments" ? "news-tab--active" : ""}" data-news-tab="augments">符文资料</button></div>`;
+}
+
 function renderNewsPage(): string {
+  if (newsTab === "hextech") return hextech.renderPage(renderNewsTabs());
   const roleOptions: ChampionRole[] = ["全部", "上路", "打野", "中路", "下路", "辅助"];
   const query = newsQuery.trim().toLocaleLowerCase("zh-CN");
   const champions = championStats.filter((champion) => (championRole === "全部" || champion.role === championRole) && (!query || champion.name.toLocaleLowerCase("zh-CN").includes(query)));
@@ -822,7 +830,7 @@ function renderNewsPage(): string {
     <section class="page-head"><div><span class="eyebrow">LIVE DATA DESK</span><h1>游戏资讯</h1><p>官方静态资料与可验证的海克斯大乱斗选取率。</p></div><div><div class="data-freshness"><span class="connection-dot ${newsMeta.source === "unavailable" ? "status-error" : "status-ready"}"></span><span>${escapeHtml(newsSourceLabel())}</span></div><button class="secondary-button news-refresh" data-action="news-refresh" ${dashboardLoading ? "disabled" : ""}>${icon("refresh-ccw", 15)}刷新数据</button></div></section>
     ${loadingNotice}
     ${renderNewsWarning()}
-    <div class="news-tabs"><button class="news-tab ${newsTab === "champions" ? "news-tab--active" : ""}" data-news-tab="champions">${icon("swords", 16)}英雄数据</button><button class="news-tab ${newsTab === "augments" ? "news-tab--active" : ""}" data-news-tab="augments">${icon("sparkles", 16)}海克斯大乱斗符文</button></div>
+    ${renderNewsTabs()}
     <section class="news-toolbar"><label class="search-box news-search">${icon("search", 15)}<input type="search" maxlength="40" value="${escapeHtml(newsQuery)}" placeholder="搜索${newsTab === "champions" ? "英雄" : "符文"}" aria-label="搜索资讯" data-news-search /></label>${newsTab === "champions" ? `<div class="segmented role-segmented">${roleOptions.map((role) => `<button class="segment ${championRole === role ? "segment--active" : ""}" data-role="${role}">${role}</button>`).join("")}</div>` : `<span class="filter-caption">海克斯大乱斗 · 游戏资源与公开统计</span>`}</section>
     ${newsTab === "champions" ? `<section class="news-summary-row"><article><span>官方英雄资料</span><strong>${championStats.length || "—"}</strong><small>${newsMeta.officialSource || "暂无"}</small></article><article><span>英雄选取率</span><strong>${championStats.filter((item) => item.pickRate !== null).length || "—"}</strong><small>${newsMeta.statsSource ? "第三方有限样本" : "官方未提供"}</small></article><article><span>胜率</span><strong>未提供</strong><small>官方接口未开放</small></article></section><section class="news-table-panel"><div class="news-table news-table--champions"><div class="news-table-head"><span>#</span><span>英雄</span><span>位置</span><span>评级</span><span>胜率</span><span>登场率</span><span>趋势</span><span></span></div>${champions.length ? champions.map((champion, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion">${renderChampionIcon(champion.id, champion.name, champion.color)}<strong>${escapeHtml(champion.name)}<small>KDA ${champion.kda === null ? "官方未提供" : champion.kda.toFixed(1)}</small></strong></span><span>${escapeHtml(champion.role)}</span><span class="tier tier--${champion.tier.replace("+", "plus")}">${escapeHtml(champion.tier)}</span><span class="stat-strong">${newsPercent(champion.winRate)}</span><span>${newsPercent(champion.pickRate)}</span><span class="trend trend--${champion.trend}">${champion.trend === "up" ? "↑" : champion.trend === "down" ? "↓" : "—"}</span><button class="icon-button table-arrow" data-news-detail="${champion.id}" aria-label="查看${escapeHtml(champion.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的英雄</span></div>`}</div></section>` : `<section class="news-summary-row"><article><span>可查海克斯</span><strong>${augmentStats.length || "—"}</strong><small>客户端与官网资源目录</small></article><article><span>最高选取率</span><strong>${newsPercent(availableAugmentRates.length ? Math.max(...availableAugmentRates) : null)}</strong><small>胜率官方未提供</small></article><article><span>组合推荐</span><strong>${augmentCombos.length || "—"}</strong><small>仅展示组合目录</small></article></section><section class="news-table-panel"><div class="news-table news-table--augments"><div class="news-table-head"><span>#</span><span>符文</span><span>评级</span><span>胜率</span><span>选择率</span><span>样本</span><span></span></div>${augments.length ? augments.map((augment, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion">${renderGameIcon(augment.name, augment.color, augment.iconPath, augment.iconUrl, "augment")}<strong>${escapeHtml(augment.name)}<small>${escapeHtml(augment.description || "暂无官方描述")}</small></strong></span><span class="tier tier--${augment.tier.replace("+", "plus")}">${escapeHtml(augment.tier)}</span><span class="stat-strong">${newsPercent(augment.winRate)}</span><span>${newsPercent(augment.pickRate)}</span><span>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</span><button class="icon-button table-arrow" data-news-detail="${escapeHtml(augment.id)}" aria-label="查看${escapeHtml(augment.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的符文</span></div>`}</div></section>`}${detail}`;
 }
@@ -864,6 +872,11 @@ function renderDashboardShell(): void {
 }
 
 function render(): void {
+  const previousHex = app.querySelector<HTMLElement>(".hex-detail");
+  const hexScroll = previousHex?.scrollTop ?? 0;
+  const hexInput = app.querySelector<HTMLInputElement>("[data-hex-search]:focus, [data-hex-rune-search]:focus");
+  const hexInputSelector = hexInput ? (hexInput.dataset.hexRuneSearch !== undefined ? "[data-hex-rune-search]" : "[data-hex-search]") : null;
+  const hexCursor = hexInput?.selectionStart ?? null;
   const previousContent = app.querySelector<HTMLElement>(".main-content");
   const scrollTop = previousContent?.scrollTop ?? 0;
   const previousPage = previousContent?.dataset.page;
@@ -877,6 +890,17 @@ function render(): void {
       content.scrollTop = scrollTop;
       if (restoreContentFocus) content.focus({ preventScroll: true });
     }
+  }
+  hextech.bind(app);
+  const currentHex = app.querySelector<HTMLElement>(".hex-detail");
+  if (currentHex) {
+    currentHex.scrollTop = hexScroll;
+    if (!previousHex) currentHex.querySelector<HTMLElement>("[data-hex-close]")?.focus({ preventScroll: true });
+  }
+  if (hexInputSelector) {
+    const input = app.querySelector<HTMLInputElement>(hexInputSelector);
+    input?.focus({ preventScroll: true });
+    if (hexCursor !== null) input?.setSelectionRange(hexCursor, hexCursor);
   }
   loadGameIcons();
 }
@@ -1131,6 +1155,7 @@ function wireEvents(): void {
     const route = element.dataset.route;
     if (route !== "profile" && route !== "assistant" && route !== "news" && route !== "settings") return;
     currentRoute = route;
+    if (route === "news" && newsTab === "hextech") void hextech.loadRanking();
     window.history.replaceState(null, "", `#${route}`);
     settingsOpen = false;
     render();
@@ -1138,9 +1163,11 @@ function wireEvents(): void {
   }));
   app.querySelectorAll<HTMLElement>("[data-news-tab]").forEach((element) => element.addEventListener("click", () => {
     const tab = element.dataset.newsTab;
-    if (tab !== "champions" && tab !== "augments") return;
+    if (tab !== "hextech" && tab !== "champions" && tab !== "augments") return;
     newsTab = tab;
+    newsDetailId = null;
     newsQuery = "";
+    if (tab === "hextech") void hextech.loadRanking();
     render();
   }));
   app.querySelectorAll<HTMLElement>("[data-role]").forEach((element) => element.addEventListener("click", () => {
@@ -1314,6 +1341,7 @@ async function bootstrap(): Promise<void> {
   loadLocalPreferences();
   render();
   void hydrateDashboardData();
+  if (currentRoute === "news") void hextech.loadRanking();
   if (!isTauri) {
     void hydrateProfileData();
     return;
@@ -1361,6 +1389,7 @@ app.addEventListener("scroll", () => {
   });
 }, { capture: true, passive: true });
 window.addEventListener("keydown", (event) => {
+  if (hextech.isOpen() && event.key !== "Escape") return;
   const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
   if ((event.key === "/" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f")) && !settingsOpen) {
     event.preventDefault();
@@ -1369,6 +1398,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (event.key.toLowerCase() === "r" && !event.ctrlKey && !event.metaKey && !typing && !settingsOpen) void applyRandom();
   if (event.key === "Escape") {
+    if (hextech.closeDetail()) return;
     if (settingsOpen) {
       settingsOpen = false;
       render();

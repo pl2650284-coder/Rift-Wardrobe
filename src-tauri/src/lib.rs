@@ -1,5 +1,6 @@
 mod discovery;
 mod game_assets;
+mod hextech;
 mod lcu;
 mod models;
 mod official_data;
@@ -33,6 +34,16 @@ async fn get_news_data(state: State<'_, RuntimeState>) -> Result<NewsDataSnapsho
         official_data::attach_client_augment_assets(&mut news, &catalog);
     }
     Ok(news)
+}
+
+#[tauri::command]
+async fn get_hextech_ranking(force: Option<bool>) -> Result<hextech::Ranking, String> {
+    hextech::get_ranking(force.unwrap_or(false)).await
+}
+
+#[tauri::command]
+async fn get_hextech_detail(hero_id: u32, force: Option<bool>) -> Result<hextech::Detail, String> {
+    hextech::get_detail(hero_id, force.unwrap_or(false)).await
 }
 
 #[tauri::command]
@@ -239,6 +250,8 @@ pub fn run() {
             get_snapshot,
             get_profile,
             get_news_data,
+            get_hextech_ranking,
+            get_hextech_detail,
             get_game_icon,
             reconnect_client,
             apply_skin,

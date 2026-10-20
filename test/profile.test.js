@@ -199,6 +199,7 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./data/mock": { DEFAULT_PREFERENCES },
     "./services/mock": { getChampionStats: async () => [], getAugmentStats: async () => [], getAssistantLogs: async () => [] },
     "./services/profile": { getProfileSummary: async () => { reads += 1; return read(); } },
+    "./hextech-view": evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: async () => { throw new Error("Unexpected hextech call"); } } }),
     "./styles.css": {},
   }, { window, document });
   return { app, testing: result.testing, nativeCalls, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };

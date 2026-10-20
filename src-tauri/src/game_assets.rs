@@ -15,16 +15,22 @@ fn allowed_icon_url(url: &str) -> bool {
         && url.port().is_none()
         && url.query().is_none()
         && url.fragment().is_none()
-        && ["/images/lol/act/img/champion/", "/images/lol/act/img/rune/"]
-            .iter()
-            .any(|prefix| {
-                url.path().strip_prefix(prefix).is_some_and(|file| {
-                    file.ends_with(".png")
-                        && file
-                            .bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
-                })
+        && [
+            "/images/lol/act/img/champion/",
+            "/images/lol/act/img/rune/",
+            "/images/lol/act/img/item/",
+            "/images/lol/act/img/spell/",
+            "/images/lol/act/img/passive/",
+        ]
+        .iter()
+        .any(|prefix| {
+            url.path().strip_prefix(prefix).is_some_and(|file| {
+                file.ends_with(".png")
+                    && file
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
             })
+        })
 }
 
 pub async fn fetch_official_icon(url: &str) -> Result<String, String> {
@@ -73,6 +79,13 @@ mod tests {
         assert!(allowed_icon_url(
             "https://game.gtimg.cn/images/lol/act/img/rune/recursion_small.png"
         ));
+        for url in [
+            "https://game.gtimg.cn/images/lol/act/img/item/3161.png",
+            "https://game.gtimg.cn/images/lol/act/img/spell/HecarimRapidSlash.png",
+            "https://game.gtimg.cn/images/lol/act/img/passive/Hecarim_Passive.png",
+        ] {
+            assert!(allowed_icon_url(url), "{url}");
+        }
         for url in [
             "http://game.gtimg.cn/images/lol/act/img/rune/a.png",
             "https://example.com/images/lol/act/img/rune/a.png",

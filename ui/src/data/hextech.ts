@@ -1,0 +1,11 @@
+export type HexAsset = { id: number; name: string; description: string; iconPath: string | null; iconUrl: string | null };
+export type HexHero = HexAsset & { title: string; roles: string[]; rank: number; tier: string; winRate: number; pickRate: number; pickChange: number | null };
+export type HexRanking = { statsDate: string; heroes: HexHero[]; warnings: string[] };
+export type HexRune = HexAsset & { quality: string; strength: string | null; rank: number; pickRate: number };
+export type HexPlan = { id: string; order: string[]; pickRate: number; winRate: number };
+export type HexPriority = HexPlan & { plans: HexPlan[] };
+export type HexEquipment = { id: number; items: HexAsset[]; pickRate: number; winRate: number };
+export type HexEquipmentSection = { key: string; title: string; rows: HexEquipment[] };
+export type HexPartner = { hero: HexAsset; title: string; roles: string[]; rank: number; pickRate: number; winRate: number };
+export type HexSpell = HexAsset & { key: string };
+export type HexDetail = { heroId: number; statsDate: string; hero: HexHero | null; spells: HexSpell[]; runes: HexRune[]; skills: HexPriority[]; equipment: HexEquipmentSection[]; partners: HexPartner[]; warnings: string[] };
