@@ -190,6 +190,19 @@ h1 { margin-top: 8px; color: var(--text); font-size: 32px; font-weight: 700; let
 @media (max-width: 760px) { .news-mode-header { gap: 14px; }.news-mode-tab { padding-inline: 12px; } }
 
 /* Official Hextech ARAM rankings and hero builds. */
+.ranking-settings { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+.ranking-select { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--font-small); }
+.ranking-select select { min-width: 136px; min-height: 38px; padding: 7px 30px 7px 12px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); background: var(--surface); font: inherit; }
+.ranking-select select:disabled { opacity: .6; }
+.ranking-positions { display: flex; flex-wrap: wrap; width: fit-content; margin-bottom: 16px; }
+.ranking-table { min-width: 500px; }
+.ranking-table--rift { min-width: 840px; }
+.ranking-table th:nth-child(2), .ranking-table td:nth-child(2) { text-align: left; }
+.ranking-table td:nth-child(2) { min-width: 170px; }
+.ranking-counters { display: flex; justify-content: flex-end; gap: 7px; }
+.ranking-counter-icon { width: 25px; height: 25px; flex-basis: 25px; font-size: var(--font-caption); }
+.ranking-change { display: block; margin-top: 5px; font-size: var(--font-caption); }
+.official-ranking .empty-state { gap: 16px; }
 .hex-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
 .hex-table { width: 100%; border-collapse: collapse; color: var(--text); font-size: var(--font-small); text-align: left; }
 .hex-table th { padding: 12px 18px; color: var(--muted); background: var(--surface-raised); font-weight: 500; white-space: nowrap; }

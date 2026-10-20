@@ -11,6 +11,7 @@ use tokio::sync::Mutex;
 const API: &str = "https://mlol.qt.qq.com/go/battle_info/odp_proxy/";
 const CDN: &str = "https://game.gtimg.cn/images/lol/act/img/";
 const TTL: Duration = Duration::from_secs(15 * 60);
+const RANK_PENDING: &str = "官网尚未发布该日英雄榜";
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,7 +149,7 @@ fn http() -> &'static Client {
             .expect("create official stats client")
     })
 }
-async fn fetch(url: impl AsRef<str>) -> Result<Value, String> {
+pub(crate) async fn fetch(url: impl AsRef<str>) -> Result<Value, String> {
     http()
         .get(url.as_ref())
         .header("Referer", "https://101.qq.com/")
@@ -352,7 +353,7 @@ fn parse_ranking(
         .get("listcollect")
         .and_then(Value::as_str)
         .filter(|s| !s.is_empty())
-        .ok_or("官网尚未发布该日英雄榜")?;
+        .ok_or(RANK_PENDING)?;
     let mut heroes = vec![];
     for row in packed.split('#').filter(|r| !r.is_empty()) {
         let p: Vec<_> = row.split('_').collect();
@@ -417,7 +418,8 @@ async fn ranking_for(date: &str, catalog: &Catalog, force: bool) -> Result<Ranki
             return Ok(r);
         }
     }
-    let raw = api("fuwen_aram_hero_rank_v2", &format!("dtstatdate={date}")).await?;
+    let outer = fetch(format!("{API}fuwen_aram_hero_rank_v2?dtstatdate={date}")).await?;
+    let raw = ranking_payload(&outer)?;
     let result = parse_ranking(&raw, catalog, date, None)?;
     let mut cache = cache().lock().await;
     if cache.ranks.len() >= 4 {
@@ -434,7 +436,7 @@ async fn ranking_for(date: &str, catalog: &Catalog, force: bool) -> Result<Ranki
     }
     Ok(result)
 }
-fn date_ago(days: i64) -> String {
+pub(crate) fn date_ago(days: i64) -> String {
     // Gregorian civil date from Unix days, using the site's China time zone.
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -455,16 +457,57 @@ fn date_from_days(days: i64) -> String {
     y += if m <= 2 { 1 } else { 0 };
     format!("{y:04}{m:02}{d:02}")
 }
+fn ranking_payload(outer: &Value) -> Result<Value, String> {
+    if outer.get("code").and_then(Value::as_i64) == Some(0)
+        && outer
+            .pointer("/data/result")
+            .and_then(Value::as_str)
+            .is_some_and(|s| s.trim().is_empty())
+    {
+        return Err(RANK_PENDING.into());
+    }
+    unpack(outer)
+}
+fn previous_date(date: &str) -> Option<String> {
+    if date.len() != 8 || !date.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let mut year = date[..4].parse::<i64>().ok()?;
+    let month = date[4..6].parse::<i64>().ok()?;
+    let day = date[6..].parse::<i64>().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    year -= if month <= 2 { 1 } else { 0 };
+    let era = year.div_euclid(400);
+    let yoe = year - era * 400;
+    let mp = month + if month > 2 { -3 } else { 9 };
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
+    (date_from_days(days) == date).then(|| date_from_days(days - 1))
+}
 pub async fn get_ranking(force: bool) -> Result<Ranking, String> {
     let catalog = catalog(force).await?;
-    let date = date_ago(1);
-    let previous_date = date_ago(2);
-    let (current, previous) = tokio::join!(
-        ranking_for(&date, &catalog, force),
-        ranking_for(&previous_date, &catalog, force)
-    );
-    let mut current = current?;
-    match previous {
+    let mut latest = None;
+    // Empty results at midnight mean unpublished data, not a transport failure.
+    for days_ago in 1..=5 {
+        match ranking_for(&date_ago(days_ago), &catalog, force).await {
+            Ok(current) => {
+                latest = Some((current, days_ago));
+                break;
+            }
+            Err(error) if error == RANK_PENDING => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    let (mut current, days_ago) = latest.ok_or(RANK_PENDING)?;
+    if days_ago > 1 {
+        current.warnings.push(format!(
+            "最新统计尚未发布，已读取最近可用统计日 {}",
+            current.stats_date
+        ));
+    }
+    match ranking_for(&date_ago(days_ago + 1), &catalog, force).await {
         Ok(prev) => {
             for h in &mut current.heroes {
                 h.pick_change = prev
@@ -729,7 +772,7 @@ pub async fn get_detail(hero_id: u32, force: bool) -> Result<Detail, String> {
     );
     let catalog = catalog?;
     let mut detail = parse_detail(&raw?, hero_id, &catalog)?;
-    let previous_date = date_ago(2);
+    let previous_date = previous_date(&detail.stats_date).ok_or("官网统计日期无效")?;
     let (rank, prev) = tokio::join!(
         ranking_for(&detail.stats_date, &catalog, force),
         ranking_for(&previous_date, &catalog, false)
@@ -739,7 +782,7 @@ pub async fn get_detail(hero_id: u32, force: bool) -> Result<Detail, String> {
             detail.hero = rank.heroes.into_iter().find(|h| h.asset.id == hero_id);
             if let Some(hero) = detail.hero.as_mut() {
                 if let Ok(prev) = prev {
-                    if prev.stats_date == date_ago(2) && detail.stats_date == date_ago(1) {
+                    if prev.stats_date == previous_date {
                         hero.pick_change = prev
                             .heroes
                             .iter()
@@ -913,6 +956,27 @@ mod tests {
         assert!(fraction("-1").is_err());
         assert!(unpack(&serde_json::json!({"code":1,"data":{"result":"{}"}})).is_err());
         assert!(unpack(&serde_json::json!({"code":0,"data":{"result":"broken"}})).is_err());
+    }
+    #[test]
+    fn preceding_statistics_day_uses_the_response_date_across_midnight_and_leap_years() {
+        assert_eq!(previous_date("20261019").as_deref(), Some("20261018"));
+        assert_eq!(previous_date("20260301").as_deref(), Some("20260228"));
+        assert_eq!(previous_date("20240301").as_deref(), Some("20240229"));
+        assert_eq!(previous_date("20260101").as_deref(), Some("20251231"));
+        assert!(previous_date("20260230").is_none());
+        assert!(previous_date("invalid").is_none());
+        assert_eq!(
+            ranking_payload(&serde_json::json!({"code":0,"data":{"result":""}})).unwrap_err(),
+            RANK_PENDING
+        );
+        assert_ne!(
+            ranking_payload(&serde_json::json!({"code":1,"data":{"result":""}})).unwrap_err(),
+            RANK_PENDING
+        );
+        assert_ne!(
+            ranking_payload(&serde_json::json!({"code":0,"data":{"result":"broken"}})).unwrap_err(),
+            RANK_PENDING
+        );
     }
     #[tokio::test]
     #[ignore = "requires Tencent official APIs"]

@@ -49,6 +49,7 @@ import type { AppPreferences, AssistantLog, AugmentStat, ChampionStat, NewsDataM
 import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
 import { getProfileSummary } from "./services/profile";
 import { createHextechView } from "./hextech-view";
+import { createRankingsView } from "./rankings-view";
 import "./styles.css";
 
 type ConnectionState = "disconnected" | "ready";
@@ -227,6 +228,7 @@ let dashboardLoading = true;
 let logsOpen = false;
 let newsDetailId: string | null = null;
 const hextech = createHextechView({ isNative: isTauri, render, escape: escapeHtml, icon, image: renderGameIcon });
+const rankings = createRankingsView({ isNative: isTauri, activeMode: () => newsMode, render, escape: escapeHtml, icon, image: renderGameIcon });
 let autoAccept = DEFAULT_PREFERENCES.autoAccept;
 let autoSkin = DEFAULT_PREFERENCES.autoSkin;
 let notifyEnabled = DEFAULT_PREFERENCES.notify;
@@ -828,11 +830,19 @@ function selectNewsMode(mode: string): void {
   newsQuery = "";
   championRole = "全部";
   if (!hextech.closeDetail()) render();
-  if (newsMode === "hextech") void hextech.loadRanking();
+  loadNewsRanking();
+}
+
+function loadNewsRanking(): void {
+  if (newsMode === "hextech") {
+    if (newsTab === "ranking") void hextech.loadRanking();
+  } else {
+    void rankings.load(newsMode);
+  }
 }
 
 function renderNewsPage(): string {
-  if (newsMode !== "hextech") return `${renderNewsTabs()}<section class="news-mode-empty news-table-panel">${icon("bar-chart-3", 28)}<h2>${NEWS_MODES[newsMode]} · 英雄榜</h2><p>该模式的官方榜单尚未接入。</p><button class="secondary-button" data-news-mode="hextech">查看海克斯大乱斗榜单 ${icon("chevron-right", 15)}</button></section>`;
+  if (newsMode !== "hextech") return rankings.renderPage(newsMode, renderNewsTabs());
   if (newsTab === "ranking") return hextech.renderPage(renderNewsTabs());
   const roleOptions: ChampionRole[] = ["全部", "上路", "打野", "中路", "下路", "辅助"];
   const query = newsQuery.trim().toLocaleLowerCase("zh-CN");
@@ -891,8 +901,8 @@ function renderDashboardShell(): void {
 function render(): void {
   const previousHex = app.querySelector<HTMLElement>(".hex-detail");
   const hexScroll = previousHex?.scrollTop ?? 0;
-  const hexInput = app.querySelector<HTMLInputElement>("[data-hex-search]:focus, [data-hex-rune-search]:focus");
-  const hexInputSelector = hexInput ? (hexInput.dataset.hexRuneSearch !== undefined ? "[data-hex-rune-search]" : "[data-hex-search]") : null;
+  const hexInput = app.querySelector<HTMLInputElement>("[data-hex-search]:focus, [data-hex-rune-search]:focus, [data-ranking-search]:focus");
+  const hexInputSelector = hexInput ? (hexInput.dataset.rankingSearch !== undefined ? "[data-ranking-search]" : hexInput.dataset.hexRuneSearch !== undefined ? "[data-hex-rune-search]" : "[data-hex-search]") : null;
   const hexCursor = hexInput?.selectionStart ?? null;
   const previousContent = app.querySelector<HTMLElement>(".main-content");
   const scrollTop = previousContent?.scrollTop ?? 0;
@@ -909,6 +919,7 @@ function render(): void {
     }
   }
   hextech.bind(app);
+  rankings.bind(app);
   const currentHex = app.querySelector<HTMLElement>(".hex-detail");
   if (currentHex) {
     currentHex.scrollTop = hexScroll;
@@ -1172,7 +1183,7 @@ function wireEvents(): void {
     const route = element.dataset.route;
     if (route !== "profile" && route !== "assistant" && route !== "news" && route !== "settings") return;
     currentRoute = route;
-    if (route === "news" && newsMode === "hextech" && newsTab === "ranking") void hextech.loadRanking();
+    if (route === "news") loadNewsRanking();
     window.history.replaceState(null, "", `#${route}`);
     settingsOpen = false;
     render();
@@ -1361,7 +1372,7 @@ async function bootstrap(): Promise<void> {
   loadLocalPreferences();
   render();
   void hydrateDashboardData();
-  if (currentRoute === "news" && newsMode === "hextech") void hextech.loadRanking();
+  if (currentRoute === "news") loadNewsRanking();
   if (!isTauri) {
     void hydrateProfileData();
     return;

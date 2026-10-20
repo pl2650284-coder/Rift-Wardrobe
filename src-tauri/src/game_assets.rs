@@ -21,6 +21,7 @@ fn allowed_icon_url(url: &str) -> bool {
             "/images/lol/act/img/item/",
             "/images/lol/act/img/spell/",
             "/images/lol/act/img/passive/",
+            "/images/lol/act/img/jade/championsHeadICON/",
         ]
         .iter()
         .any(|prefix| {
@@ -83,6 +84,7 @@ mod tests {
             "https://game.gtimg.cn/images/lol/act/img/item/3161.png",
             "https://game.gtimg.cn/images/lol/act/img/spell/HecarimRapidSlash.png",
             "https://game.gtimg.cn/images/lol/act/img/passive/Hecarim_Passive.png",
+            "https://game.gtimg.cn/images/lol/act/img/jade/championsHeadICON/60011.png",
         ] {
             assert!(allowed_icon_url(url), "{url}");
         }

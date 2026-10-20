@@ -176,7 +176,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); } } = {}) {
+function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); }, readRanking = async () => { throw new Error("Unexpected ranking call"); } } = {}) {
   const app = { innerHTML: "", dataset: {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
   const document = { querySelector: (selector) => selector === "#app" ? app : null, activeElement: null, hidden: false, addEventListener() {} };
   let snapshotListener;
@@ -201,6 +201,7 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./services/mock": { getChampionStats: async () => [], getAugmentStats: async () => [], getAssistantLogs: async () => [] },
     "./services/profile": { getProfileSummary: async () => { reads += 1; return read(); } },
     "./hextech-view": evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: readHextech } }),
+    "./rankings-view": evaluate(compile("../ui/src/rankings-view.ts"), { "@tauri-apps/api/core": { invoke: readRanking } }),
     "./styles.css": {},
   }, { window, document });
   return { app, testing: result.testing, nativeCalls, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };
@@ -221,10 +222,11 @@ test("ranking navigation starts with four modes and keeps late hextech data insi
   pending.resolve({ statsDate: "20261019", heroes: [], warnings: [] });
   await settle();
   const aram = ui.testing.renderNewsPage();
-  assert.match(aram, /极地大乱斗 · 英雄榜/);
+  assert.match(aram, /data-ranking-mode="aram"/);
+  assert.match(aram, /<span class="eyebrow">极地大乱斗<\/span>/);
   assert.doesNotMatch(aram, /hex-ranking|data-news-tab=/);
   ui.testing.selectNewsMode("classic");
-  assert.match(ui.testing.renderNewsPage(), /经典模式 · 英雄榜/);
+  assert.match(ui.testing.renderNewsPage(), /data-ranking-mode="classic"/);
   ui.testing.selectNewsMode("__proto__");
   assert.equal(ui.testing.state().newsMode, "classic");
 });

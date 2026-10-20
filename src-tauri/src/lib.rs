@@ -5,6 +5,7 @@ mod lcu;
 mod models;
 mod official_data;
 mod profile;
+mod rankings;
 mod runtime;
 
 use models::{AppSnapshot, ApplyResult};
@@ -44,6 +45,14 @@ async fn get_hextech_ranking(force: Option<bool>) -> Result<hextech::Ranking, St
 #[tauri::command]
 async fn get_hextech_detail(hero_id: u32, force: Option<bool>) -> Result<hextech::Detail, String> {
     hextech::get_detail(hero_id, force.unwrap_or(false)).await
+}
+
+#[tauri::command]
+async fn get_official_ranking(
+    query: rankings::Query,
+    force: Option<bool>,
+) -> Result<rankings::Snapshot, String> {
+    rankings::get_ranking(query, force.unwrap_or(false)).await
 }
 
 #[tauri::command]
@@ -252,6 +261,7 @@ pub fn run() {
             get_news_data,
             get_hextech_ranking,
             get_hextech_detail,
+            get_official_ranking,
             get_game_icon,
             reconnect_client,
             apply_skin,
