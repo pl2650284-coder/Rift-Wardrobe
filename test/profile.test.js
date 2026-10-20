@@ -160,7 +160,8 @@ test("native profile failure is surfaced without falling back to a demo account"
 
 const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   receiveSnapshot, hydrateProfileData, reconnectClient, refreshProfileIfNeeded, renderSettingsPage,
-  state: () => ({ snapshot, profileData, profileLoading, profileError }),
+  renderNewsPage, selectNewsMode,
+  state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -175,7 +176,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {} } = {}) {
+function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); } } = {}) {
   const app = { innerHTML: "", dataset: {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
   const document = { querySelector: (selector) => selector === "#app" ? app : null, activeElement: null, hidden: false, addEventListener() {} };
   let snapshotListener;
@@ -199,11 +200,34 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./data/mock": { DEFAULT_PREFERENCES },
     "./services/mock": { getChampionStats: async () => [], getAugmentStats: async () => [], getAssistantLogs: async () => [] },
     "./services/profile": { getProfileSummary: async () => { reads += 1; return read(); } },
-    "./hextech-view": evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: async () => { throw new Error("Unexpected hextech call"); } } }),
+    "./hextech-view": evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: readHextech } }),
     "./styles.css": {},
   }, { window, document });
   return { app, testing: result.testing, nativeCalls, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };
 }
+
+test("ranking navigation starts with four modes and keeps late hextech data inside its mode", async () => {
+  const pending = deferred();
+  const calls = [];
+  const ui = page({ readHextech: async (command) => { calls.push(command); return pending.promise; } });
+  const initialHtml = ui.testing.renderNewsPage();
+  assert.equal(ui.testing.state().newsMode, "rift");
+  assert.deepEqual([...initialHtml.matchAll(/role="tab" aria-selected="(?:true|false)" data-news-mode="([a-z]+)"/g)].map(match => match[1]), ["rift", "hextech", "aram", "classic"]);
+  assert.equal(calls.length, 0);
+  ui.testing.selectNewsMode("hextech");
+  assert.match(ui.testing.renderNewsPage(), /data-news-tab="ranking"/);
+  assert.deepEqual(calls, ["get_hextech_ranking"]);
+  ui.testing.selectNewsMode("aram");
+  pending.resolve({ statsDate: "20261019", heroes: [], warnings: [] });
+  await settle();
+  const aram = ui.testing.renderNewsPage();
+  assert.match(aram, /极地大乱斗 · 英雄榜/);
+  assert.doesNotMatch(aram, /hex-ranking|data-news-tab=/);
+  ui.testing.selectNewsMode("classic");
+  assert.match(ui.testing.renderNewsPage(), /经典模式 · 英雄榜/);
+  ui.testing.selectNewsMode("__proto__");
+  assert.equal(ui.testing.state().newsMode, "classic");
+});
 
 test("startup clears topmost state and ignores legacy enabled preferences", async () => {
   for (const storedPreferences of [{}, {

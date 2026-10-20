@@ -173,6 +173,22 @@ h1 { margin-top: 8px; color: var(--text); font-size: 32px; font-weight: 700; let
 @media (max-width: 900px) { .sidebar { width: 175px; flex-basis: 175px; }.main-content { padding-inline: 28px; }.main-content--dashboard { padding-inline: 28px; }.hero-panel { grid-template-columns: 1fr .82fr; }.hero-meta { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; gap: 28px; padding: 17px 0 0; border-top: 1px solid rgba(120, 151, 155, .18); border-left: 0; }.hero-panel { min-height: 300px; }.dashboard-grid, .dashboard-grid--lower { grid-template-columns: 1fr; }.profile-hero { flex-wrap: wrap; }.profile-rank { padding-left: 0; border-left: 0; }.rank-badge { margin-left: auto; } }
 @media (max-width: 760px) { body { min-width: 0; }.sidebar { width: 58px; flex-basis: 58px; padding-inline: 8px; }.sidebar .eyebrow, .nav-item span, .nav-item b, .nav-item kbd, .sidebar-foot { display: none; }.nav-item { justify-content: center; padding: 0; }.main-content, .main-content--dashboard { padding-inline: 19px; }.catalog-tools { align-items: stretch; flex-wrap: wrap; }.search-box { flex-basis: 100%; }.segmented { flex: 1; justify-content: center; }.hero-panel { padding-inline: 20px; }.content-foot { flex-direction: column; }.modal-backdrop { padding: 14px; }.settings-dialog { width: min(520px, calc(100vw - 28px)); }.settings-head, .settings-body, .settings-foot { padding-inline: 18px; } h1 { font-size: 27px; }.page-head { flex-direction: column; gap: 8px; }.page-head .secondary-button { margin-top: 0; }.profile-hero { padding: 19px; }.profile-identity { min-width: 0; }.rank-badge { margin-left: 0; }.metric-grid { gap: 8px; }.metric-card { padding: 13px; }.assist-control-grid { grid-template-columns: 1fr; }.assist-log { grid-column: auto; }.news-toolbar { align-items: stretch; flex-direction: column; }.news-search { width: 100%; }.news-table-panel { overflow-x: auto; }.news-table { min-width: 650px; }.news-summary-row { gap: 8px; }.news-summary-row article { padding-inline: 11px; }.news-summary-row small { display: block; margin: 4px 0 0; } }
 
+/* Ranking navigation: game mode first, then its data categories. */
+.news-mode-header { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.news-mode-header h1 { margin: 0; color: var(--warning); font-size: 30px; }
+.news-mode-tabs { display: flex; flex-wrap: wrap; border: 1px solid var(--line); }
+.news-mode-tab { min-height: 43px; padding: 0 17px; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font-size: var(--font-body); }
+.news-mode-tab:last-child { border-right: 0; }
+.news-mode-tab:hover { color: var(--text-bright); background: var(--surface-raised); }
+.news-mode-tab--active { position: relative; color: var(--warning); background: var(--surface); box-shadow: inset 0 0 0 1px var(--warning); }
+.news-mode-empty { display: flex; min-height: 270px; padding: 30px; align-items: center; justify-content: center; flex-direction: column; gap: 16px; text-align: center; }
+.news-mode-empty > svg { color: var(--warning); }
+.news-mode-empty h2 { font-size: 20px; color: var(--text-bright); }
+.news-mode-empty p { color: var(--muted); font-size: var(--font-body); }
+.news-mode-empty .secondary-button { margin-top: 4px; }
+.main-content[data-page="news"] .page-head h2 { margin: 8px 0 0; font-size: 24px; color: var(--text-bright); }
+@media (max-width: 760px) { .news-mode-header { gap: 14px; }.news-mode-tab { padding-inline: 12px; } }
+
 /* Official Hextech ARAM rankings and hero builds. */
 .hex-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
 .hex-table { width: 100%; border-collapse: collapse; color: var(--text); font-size: var(--font-small); text-align: left; }
