@@ -6,16 +6,22 @@ body { margin: 0; min-width: 760px; overflow: hidden; background: var(--bg); }
 button { border: 0; font: inherit; color: inherit; cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 .shell { height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(circle at 80% -10%, rgba(44, 100, 112, .14), transparent 38%), var(--bg); }
-.titlebar { height: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid #202a34; background: rgba(11, 15, 21, .94); user-select: none; cursor: grab; }
+.titlebar { height: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 0 0 24px; border-bottom: 1px solid #202a34; background: rgba(11, 15, 21, .94); user-select: none; cursor: grab; }
 .titlebar:active { cursor: grabbing; }
 .brand { display: flex; align-items: center; gap: 11px; cursor: pointer; }
 .brand-mark { width: 30px; height: 30px; display: block; border: 1px solid #2f6f64; border-radius: 7px; object-fit: cover; background: #12241f; }
 .brand strong { display: block; font-size: 15px; letter-spacing: .01em; }
 .brand span { display: block; margin-top: 2px; color: var(--muted); font: var(--font-caption) "DM Mono", monospace; letter-spacing: .13em; }
-.window-actions { display: flex; align-items: center; gap: 5px; }
+.window-actions { display: flex; align-self: flex-start; flex-shrink: 0; }
+.window-button { width: 46px; height: 40px; display: grid; place-items: center; padding: 0; border-radius: 0; background: transparent; color: var(--text); cursor: default; }
+.window-button svg { width: 12px; height: 12px; pointer-events: none; }
+.window-button:hover { background: rgba(128, 128, 128, .18); }
+.window-button:active { background: rgba(128, 128, 128, .28); }
+.window-button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -3px; }
+.window-button--close:hover { color: #ffffff; background: #c42b1c; }
+.window-button--close:active { color: #ffffff; background: #a52317; }
 .icon-button { width: 30px; height: 30px; display: grid; place-items: center; background: transparent; color: var(--muted); border-radius: 5px; }
 .icon-button:hover, .icon-button[data-active="true"] { color: var(--text); background: #1a2928; }
-.icon-button--close:hover { color: #ffb4ae; background: #302020; }
 .workspace { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .sidebar { width: 205px; flex: 0 0 205px; min-height: 0; display: flex; flex-direction: column; padding: 27px 14px 17px; border-right: 1px solid #202a34; background: #0e131b; }
 .sidebar-section { flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -151,7 +157,6 @@ h1 { margin-top: 8px; color: var(--text); font-size: 32px; font-weight: 700; let
 #app[data-theme="light"] .nav-item:hover { color: var(--text); background: var(--surface-muted); }
 #app[data-theme="light"] .nav-item--active { color: var(--accent); background: var(--accent-soft); }
 #app[data-theme="light"] .icon-button:hover, #app[data-theme="light"] .icon-button[data-active="true"] { color: var(--accent); background: var(--accent-soft); }
-#app[data-theme="light"] .icon-button--close:hover { color: var(--negative); background: #f8e5e3; }
 #app[data-theme="light"] .switch-input:not(:checked) + .switch-track { border-color: #97aaa4; background: #dce6e2; }
 #app[data-theme="light"] .switch-input:not(:checked) + .switch-track::after { background: #627871; }
 #app[data-theme="light"] .accent-swatch--active { border-color: var(--text); }

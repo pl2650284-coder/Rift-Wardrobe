@@ -23,9 +23,7 @@ import {
   LoaderCircle,
   Lock,
   Moon,
-  Minus,
   Palette,
-  Pin,
   Radio,
   RefreshCw,
   RefreshCcw,
@@ -85,8 +83,8 @@ type Snapshot = {
 
 type WindowApi = {
   minimize: () => Promise<void>;
+  maximize: () => Promise<void>;
   close: () => Promise<void>;
-  top: (enabled: boolean) => Promise<void>;
 };
 
 const demoSkins: Skin[] = [
@@ -136,9 +134,7 @@ const iconSet = {
   LoaderCircle,
   Lock,
   Moon,
-  Minus,
   Palette,
-  Pin,
   Radio,
   RefreshCw,
   RefreshCcw,
@@ -188,7 +184,6 @@ function isAppRoute(value: string): value is AppRoute {
 
 const FAVORITES_STORAGE_KEY = "lol-skin-assistant:favorites";
 const CATALOG_STATE_STORAGE_KEY = "lol-skin-assistant:catalog-state";
-const WINDOW_PREFERENCES_STORAGE_KEY = "lol-skin-assistant:window-preferences";
 const APP_PREFERENCES_STORAGE_KEY = "lol-skin-assistant:app-preferences";
 
 let activeFilter: CatalogFilter = "可用";
@@ -197,7 +192,7 @@ let favoriteSkinIds = new Set<number>();
 let selectedSkinId = snapshot.selectedSkinId;
 let previewOnlySelectionId: number | null = null;
 let busy = false;
-let alwaysOnTop = false;
+let windowMaximized = false;
 let launchAtStartup = false;
 let settingsOpen = false;
 let settingsBusy = false;
@@ -238,6 +233,7 @@ let toastTimer: number | undefined;
 let toastMessage: string | null = null;
 let toastKind: "info" | "error" = "info";
 let cleanupListener: UnlistenFn | undefined;
+let cleanupWindowResize: UnlistenFn | undefined;
 const imageCache = new Map<string, string>();
 const MAX_IMAGE_CACHE_ENTRIES = 24;
 const imageRequests = new Set<string>();
@@ -251,13 +247,16 @@ const app: HTMLDivElement = appRoot;
 
 const windowApi: WindowApi = {
   minimize: async () => {
-    if (isTauri) await getCurrentWindow().minimize();
+    if (isTauri) await invoke("minimize_main_window");
+  },
+  maximize: async () => {
+    if (isTauri) {
+      await getCurrentWindow().toggleMaximize();
+      await syncWindowMaximized();
+    }
   },
   close: async () => {
     if (isTauri) await invoke("hide_main_window");
-  },
-  top: async (enabled: boolean) => {
-    if (isTauri) await invoke("set_always_on_top", { enabled });
   },
 };
 
@@ -290,14 +289,6 @@ function persistFavorites(): void {
   }
 }
 
-function persistWindowPreferences(): void {
-  try {
-    window.localStorage.setItem(WINDOW_PREFERENCES_STORAGE_KEY, JSON.stringify({ alwaysOnTop }));
-  } catch {
-    // Local storage is optional; the native state still applies for this session.
-  }
-}
-
 function currentPreferences(): AppPreferences {
   return {
     themeMode,
@@ -305,7 +296,6 @@ function currentPreferences(): AppPreferences {
     compactMode,
     animations: animationsEnabled,
     launchAtStartup,
-    alwaysOnTop,
     autoAccept,
     autoSkin,
     notify: notifyEnabled,
@@ -423,11 +413,6 @@ function loadLocalPreferences(): void {
       activeFilter = state.activeFilter;
     }
     if (typeof state.searchQuery === "string") searchQuery = state.searchQuery.slice(0, 80);
-  }
-  const windowPreferences = readLocalStorage<unknown>(WINDOW_PREFERENCES_STORAGE_KEY, {});
-  if (windowPreferences && typeof windowPreferences === "object") {
-    const preferences = windowPreferences as { alwaysOnTop?: unknown };
-    if (typeof preferences.alwaysOnTop === "boolean") alwaysOnTop = preferences.alwaysOnTop;
   }
   const storedPreferences = readLocalStorage<unknown>(APP_PREFERENCES_STORAGE_KEY, {});
   if (storedPreferences && typeof storedPreferences === "object") {
@@ -563,11 +548,6 @@ function renderSettingsDialog(): string {
             <input class="switch-input" type="checkbox" data-setting="launch-at-startup" ${launchAtStartup ? "checked" : ""} ${settingsBusy ? "disabled" : ""} />
             <span class="switch-track" aria-hidden="true"></span>
           </label>
-          <label class="setting-row">
-            <span><strong>窗口保持置顶</strong><small>选人时让助手显示在其他窗口上方</small></span>
-            <input class="switch-input" type="checkbox" data-setting="always-on-top" ${alwaysOnTop ? "checked" : ""} ${settingsBusy ? "disabled" : ""} />
-            <span class="switch-track" aria-hidden="true"></span>
-          </label>
           <div class="setting-row setting-row--button">
             <span><strong>图片内存缓存</strong><small>清除后会从客户端重新加载当前皮肤图片</small></span>
             <button class="secondary-button" data-action="clear-image-cache">清除缓存</button>
@@ -576,6 +556,44 @@ function renderSettingsDialog(): string {
         <footer class="settings-foot"><span>收藏、筛选和搜索条件保存在本机</span><button class="primary-button" data-action="close-settings">完成</button></footer>
       </section>
     </div>`;
+}
+
+function renderWindowActions(): string {
+  return `<div class="window-actions">
+    <button class="window-button" title="最小化" aria-label="最小化" data-action="minimize"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6.5h10" fill="none" stroke="currentColor" /></svg></button>
+    <button class="window-button" title="${windowMaximized ? "还原" : "最大化"}" aria-label="${windowMaximized ? "还原" : "最大化"}" data-action="maximize">${maximizeIcon()}</button>
+    <button class="window-button window-button--close" title="关闭（隐藏到托盘）" aria-label="关闭" data-action="close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m1.5 1.5 9 9m0-9-9 9" fill="none" stroke="currentColor" /></svg></button>
+  </div>`;
+}
+
+function maximizeIcon(): string {
+  return `<svg viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1">${windowMaximized
+    ? '<path d="M3.5 3.5V1.5h7v7h-2"/><path d="M1.5 3.5h7v7h-7z"/>'
+    : '<path d="M1.5 1.5h9v9h-9z"/>'}</svg>`;
+}
+
+async function syncWindowMaximized(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    windowMaximized = await getCurrentWindow().isMaximized();
+    const button = app.querySelector<HTMLButtonElement>('[data-action="maximize"]');
+    if (button) {
+      button.title = windowMaximized ? "还原" : "最大化";
+      button.setAttribute("aria-label", button.title);
+      button.innerHTML = maximizeIcon();
+    }
+  } catch (error) {
+    console.error("Failed to read window maximized state", error);
+  }
+}
+
+async function runWindowAction(action: "minimize" | "maximize" | "close"): Promise<void> {
+  try {
+    await windowApi[action]();
+  } catch (error) {
+    console.error(`Failed to ${action} window`, error);
+    showToast("窗口操作失败，请重试", "error");
+  }
 }
 
 function renderSkinWorkspace(): void {
@@ -596,11 +614,7 @@ function renderSkinWorkspace(): void {
           <img class="brand-mark" src="/app-mark.svg" alt="" />
           <div><strong>峡谷换肤助手</strong><span>SKIN SELECTOR</span></div>
         </div>
-        <div class="window-actions">
-          <button class="icon-button" title="置顶窗口" aria-label="置顶窗口" data-action="top" data-active="${alwaysOnTop}">${icon("pin", 16)}</button>
-          <button class="icon-button" title="最小化" aria-label="最小化" data-action="minimize">${icon("minus", 17)}</button>
-          <button class="icon-button icon-button--close" title="隐藏窗口" aria-label="隐藏窗口" data-action="close">${icon("x", 17)}</button>
-        </div>
+        ${renderWindowActions()}
       </header>
 
       <div class="workspace">
@@ -777,7 +791,7 @@ function renderSettingsPage(): string {
   const colors = ["mint", "blue", "gold", "rose"];
   return `
     <section class="page-head"><div><span class="eyebrow">APP CONTROL CENTER</span><h1>应用设置</h1><p>调整外观、自动化行为和本地数据偏好。</p></div><span class="settings-saved">${icon("check-circle-2", 14)}设置自动保存</span></section>
-    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("alwaysOnTop", "窗口置顶", "让辅助窗口保持在游戏客户端上方", alwaysOnTop)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>游戏资讯优先读取 Riot Data Dragon；海克斯大乱斗选取率会标注第三方有限样本，官方未提供的胜率不会显示。</p></div></div></article></div></section>`;
+    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>游戏资讯优先读取 Riot Data Dragon；海克斯大乱斗选取率会标注第三方有限样本，官方未提供的胜率不会显示。</p></div></div></article></div></section>`;
 }
 
 function renderDashboardShell(): void {
@@ -785,7 +799,7 @@ function renderDashboardShell(): void {
   const content = currentRoute === "profile" ? renderProfilePage() : currentRoute === "news" ? renderNewsPage() : renderSettingsPage();
   app.innerHTML = `
     <div class="shell">
-      <header class="titlebar"><div class="brand" data-route="profile"><img class="brand-mark" src="/app-mark.svg" alt="" /><div><strong>峡谷换肤助手</strong><span>SUMMONER DESK · ${routeTitle.toUpperCase()}</span></div></div><div class="window-actions"><button class="icon-button" title="置顶窗口" aria-label="置顶窗口" data-action="top" data-active="${alwaysOnTop}">${icon("pin", 16)}</button><button class="icon-button" title="最小化" aria-label="最小化" data-action="minimize">${icon("minus", 17)}</button><button class="icon-button icon-button--close" title="隐藏窗口" aria-label="隐藏窗口" data-action="close">${icon("x", 17)}</button></div></header>
+      <header class="titlebar"><div class="brand" data-route="profile"><img class="brand-mark" src="/app-mark.svg" alt="" /><div><strong>峡谷换肤助手</strong><span>SUMMONER DESK · ${routeTitle.toUpperCase()}</span></div></div>${renderWindowActions()}</header>
       <div class="workspace"><aside class="sidebar"><div class="sidebar-section"><span class="eyebrow">WORKSPACE</span><button class="nav-item ${currentRoute === "profile" ? "nav-item--active" : ""}" data-route="profile">${icon("circle-user", 17)}<span>个人信息</span></button><button class="nav-item ${currentRoute === "assistant" ? "nav-item--active" : ""}" data-route="assistant">${icon("gamepad-2", 17)}<span>游戏辅助</span><b>${snapshot.skins.length}</b></button><button class="nav-item ${currentRoute === "news" ? "nav-item--active" : ""}" data-route="news">${icon("book-open", 17)}<span>游戏资讯</span></button></div><div class="sidebar-section sidebar-section--bottom"><span class="eyebrow">SYSTEM</span><button class="nav-item" data-action="refresh">${icon("refresh-cw", 17)}<span>重新连接</span></button><button class="nav-item ${currentRoute === "settings" ? "nav-item--active" : ""}" data-route="settings">${icon("settings-2", 17)}<span>应用设置</span></button></div><div class="sidebar-foot"><span class="version-dot"></span><span>v0.3 · 本地运行</span></div></aside><main class="main-content main-content--dashboard" data-page="${currentRoute}" tabindex="0" aria-label="${routeTitle}内容">${content}</main></div><div id="toast" class="toast ${toastMessage ? "toast--visible" : ""}" data-kind="${toastKind}" aria-live="polite">${toastMessage ? escapeHtml(toastMessage) : ""}</div>
     </div>`;
   wireEvents();
@@ -999,24 +1013,6 @@ async function clearImageCache(): Promise<void> {
   showToast("图片缓存已清除，正在重新加载");
 }
 
-async function updateAlwaysOnTop(enabled: boolean): Promise<void> {
-  if (settingsBusy) return;
-  settingsBusy = true;
-  render();
-  try {
-    await windowApi.top(enabled);
-    alwaysOnTop = enabled;
-    persistWindowPreferences();
-    persistAppPreferences();
-    showToast(enabled ? "窗口已保持置顶" : "窗口已取消置顶");
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : "无法修改窗口置顶状态", "error");
-  } finally {
-    settingsBusy = false;
-    render();
-  }
-}
-
 async function updateLaunchAtStartup(enabled: boolean): Promise<void> {
   if (settingsBusy) return;
   settingsBusy = true;
@@ -1071,7 +1067,6 @@ function wireEvents(): void {
   }));
   app.querySelectorAll<HTMLInputElement>("[data-setting]").forEach((element) => element.addEventListener("change", () => {
     if (element.dataset.setting === "launch-at-startup") void updateLaunchAtStartup(element.checked);
-    if (element.dataset.setting === "always-on-top") void updateAlwaysOnTop(element.checked);
   }));
   app.querySelectorAll<HTMLElement>("[data-route]").forEach((element) => element.addEventListener("click", () => {
     const route = element.dataset.route;
@@ -1109,7 +1104,6 @@ function wireEvents(): void {
     if (key === "autoAccept") autoAccept = input.checked;
     if (key === "autoSkin") autoSkin = input.checked;
     if (key === "notify") notifyEnabled = input.checked;
-    if (key === "alwaysOnTop") void updateAlwaysOnTop(input.checked);
     if (key === "launchAtStartup") void updateLaunchAtStartup(input.checked);
     if (key === "compact") compactMode = input.checked;
     if (key === "animations") animationsEnabled = input.checked;
@@ -1136,9 +1130,7 @@ function wireEvents(): void {
     if (action === "close-settings" && element.classList.contains("modal-backdrop") && event.target !== element) return;
     if (action === "apply" && selectedSkinId !== null) void applySkin(selectedSkinId);
     if (action === "random") void applyRandom();
-    if (action === "minimize") void windowApi.minimize();
-    if (action === "close") void windowApi.close();
-    if (action === "top") void updateAlwaysOnTop(!alwaysOnTop);
+    if (action === "minimize" || action === "maximize" || action === "close") void runWindowAction(action);
     if (action === "refresh") void reconnectClient();
     if (action === "news-refresh") void hydrateDashboardData(true);
     if (action === "settings") {
@@ -1219,18 +1211,16 @@ async function reconnectClient(): Promise<void> {
 async function hydrateNativePreferences(): Promise<void> {
   if (!isTauri) return;
   try {
+    // Clear native topmost state even if an older version enabled it.
+    await invokeCommand("disable_always_on_top", {});
+  } catch (error) {
+    console.error("Failed to disable always-on-top", error);
+    showToast("无法取消窗口置顶，请重启应用", "error");
+  }
+  try {
     launchAtStartup = await invokeCommand<boolean>("get_launch_at_startup", {});
   } catch (error) {
     console.error("Failed to read launch-at-startup preference", error);
-  }
-  if (alwaysOnTop) {
-    try {
-      await windowApi.top(true);
-    } catch (error) {
-      alwaysOnTop = false;
-      persistWindowPreferences();
-      console.error("Failed to restore always-on-top preference", error);
-    }
   }
   render();
 }
@@ -1270,6 +1260,12 @@ async function bootstrap(): Promise<void> {
   }
   void hydrateNativePreferences();
   try {
+    cleanupWindowResize = await getCurrentWindow().onResized(() => { void syncWindowMaximized(); });
+    await syncWindowMaximized();
+  } catch (error) {
+    console.error("Failed to listen for window resize", error);
+  }
+  try {
     // Listen first so a connection established during startup cannot be missed.
     cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => receiveSnapshot(event.payload));
     receiveSnapshot(await invokeCommand<Snapshot>("get_snapshot", {}));
@@ -1281,6 +1277,7 @@ async function bootstrap(): Promise<void> {
 
 window.addEventListener("beforeunload", () => {
   cleanupListener?.();
+  cleanupWindowResize?.();
   window.clearInterval(profileRefreshTimer);
 });
 window.addEventListener("focus", refreshProfileIfNeeded);
@@ -1310,7 +1307,7 @@ window.addEventListener("keydown", (event) => {
       persistCatalogState();
       render();
     } else {
-      void windowApi.close();
+      void runWindowAction("close");
     }
   }
 });

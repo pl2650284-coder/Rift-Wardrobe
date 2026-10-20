@@ -157,7 +157,7 @@ test("native profile failure is surfaced without falling back to a demo account"
 });
 
 const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
-  receiveSnapshot, hydrateProfileData, reconnectClient, refreshProfileIfNeeded,
+  receiveSnapshot, hydrateProfileData, reconnectClient, refreshProfileIfNeeded, renderSettingsPage,
   state: () => ({ snapshot, profileData, profileLoading, profileError }),
 };`;
 const disconnected = {
@@ -173,27 +173,52 @@ function deferred() {
   return { promise, resolve };
 }
 
-function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now) } = {}) {
+function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {} } = {}) {
   const app = { innerHTML: "", dataset: {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
   const document = { querySelector: (selector) => selector === "#app" ? app : null, activeElement: null, hidden: false, addEventListener() {} };
   let snapshotListener;
   let reads = 0;
+  const nativeCalls = [];
   const window = {
     __TAURI_INTERNALS__: {}, location: { hash: "#profile" }, history: { replaceState() {} },
-    localStorage: { getItem: () => null, setItem() {} }, addEventListener() {},
+    localStorage: { getItem: (key) => storedPreferences[key] ?? null, setItem() {} }, addEventListener() {},
     setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
   };
   const result = evaluate(pageCode, {
-    "@tauri-apps/api/core": { invoke: async (command) => command === "get_snapshot" ? await initial : false },
+    "@tauri-apps/api/core": { invoke: async (command, args) => {
+      nativeCalls.push({ command, args });
+      return command === "get_snapshot" ? await initial : false;
+    } },
     "@tauri-apps/api/event": { listen: async (_name, callback) => { snapshotListener = callback; return () => {}; } },
-    "@tauri-apps/api/window": {}, lucide: { createIcons() {} },
+    "@tauri-apps/api/window": { getCurrentWindow: () => ({
+      onResized: async () => () => {},
+      isMaximized: async () => false,
+    }) }, lucide: { createIcons() {} },
     "./data/mock": { DEFAULT_PREFERENCES },
     "./services/mock": { getChampionStats: async () => [], getAugmentStats: async () => [], getAssistantLogs: async () => [] },
     "./services/profile": { getProfileSummary: async () => { reads += 1; return read(); } },
     "./styles.css": {},
   }, { window, document });
-  return { app, testing: result.testing, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };
+  return { app, testing: result.testing, nativeCalls, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };
 }
+
+test("startup clears topmost state and ignores legacy enabled preferences", async () => {
+  for (const storedPreferences of [{}, {
+    "lol-skin-assistant:window-preferences": JSON.stringify({ alwaysOnTop: true }),
+    "lol-skin-assistant:app-preferences": JSON.stringify({ alwaysOnTop: true, themeMode: "light" }),
+  }]) {
+    const ui = page({ storedPreferences });
+    await settle();
+    assert.deepEqual(ui.nativeCalls.filter(({ command }) => /always_on_top/.test(command)), [
+      { command: "disable_always_on_top", args: {} },
+    ]);
+    assert.doesNotMatch(ui.testing.renderSettingsPage(), /置顶|alwaysOnTop/);
+    assert.match(ui.app.innerHTML, /data-action="minimize"/);
+    assert.match(ui.app.innerHTML, /data-action="maximize"/);
+    assert.match(ui.app.innerHTML, /data-action="close"/);
+    assert.doesNotMatch(ui.app.innerHTML, /data-action="top"/);
+  }
+});
 
 test("disconnected profile shows a waiting state and never requests a demo account", async () => {
   const ui = page();

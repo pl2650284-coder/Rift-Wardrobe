@@ -90,11 +90,37 @@ fn minimize_main_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn set_always_on_top(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
-    app.get_webview_window("main")
-        .ok_or_else(|| "找不到主窗口".to_string())?
-        .set_always_on_top(enabled)
-        .map_err(|error| error.to_string())
+fn disable_always_on_top(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "找不到主窗口".to_string())?;
+    window
+        .set_always_on_top(false)
+        .map_err(|error| error.to_string())?;
+
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_NOTOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        };
+
+        // Tao only updates Windows when its cached flag changes. Also clear the
+        // native state so a stale topmost flag cannot survive frontend reloads.
+        let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                Some(HWND_NOTOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+            )
+        }
+        .map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -198,7 +224,7 @@ pub fn run() {
             clear_image_cache,
             hide_main_window,
             minimize_main_window,
-            set_always_on_top,
+            disable_always_on_top,
             get_launch_at_startup,
             set_launch_at_startup,
         ])

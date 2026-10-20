@@ -6,7 +6,6 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   compactMode: false,
   animations: true,
   launchAtStartup: false,
-  alwaysOnTop: false,
   autoAccept: false,
   autoSkin: false,
   notify: true,

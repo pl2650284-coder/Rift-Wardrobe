@@ -120,7 +120,6 @@ export type AppPreferences = {
   compactMode: boolean;
   animations: boolean;
   launchAtStartup: boolean;
-  alwaysOnTop: boolean;
   autoAccept: boolean;
   autoSkin: boolean;
   notify: boolean;
