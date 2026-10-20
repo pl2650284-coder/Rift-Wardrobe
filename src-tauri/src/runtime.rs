@@ -117,6 +117,10 @@ impl RuntimeState {
         self.apply_skin(app, skin_id, expected_context_id).await
     }
 
+    pub async fn augment_catalog(&self) -> Option<serde_json::Value> {
+        self.client().await?.get_augment_catalog().await.ok()
+    }
+
     pub async fn image_data_url(&self, path: &str) -> Result<String, String> {
         if let Some(cached) = self.image_cache.read().await.get(path).cloned() {
             return Ok(cached);

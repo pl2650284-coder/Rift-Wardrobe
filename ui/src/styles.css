@@ -1,6 +1,10 @@
 :root { --accent: #a9e9c8; --accent-strong: #71cfaa; --accent-soft: #17302c; --accent-wash: rgba(121, 213, 177, .12); --bg: #0b0f15; --surface: #111820; --surface-raised: #151e27; --surface-muted: #0e151c; --line: #27343d; --line-soft: #202b33; --text: #e8edf4; --text-bright: #f0f4f7; --muted: #a0aeb8; --muted-2: #8d9da8; --positive: #a1e4c0; --warning: #e5c284; --negative: #e5a1a1; --info: #a9baf7; --pink: #e6acc6; --font-caption: 12px; --font-small: 13px; --font-body: 14px; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 14px; line-height: 1.5; color: var(--text); background: var(--bg); font-synthesis: none; text-rendering: optimizeLegibility; }
 * { box-sizing: border-box; scrollbar-width: none; }
 *::-webkit-scrollbar { display: none; }
+.game-icon { overflow: hidden; }
+.game-icon img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.augment-token.game-icon:has(img) { background: var(--surface-muted); }
+.augment-token.game-icon img { object-fit: contain; }
 html, body, #app { width: 100%; height: 100%; }
 body { margin: 0; min-width: 760px; overflow: hidden; background: var(--bg); }
 button { border: 0; font: inherit; color: inherit; cursor: pointer; }

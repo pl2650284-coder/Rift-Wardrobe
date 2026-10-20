@@ -58,6 +58,8 @@ test("profile summarizes the latest five matches, excludes remakes, and counts l
   assert.equal(result.source, "client");
   assert.equal(result.matchCount, 6);
   assert.equal(result.recentGames.length, 5);
+  assert.equal(result.recentGames[0].championId, 67);
+  assert.equal(result.topChampions[0].championId, 67);
   assert.equal(result.recentWinRate, 75);
   assert.equal(result.recentWinRateSampleSize, 4);
   assert.equal(result.assets.favorites, 7);
@@ -226,6 +228,13 @@ test("disconnected profile shows a waiting state and never requests a demo accou
   assert.equal(ui.reads(), 0);
   assert.match(ui.app.innerHTML, /等待英雄联盟客户端/);
   assert.doesNotMatch(ui.app.innerHTML, /薇恩玩家|正在加载召唤师数据/);
+});
+
+test("profile champion icons use numeric client IDs in recent games and most played", async () => {
+  const ui = page({ initial: connected, read: async () => summarizeProfile(profile([match("icon")]), 0, now) });
+  await settle();
+  const paths = [...ui.app.innerHTML.matchAll(/data-icon-path="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(paths.filter((path) => path === "/lol-game-data/assets/v1/champion-icons/67.png").length, 2);
 });
 
 test("startup subscribes before loading the snapshot and ignores older connection data", async () => {

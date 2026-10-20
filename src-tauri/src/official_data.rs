@@ -10,11 +10,14 @@ const DRAGON_CHAMPIONS_URL: &str =
 const MAYHEM_CHAMPIONS_URL: &str = "https://arammayhem.com/data/v1/latest/champions.json";
 const MAYHEM_AUGMENTS_URL: &str = "https://arammayhem.com/data/v1/latest/augments.json";
 const MAYHEM_COMBOS_URL: &str = "https://arammayhem.com/data/v1/latest/combos.json";
+const OFFICIAL_AUGMENTS_URL: &str = "https://game.gtimg.cn/images/lol/act/img/js/kiwi/kiwi_augments.json";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewsChampion {
     pub id: i64,
+    pub icon_path: String,
+    pub icon_url: String,
     #[serde(skip)]
     dragon_key: String,
     pub name: String,
@@ -34,6 +37,10 @@ pub struct NewsChampion {
 #[serde(rename_all = "camelCase")]
 pub struct NewsAugment {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
     pub name: String,
     pub description: String,
     pub win_rate: Option<f64>,
@@ -117,10 +124,11 @@ pub async fn get_news_data() -> Result<NewsDataSnapshot, String> {
     let mut combos = Vec::new();
     let mut stats_source = None;
 
-    let (mayhem_champions, mayhem_augments, mayhem_combos) = tokio::join!(
+    let (mayhem_champions, mayhem_augments, mayhem_combos, official_augments) = tokio::join!(
         fetch_json(&http, MAYHEM_CHAMPIONS_URL),
         fetch_json(&http, MAYHEM_AUGMENTS_URL),
         fetch_json(&http, MAYHEM_COMBOS_URL),
+        fetch_json(&http, OFFICIAL_AUGMENTS_URL),
     );
 
     match mayhem_champions {
@@ -144,13 +152,18 @@ pub async fn get_news_data() -> Result<NewsDataSnapshot, String> {
         Err(error) => warnings.push(format!("英雄与海克斯组合暂时无法读取: {error}")),
     }
 
-    let has_stats = !augments.is_empty()
+    if let Err(error) = &official_augments {
+        warnings.push(format!("官网海克斯资料暂时无法读取: {error}"));
+    }
+    merge_augment_assets(&mut augments, None, official_augments.as_ref().ok());
+
+    let has_stats = augments.iter().any(|augment| augment.pick_rate.is_some())
         || champions
             .iter()
             .any(|champion| champion.pick_rate.is_some());
     let source = if has_stats {
         "third-party"
-    } else if !champions.is_empty() {
+    } else if !champions.is_empty() || !augments.is_empty() {
         "official"
     } else {
         "unavailable"
@@ -206,6 +219,8 @@ fn parse_dragon_champions(value: &Value) -> Result<Vec<NewsChampion>, String> {
                 .unwrap_or_default();
             Some(NewsChampion {
                 id,
+                icon_path: format!("/lol-game-data/assets/v1/champion-icons/{id}.png"),
+                icon_url: format!("https://game.gtimg.cn/images/lol/act/img/champion/{}.png", text(raw, &["id"])?),
                 dragon_key: text(raw, &["id"]).unwrap_or_default(),
                 short_name: name.chars().take(2).collect(),
                 name,
@@ -251,6 +266,8 @@ fn parse_mayhem_augments(value: &Value) -> Vec<NewsAugment> {
             let rarity = text(row, &["rarity", "tier"]).unwrap_or_default();
             Some(NewsAugment {
                 id,
+                icon_path: None,
+                icon_url: None,
                 name,
                 description: localized_text(row, &["description", "desc"]).unwrap_or_default(),
                 win_rate: None,
@@ -269,6 +286,102 @@ fn parse_mayhem_augments(value: &Value) -> Vec<NewsAugment> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     augments
+}
+
+pub fn attach_client_augment_assets(news: &mut NewsDataSnapshot, catalog: &Value) {
+    merge_augment_assets(&mut news.augments, Some(catalog), None);
+    if news.meta.source == "unavailable" && !news.augments.is_empty() {
+        news.meta.source = "official".to_string();
+    }
+}
+
+fn asset_key(value: &str) -> String {
+    value
+        .trim_start_matches("ARAM_")
+        .chars()
+        .filter(|character| character.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn merge_augment_assets(
+    augments: &mut Vec<NewsAugment>,
+    local: Option<&Value>,
+    official: Option<&Value>,
+) {
+    let strip_tags = regex::Regex::new(r"<[^>]*>").unwrap();
+    // Match stable IDs first; translated names are only an exact normalized fallback.
+    for (is_local, catalog) in [(false, official), (true, local)] {
+        let Some(catalog) = catalog else { continue };
+        for row in rows(catalog) {
+            let Some(id) = text(row, &["augmentID", "id"]) else {
+                continue;
+            };
+            let Some(name_id) = text(row, &["augmentNameId", "name_en"]) else {
+                continue;
+            };
+            if is_local {
+                if !name_id.starts_with("ARAM_") {
+                    continue;
+                }
+            } else {
+                let kiwi = text(row, &["mode"])
+                    .is_some_and(|modes| modes.split(',').any(|mode| mode.trim() == "KIWI"));
+                if !kiwi || integer(row, &["isPBE"]).unwrap_or(0) != 0 {
+                    continue;
+                }
+            }
+            let Some(name) = text(row, &["nameTRA", "name_cn"]) else {
+                continue;
+            };
+            let id_key = asset_key(&name_id);
+            let name_key = asset_key(&name);
+            let found = augments.iter().position(|augment| {
+                augment.id == id
+                    || asset_key(&augment.id) == id_key
+                    || asset_key(&augment.name) == name_key
+            });
+            let index = found.unwrap_or_else(|| {
+                augments.push(NewsAugment {
+                    id: id.clone(),
+                    name: name.clone(),
+                    description: String::new(),
+                    icon_path: None,
+                    icon_url: None,
+                    win_rate: None,
+                    pick_rate: None,
+                    sample_size: None,
+                    tier: "—".to_string(),
+                    color: "#d8af70".to_string(),
+                    source: "official".to_string(),
+                });
+                augments.len() - 1
+            });
+            let augment = &mut augments[index];
+            if is_local {
+                augment.icon_path = text(row, &["augmentSmallIconPath"])
+                    .filter(|path| path.starts_with("/lol-game-data/assets/"));
+            } else {
+                augment.icon_url = text(row, &["small_Icon", "large_Icon"]);
+                if let Some(description) = text(row, &["tooltip"]) {
+                    augment.description = strip_tags
+                        .replace_all(&description, " ")
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                }
+            }
+            let rarity = text(row, &["rarity", "level"]).unwrap_or_default();
+            augment.tier = tier_for_rarity(&rarity);
+            augment.color = match augment.tier.as_str() {
+                "S" => "#8aa4e5",
+                "A" => "#d8af70",
+                "B" => "#a0aeb8",
+                _ => "#7fc6a5",
+            }
+            .to_string();
+        }
+    }
 }
 
 fn parse_mayhem_combos(value: &Value, champions: &[NewsChampion]) -> Vec<NewsCombo> {
@@ -389,9 +502,9 @@ fn role_for_tags(tags: &[&str]) -> String {
 
 fn tier_for_rarity(rarity: &str) -> String {
     match rarity.to_ascii_lowercase().as_str() {
-        "prismatic" | "legendary" | "s" => "S".to_string(),
-        "gold" | "epic" | "a" => "A".to_string(),
-        "silver" | "common" | "b" => "B".to_string(),
+        "prismatic" | "kprismatic" | "legendary" | "s" => "S".to_string(),
+        "gold" | "kgold" | "epic" | "a" => "A".to_string(),
+        "silver" | "ksilver" | "common" | "b" => "B".to_string(),
         _ => "—".to_string(),
     }
 }
@@ -406,6 +519,48 @@ fn hash_text(value: &str) -> usize {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn client_icons_match_stats_without_changing_combo_ids_or_inventing_rates() {
+        let mut augments = parse_mayhem_augments(&json!([
+            { "augmentId": "transmute_prismatic", "name": { "zh-CN": "质变：棱彩阶" }, "pickRate": 64.28 }
+        ]));
+        let official = json!([
+            { "augmentID": 1238, "name_en": "ARAM_TransmutePrismatic", "name_cn": "质变：棱彩阶", "mode": "KIWI, KIWI_JADE", "level": "kGold", "tooltip": "<attention>转换</attention>你的符文", "small_Icon": "https://game.gtimg.cn/images/lol/act/img/rune/transmuteprismatic_small.png" },
+            { "augmentID": 1068, "name_en": "ARAM_Recursion", "name_cn": "循环往复", "mode": "KIWI", "level": "kGold" },
+            { "augmentID": 9, "name_en": "NotKiwi", "name_cn": "其他模式", "mode": "KIWI_JADE" },
+            { "augmentID": 10, "name_en": "TestOnly", "name_cn": "测试服", "mode": "KIWI", "isPBE": 1 }
+        ]);
+        let local = json!([
+            { "id": 1238, "augmentNameId": "ARAM_TransmutePrismatic", "nameTRA": "质变：棱彩阶", "rarity": "kGold", "augmentSmallIconPath": "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/TransmutePrismatic_small.png" },
+            { "id": 68, "augmentNameId": "Recursion", "nameTRA": "循环往复", "rarity": "kGold", "augmentSmallIconPath": "wrong-arena-icon" }
+        ]);
+        merge_augment_assets(&mut augments, Some(&local), Some(&official));
+        assert_eq!(augments.len(), 2);
+        assert_eq!(augments[0].id, "transmute_prismatic");
+        assert_eq!(augments[0].pick_rate, Some(64.28));
+        assert_eq!(augments[0].win_rate, None);
+        assert_eq!(augments[0].tier, "A");
+        assert_eq!(augments[0].description, "转换 你的符文");
+        assert!(augments[0].icon_path.as_ref().unwrap().contains("TransmutePrismatic"));
+        assert!(augments[0].icon_url.is_some());
+        assert_eq!(augments[1].name, "循环往复");
+        assert_eq!(augments[1].source, "official");
+        assert_eq!(augments[1].pick_rate, None);
+        assert!(augments[1].icon_path.is_none());
+    }
+
+    #[test]
+    fn client_catalog_works_when_online_catalogs_are_unavailable() {
+        let mut augments = Vec::new();
+        merge_augment_assets(&mut augments, Some(&json!([
+            { "id": 1068, "augmentNameId": "ARAM_Recursion", "nameTRA": "循环往复", "rarity": "kGold", "augmentSmallIconPath": "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/Recursion_small.png" }
+        ])), None);
+        assert_eq!(augments.len(), 1);
+        assert_eq!(augments[0].name, "循环往复");
+        assert!(augments[0].icon_path.is_some());
+        assert_eq!(augments[0].win_rate, None);
+    }
 
     #[test]
     fn news_ipc_matches_frontend_contract() {

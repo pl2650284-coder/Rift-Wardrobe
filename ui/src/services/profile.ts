@@ -101,6 +101,7 @@ export function summarizeProfile(raw: NativeProfile, favorites: number, now = Da
     .sort((first, second) => second[1].length - first[1].length)
     .slice(0, 3)
     .map(([id, games]) => ({
+      championId: id,
       name: games[0].champion,
       role: mostPlayedRole(games)?.name ?? "",
       games: games.length,
@@ -113,6 +114,7 @@ export function summarizeProfile(raw: NativeProfile, favorites: number, now = Da
     rank: raw.rank,
     recentGames: recent.map((game) => ({
       id: game.id,
+      championId: game.championId,
       champion: game.champion,
       championShort: Array.from(game.champion).slice(0, 2).join(""),
       result: game.result,

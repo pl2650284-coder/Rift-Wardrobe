@@ -1,5 +1,6 @@
 export type RecentGame = {
   id: string;
+  championId?: number;
   champion: string;
   championShort: string;
   result: "win" | "loss" | "remake";
@@ -50,7 +51,7 @@ export type ProfileSummary = {
     averageWinRate: number | null;
     averageKda: number | null;
   };
-  topChampions: Array<{ name: string; role: string; games: number; winRate: number; color: string }>;
+  topChampions: Array<{ championId?: number; name: string; role: string; games: number; winRate: number; color: string }>;
   source: "client" | "demo";
   updatedAtMs: number;
   warnings: string[];
@@ -66,6 +67,8 @@ export type AssistantLog = {
 
 export type ChampionStat = {
   id: number;
+  iconPath?: string;
+  iconUrl?: string;
   name: string;
   shortName: string;
   role: string;
@@ -81,6 +84,8 @@ export type ChampionStat = {
 
 export type AugmentStat = {
   id: string;
+  iconPath?: string;
+  iconUrl?: string;
   name: string;
   description: string;
   winRate: number | null;

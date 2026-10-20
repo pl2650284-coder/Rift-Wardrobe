@@ -1,4 +1,5 @@
 mod discovery;
+mod game_assets;
 mod lcu;
 mod models;
 mod official_data;
@@ -26,8 +27,29 @@ async fn get_profile(state: State<'_, RuntimeState>) -> Result<PlayerProfile, St
 }
 
 #[tauri::command]
-async fn get_news_data() -> Result<NewsDataSnapshot, String> {
-    official_data::get_news_data().await
+async fn get_news_data(state: State<'_, RuntimeState>) -> Result<NewsDataSnapshot, String> {
+    let mut news = official_data::get_news_data().await?;
+    if let Some(catalog) = state.augment_catalog().await {
+        official_data::attach_client_augment_assets(&mut news, &catalog);
+    }
+    Ok(news)
+}
+
+#[tauri::command]
+async fn get_game_icon(
+    state: State<'_, RuntimeState>,
+    path: Option<String>,
+    url: Option<String>,
+) -> Result<String, String> {
+    if let Some(path) = path {
+        if let Ok(image) = state.image_data_url(&path).await {
+            return Ok(image);
+        }
+    }
+    match url {
+        Some(url) => game_assets::fetch_official_icon(&url).await,
+        None => Err("客户端暂时无法提供这个图标".to_string()),
+    }
 }
 
 #[tauri::command]
@@ -217,6 +239,7 @@ pub fn run() {
             get_snapshot,
             get_profile,
             get_news_data,
+            get_game_icon,
             reconnect_client,
             apply_skin,
             apply_random_skin,

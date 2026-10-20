@@ -2,6 +2,8 @@
   "champions": [
     {
       "id": 22,
+      "iconPath": "/lol-game-data/assets/v1/champion-icons/22.png",
+      "iconUrl": "https://game.gtimg.cn/images/lol/act/img/champion/Ashe.png",
       "name": "寒冰射手",
       "shortName": "寒冰",
       "role": "下路",

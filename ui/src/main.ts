@@ -238,6 +238,9 @@ const imageCache = new Map<string, string>();
 const MAX_IMAGE_CACHE_ENTRIES = 24;
 const imageRequests = new Set<string>();
 const imageFailures = new Set<string>();
+const gameIconCache = new Map<string, string>();
+const gameIconRequests = new Set<string>();
+const gameIconFailures = new Set<string>();
 let imageLoadFrame = 0;
 let imageErrorNotice: string | null = null;
 
@@ -318,6 +321,7 @@ function applyAppearance(): void {
 }
 
 async function hydrateDashboardData(force = false): Promise<void> {
+  if (force) gameIconFailures.clear();
   dashboardLoading = true;
   render();
   try {
@@ -715,13 +719,64 @@ function renderProfilePage(): string {
       </article>
     </section>
     <section class="dashboard-grid dashboard-grid--lower">
-      <article class="dashboard-panel games-panel"><header class="panel-heading"><div><span class="eyebrow">MATCH HISTORY</span><h2>最近对局</h2></div><button class="text-button" data-action="profile-refresh" ${refreshDisabled}>更新 ${icon("refresh-ccw", 12)}</button></header><div class="games-list">${data.recentGames.length ? data.recentGames.map((game) => `<div class="game-row"><span class="game-result ${game.result}" title="${game.result === "win" ? "胜利" : game.result === "remake" ? "重开" : "失败"}"></span><span class="champion-token" style="--token-color:${game.result === "win" ? "#70c7a6" : game.result === "remake" ? "#9ba5ad" : "#c47e85"}">${escapeHtml(game.championShort)}</span><div class="game-main"><strong>${escapeHtml(game.champion)}${game.result === "remake" ? " · 重开" : ""}</strong><small>${escapeHtml(game.mode)} · ${escapeHtml(game.playedAt)}</small></div><span class="game-kda">${escapeHtml(game.kda)}<small>${game.cs} CS · ${escapeHtml(game.duration)}</small></span></div>`).join("") : `<div class="empty-state">${icon("swords", 22)}<span>${gamesEmpty}</span></div>`}</div></article>
-      <article class="dashboard-panel champion-panel"><header class="panel-heading"><div><span class="eyebrow">MOST PLAYED</span><h2>常用英雄</h2></div><span class="panel-note">近期 ${data.matchCount} 场</span></header><div class="top-champion-list">${data.topChampions.length ? data.topChampions.map((champion, index) => `<div class="top-champion-row"><b>${String(index + 1).padStart(2, "0")}</b><span class="champion-token" style="--token-color:${champion.color}">${escapeHtml(champion.name.slice(0, 2))}</span><div><strong>${escapeHtml(champion.name)}</strong><small>${champion.role ? `${escapeHtml(champion.role)} · ` : ""}${champion.games} 场</small></div><span class="champion-rate">${champion.winRate}%</span><div class="mini-progress"><i style="width:${champion.winRate}%"></i></div></div>`).join("") : `<div class="empty-state">${icon("users", 22)}<span>${gamesEmpty}</span></div>`}</div></article>
+      <article class="dashboard-panel games-panel"><header class="panel-heading"><div><span class="eyebrow">MATCH HISTORY</span><h2>最近对局</h2></div><button class="text-button" data-action="profile-refresh" ${refreshDisabled}>更新 ${icon("refresh-ccw", 12)}</button></header><div class="games-list">${data.recentGames.length ? data.recentGames.map((game) => `<div class="game-row"><span class="game-result ${game.result}" title="${game.result === "win" ? "胜利" : game.result === "remake" ? "重开" : "失败"}"></span>${renderChampionIcon(game.championId, game.champion, game.result === "win" ? "#70c7a6" : "#c47e85")}<div class="game-main"><strong>${escapeHtml(game.champion)}${game.result === "remake" ? " · 重开" : ""}</strong><small>${escapeHtml(game.mode)} · ${escapeHtml(game.playedAt)}</small></div><span class="game-kda">${escapeHtml(game.kda)}<small>${game.cs} CS · ${escapeHtml(game.duration)}</small></span></div>`).join("") : `<div class="empty-state">${icon("swords", 22)}<span>${gamesEmpty}</span></div>`}</div></article>
+      <article class="dashboard-panel champion-panel"><header class="panel-heading"><div><span class="eyebrow">MOST PLAYED</span><h2>常用英雄</h2></div><span class="panel-note">近期 ${data.matchCount} 场</span></header><div class="top-champion-list">${data.topChampions.length ? data.topChampions.map((champion, index) => `<div class="top-champion-row"><b>${String(index + 1).padStart(2, "0")}</b>${renderChampionIcon(champion.championId, champion.name, champion.color)}<div><strong>${escapeHtml(champion.name)}</strong><small>${champion.role ? `${escapeHtml(champion.role)} · ` : ""}${champion.games} 场</small></div><span class="champion-rate">${champion.winRate}%</span><div class="mini-progress"><i style="width:${champion.winRate}%"></i></div></div>`).join("") : `<div class="empty-state">${icon("users", 22)}<span>${gamesEmpty}</span></div>`}</div></article>
     </section>`;
 }
 
 function newsPercent(value: number | null): string {
   return value === null ? "未提供" : `${value.toFixed(1)}%`;
+}
+
+function renderGameIcon(name: string, color: string, path?: string, url?: string, kind = "champion", extraClass = ""): string {
+  const key = path || url;
+  const cached = key ? gameIconCache.get(key) : undefined;
+  const fallback = kind === "augment" ? icon("sparkles", 14) : escapeHtml(Array.from(name).slice(0, 2).join(""));
+  const attributes = key ? ` data-game-icon="${escapeHtml(key)}" data-icon-path="${escapeHtml(path ?? "")}" data-icon-url="${escapeHtml(url ?? "")}"` : "";
+  return `<span class="${kind}-token game-icon ${extraClass}" style="--token-color:${escapeHtml(color)}" role="img" aria-label="${escapeHtml(name)}"${attributes}>${cached ? `<img src="${cached}" alt="" />` : fallback}</span>`;
+}
+
+function renderChampionIcon(id: number | undefined, name: string, color: string, extraClass = ""): string {
+  const champion = championStats.find((item) => item.id === id);
+  const path = id ? `/lol-game-data/assets/v1/champion-icons/${id}.png` : undefined;
+  return renderGameIcon(name, color, path, champion?.iconUrl, "champion", extraClass);
+}
+
+function loadGameIcons(): void {
+  if (!isTauri) return;
+  const elements = [...app.querySelectorAll<HTMLElement>("[data-game-icon]")];
+  for (const element of elements) {
+    const cached = gameIconCache.get(element.dataset.gameIcon!);
+    if (cached && !element.querySelector("img")) element.innerHTML = `<img src="${cached}" alt="" />`;
+  }
+  const candidates = elements.filter((element) => {
+    const key = element.dataset.gameIcon!;
+    if (element.querySelector("img") || gameIconRequests.has(key) || gameIconFailures.has(key)) return false;
+    const bounds = element.getBoundingClientRect();
+    return bounds.width > 0 && bounds.bottom > 62 && bounds.top < window.innerHeight;
+  });
+  for (const element of candidates) {
+    if (gameIconRequests.size >= 4) break;
+    const key = element.dataset.gameIcon!;
+    if (gameIconRequests.has(key)) continue;
+    gameIconRequests.add(key);
+    void invokeCommand<string>("get_game_icon", {
+      path: element.dataset.iconPath || null,
+      url: element.dataset.iconUrl || null,
+    }).then((dataUrl) => {
+      if (!/^data:image\/(png|jpeg|webp|gif|avif);base64,[a-zA-Z0-9+/=]+$/.test(dataUrl)) throw new Error("Invalid game icon response");
+      if (gameIconCache.size >= 256) gameIconCache.delete(gameIconCache.keys().next().value!);
+      gameIconCache.set(key, dataUrl);
+      for (const target of app.querySelectorAll<HTMLElement>("[data-game-icon]")) {
+        if (target.dataset.gameIcon === key) target.innerHTML = `<img src="${dataUrl}" alt="" />`;
+      }
+    }).catch(() => {
+      gameIconFailures.add(key);
+    }).finally(() => {
+      gameIconRequests.delete(key);
+      loadGameIcons();
+    });
+  }
 }
 
 function newsSourceLabel(): string {
@@ -758,6 +813,7 @@ function renderNewsPage(): string {
   const query = newsQuery.trim().toLocaleLowerCase("zh-CN");
   const champions = championStats.filter((champion) => (championRole === "全部" || champion.role === championRole) && (!query || champion.name.toLocaleLowerCase("zh-CN").includes(query)));
   const augments = augmentStats.filter((augment) => !query || augment.name.toLocaleLowerCase("zh-CN").includes(query));
+  const availableAugmentRates = augmentStats.flatMap((augment) => augment.pickRate === null ? [] : [augment.pickRate]);
   const detail = newsDetailId === null ? "" : renderNewsDetail();
   const loadingNotice = dashboardLoading
     ? `<div class="profile-notice news-notice" role="status">${icon("loader-circle", 16)}<span>正在读取官方资料和海克斯数据，页面可以先浏览。</span></div>`
@@ -767,8 +823,8 @@ function renderNewsPage(): string {
     ${loadingNotice}
     ${renderNewsWarning()}
     <div class="news-tabs"><button class="news-tab ${newsTab === "champions" ? "news-tab--active" : ""}" data-news-tab="champions">${icon("swords", 16)}英雄数据</button><button class="news-tab ${newsTab === "augments" ? "news-tab--active" : ""}" data-news-tab="augments">${icon("sparkles", 16)}海克斯大乱斗符文</button></div>
-    <section class="news-toolbar"><label class="search-box news-search">${icon("search", 15)}<input type="search" maxlength="40" value="${escapeHtml(newsQuery)}" placeholder="搜索${newsTab === "champions" ? "英雄" : "符文"}" aria-label="搜索资讯" data-news-search /></label>${newsTab === "champions" ? `<div class="segmented role-segmented">${roleOptions.map((role) => `<button class="segment ${championRole === role ? "segment--active" : ""}" data-role="${role}">${role}</button>`).join("")}</div>` : `<span class="filter-caption">极地大乱斗 · 全段位 · 最近 30 天</span>`}</section>
-    ${newsTab === "champions" ? `<section class="news-summary-row"><article><span>官方英雄资料</span><strong>${championStats.length || "—"}</strong><small>${newsMeta.officialSource || "暂无"}</small></article><article><span>英雄选取率</span><strong>${championStats.filter((item) => item.pickRate !== null).length || "—"}</strong><small>${newsMeta.statsSource ? "第三方有限样本" : "官方未提供"}</small></article><article><span>胜率</span><strong>未提供</strong><small>官方接口未开放</small></article></section><section class="news-table-panel"><div class="news-table news-table--champions"><div class="news-table-head"><span>#</span><span>英雄</span><span>位置</span><span>评级</span><span>胜率</span><span>登场率</span><span>趋势</span><span></span></div>${champions.length ? champions.map((champion, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="champion-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><strong>${escapeHtml(champion.name)}<small>KDA ${champion.kda === null ? "官方未提供" : champion.kda.toFixed(1)}</small></strong></span><span>${escapeHtml(champion.role)}</span><span class="tier tier--${champion.tier.replace("+", "plus")}">${escapeHtml(champion.tier)}</span><span class="stat-strong">${newsPercent(champion.winRate)}</span><span>${newsPercent(champion.pickRate)}</span><span class="trend trend--${champion.trend}">${champion.trend === "up" ? "↑" : champion.trend === "down" ? "↓" : "—"}</span><button class="icon-button table-arrow" data-news-detail="${champion.id}" aria-label="查看${escapeHtml(champion.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的英雄</span></div>`}</div></section>` : `<section class="news-summary-row"><article><span>可查海克斯</span><strong>${augmentStats.length || "—"}</strong><small>第三方选取率数据</small></article><article><span>最高选取率</span><strong>${newsPercent(Math.max(...augmentStats.map((item) => item.pickRate ?? 0), 0) || null)}</strong><small>胜率官方未提供</small></article><article><span>组合推荐</span><strong>${augmentCombos.length || "—"}</strong><small>仅展示组合目录</small></article></section><section class="news-table-panel"><div class="news-table news-table--augments"><div class="news-table-head"><span>#</span><span>符文</span><span>评级</span><span>胜率</span><span>选择率</span><span>样本</span><span></span></div>${augments.length ? augments.map((augment, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion"><span class="augment-token" style="--token-color:${augment.color}">${icon("sparkles", 15)}</span><strong>${escapeHtml(augment.name)}<small>${escapeHtml(augment.description || "暂无官方描述")}</small></strong></span><span class="tier tier--${augment.tier.replace("+", "plus")}">${escapeHtml(augment.tier)}</span><span class="stat-strong">${newsPercent(augment.winRate)}</span><span>${newsPercent(augment.pickRate)}</span><span>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</span><button class="icon-button table-arrow" data-news-detail="${escapeHtml(augment.id)}" aria-label="查看${escapeHtml(augment.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的符文</span></div>`}</div></section>`}${detail}`;
+    <section class="news-toolbar"><label class="search-box news-search">${icon("search", 15)}<input type="search" maxlength="40" value="${escapeHtml(newsQuery)}" placeholder="搜索${newsTab === "champions" ? "英雄" : "符文"}" aria-label="搜索资讯" data-news-search /></label>${newsTab === "champions" ? `<div class="segmented role-segmented">${roleOptions.map((role) => `<button class="segment ${championRole === role ? "segment--active" : ""}" data-role="${role}">${role}</button>`).join("")}</div>` : `<span class="filter-caption">海克斯大乱斗 · 游戏资源与公开统计</span>`}</section>
+    ${newsTab === "champions" ? `<section class="news-summary-row"><article><span>官方英雄资料</span><strong>${championStats.length || "—"}</strong><small>${newsMeta.officialSource || "暂无"}</small></article><article><span>英雄选取率</span><strong>${championStats.filter((item) => item.pickRate !== null).length || "—"}</strong><small>${newsMeta.statsSource ? "第三方有限样本" : "官方未提供"}</small></article><article><span>胜率</span><strong>未提供</strong><small>官方接口未开放</small></article></section><section class="news-table-panel"><div class="news-table news-table--champions"><div class="news-table-head"><span>#</span><span>英雄</span><span>位置</span><span>评级</span><span>胜率</span><span>登场率</span><span>趋势</span><span></span></div>${champions.length ? champions.map((champion, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion">${renderChampionIcon(champion.id, champion.name, champion.color)}<strong>${escapeHtml(champion.name)}<small>KDA ${champion.kda === null ? "官方未提供" : champion.kda.toFixed(1)}</small></strong></span><span>${escapeHtml(champion.role)}</span><span class="tier tier--${champion.tier.replace("+", "plus")}">${escapeHtml(champion.tier)}</span><span class="stat-strong">${newsPercent(champion.winRate)}</span><span>${newsPercent(champion.pickRate)}</span><span class="trend trend--${champion.trend}">${champion.trend === "up" ? "↑" : champion.trend === "down" ? "↓" : "—"}</span><button class="icon-button table-arrow" data-news-detail="${champion.id}" aria-label="查看${escapeHtml(champion.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的英雄</span></div>`}</div></section>` : `<section class="news-summary-row"><article><span>可查海克斯</span><strong>${augmentStats.length || "—"}</strong><small>客户端与官网资源目录</small></article><article><span>最高选取率</span><strong>${newsPercent(availableAugmentRates.length ? Math.max(...availableAugmentRates) : null)}</strong><small>胜率官方未提供</small></article><article><span>组合推荐</span><strong>${augmentCombos.length || "—"}</strong><small>仅展示组合目录</small></article></section><section class="news-table-panel"><div class="news-table news-table--augments"><div class="news-table-head"><span>#</span><span>符文</span><span>评级</span><span>胜率</span><span>选择率</span><span>样本</span><span></span></div>${augments.length ? augments.map((augment, index) => `<div class="news-table-row"><span class="rank-number">${String(index + 1).padStart(2, "0")}</span><span class="news-champion">${renderGameIcon(augment.name, augment.color, augment.iconPath, augment.iconUrl, "augment")}<strong>${escapeHtml(augment.name)}<small>${escapeHtml(augment.description || "暂无官方描述")}</small></strong></span><span class="tier tier--${augment.tier.replace("+", "plus")}">${escapeHtml(augment.tier)}</span><span class="stat-strong">${newsPercent(augment.winRate)}</span><span>${newsPercent(augment.pickRate)}</span><span>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</span><button class="icon-button table-arrow" data-news-detail="${escapeHtml(augment.id)}" aria-label="查看${escapeHtml(augment.name)}详情">${icon("chevron-right", 15)}</button></div>`).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>没有符合条件的符文</span></div>`}</div></section>`}${detail}`;
 }
 
 function renderNewsDetail(): string {
@@ -776,11 +832,11 @@ function renderNewsDetail(): string {
   if (newsTab === "champions") {
     const champion = championStats.find((item) => String(item.id) === newsDetailId);
     if (!champion) return "";
-    return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">CHAMPION DETAIL</span><h2>${escapeHtml(champion.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="champion-token detail-token" style="--token-color:${champion.color}">${escapeHtml(champion.shortName)}</span><div><strong>${escapeHtml(champion.role)} · ${escapeHtml(champion.tier)} 级</strong><p>英雄名称与基础分类来自 Riot Data Dragon。</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(champion.winRate)}</strong></div><div><span>登场率</span><strong>${newsPercent(champion.pickRate)}</strong></div><div><span>禁用率</span><strong>${newsPercent(champion.banRate)}</strong></div><div><span>KDA</span><strong>${champion.kda === null ? "未提供" : champion.kda.toFixed(1)}</strong></div></div><div class="detail-copy"><span class="eyebrow">海克斯组合</span><h3>只展示可验证的组合目录</h3><p>${renderChampionComboSummary(champion.id)}</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
+    return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">CHAMPION DETAIL</span><h2>${escapeHtml(champion.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero">${renderChampionIcon(champion.id, champion.name, champion.color, "detail-token")}<div><strong>${escapeHtml(champion.role)} · ${escapeHtml(champion.tier)} 级</strong><p>英雄名称与基础分类来自 Riot Data Dragon。</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(champion.winRate)}</strong></div><div><span>登场率</span><strong>${newsPercent(champion.pickRate)}</strong></div><div><span>禁用率</span><strong>${newsPercent(champion.banRate)}</strong></div><div><span>KDA</span><strong>${champion.kda === null ? "未提供" : champion.kda.toFixed(1)}</strong></div></div><div class="detail-copy"><span class="eyebrow">海克斯组合</span><h3>只展示可验证的组合目录</h3><p>${renderChampionComboSummary(champion.id)}</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
   }
   const augment = augmentStats.find((item) => item.id === newsDetailId);
   if (!augment) return "";
-  return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">AUGMENT DETAIL</span><h2>${escapeHtml(augment.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero"><span class="augment-token detail-token" style="--token-color:${augment.color}">${icon("sparkles", 18)}</span><div><strong>${escapeHtml(augment.tier)} 级符文</strong><p>${escapeHtml(augment.description || "暂无官方描述")}</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(augment.winRate)}</strong></div><div><span>选择率</span><strong>${newsPercent(augment.pickRate)}</strong></div><div><span>样本数</span><strong>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</strong></div><div><span>模式</span><strong>海克斯大乱斗</strong></div></div><div class="detail-copy"><span class="eyebrow">数据说明</span><h3>选取率来自第三方有限样本</h3><p>Riot 官方公开接口未提供海克斯胜率，应用不会从选取率推导胜率。</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
+  return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">AUGMENT DETAIL</span><h2>${escapeHtml(augment.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero">${renderGameIcon(augment.name, augment.color, augment.iconPath, augment.iconUrl, "augment", "detail-token")}<div><strong>${escapeHtml(augment.tier)} 级符文</strong><p>${escapeHtml(augment.description || "暂无官方描述")}</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(augment.winRate)}</strong></div><div><span>选择率</span><strong>${newsPercent(augment.pickRate)}</strong></div><div><span>样本数</span><strong>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</strong></div><div><span>模式</span><strong>海克斯大乱斗</strong></div></div><div class="detail-copy"><span class="eyebrow">数据说明</span><h3>选取率来自第三方有限样本</h3><p>Riot 官方公开接口未提供海克斯胜率，应用不会从选取率推导胜率。</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
 }
 
 function preferenceRow(key: string, title: string, description: string, checked: boolean): string {
@@ -822,6 +878,7 @@ function render(): void {
       if (restoreContentFocus) content.focus({ preventScroll: true });
     }
   }
+  loadGameIcons();
 }
 
 function formatTime(timestamp: number): string {
@@ -997,6 +1054,8 @@ function isCatalogFilter(value: string | undefined): value is CatalogFilter {
 }
 
 async function clearImageCache(): Promise<void> {
+  gameIconCache.clear();
+  gameIconFailures.clear();
   imageCache.clear();
   imageRequests.clear();
   imageFailures.clear();
@@ -1228,6 +1287,7 @@ async function hydrateNativePreferences(): Promise<void> {
 function receiveSnapshot(next: Snapshot): void {
   if (next.revision < snapshot.revision) return;
   const previous = snapshot;
+  if (next.connection !== snapshot.connection) gameIconFailures.clear();
   snapshot = next;
   if (snapshot.contextId !== previous.contextId) {
     imageCache.clear();
@@ -1282,12 +1342,22 @@ window.addEventListener("beforeunload", () => {
 });
 window.addEventListener("focus", refreshProfileIfNeeded);
 document.addEventListener("visibilitychange", refreshProfileIfNeeded);
+app.addEventListener("error", (event) => {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+  const token = image.closest<HTMLElement>("[data-game-icon]");
+  if (!token) return;
+  const key = token.dataset.gameIcon!;
+  gameIconCache.delete(key);
+  gameIconFailures.add(key);
+  token.textContent = Array.from(token.getAttribute("aria-label") ?? "").slice(0, 2).join("");
+}, true);
 app.addEventListener("scroll", () => {
-  if (currentRoute !== "assistant") return;
   if (imageLoadFrame) return;
   imageLoadFrame = window.requestAnimationFrame(() => {
     imageLoadFrame = 0;
-    void loadSkinImages();
+    if (currentRoute === "assistant") void loadSkinImages();
+    loadGameIcons();
   });
 }, { capture: true, passive: true });
 window.addEventListener("keydown", (event) => {

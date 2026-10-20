@@ -367,6 +367,17 @@ impl LcuClient {
         })
     }
 
+    pub async fn get_augment_catalog(&self) -> Result<Value, String> {
+        self.request_json_with_timeout(
+            Method::GET,
+            "/lol-game-data/assets/v1/cherry-augments.json",
+            None,
+            Duration::from_secs(3),
+        )
+        .await
+        .map_err(|error| error.to_string())
+    }
+
     pub async fn get_image_data_url(&self, path: &str) -> Result<String, String> {
         if !path.starts_with("/lol-game-data/assets/")
             || path.contains("://")
