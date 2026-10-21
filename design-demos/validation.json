@@ -1,0 +1,203 @@
+{
+  "date": "2026-10-21",
+  "method": "Node Playwright + huashu-design original COLLECT_JS; Python Playwright unavailable",
+  "viewports": [
+    {
+      "direction": 1,
+      "width": 980,
+      "height": 700,
+      "document": {
+        "width": 980,
+        "height": 700
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 1,
+      "width": 1440,
+      "height": 900,
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 1,
+      "width": 760,
+      "height": 560,
+      "document": {
+        "width": 760,
+        "height": 560
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 1,
+      "width": 375,
+      "height": 812,
+      "document": {
+        "width": 375,
+        "height": 826
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 2,
+      "width": 980,
+      "height": 700,
+      "document": {
+        "width": 980,
+        "height": 700
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 2,
+      "width": 1440,
+      "height": 900,
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 2,
+      "width": 760,
+      "height": 560,
+      "document": {
+        "width": 760,
+        "height": 560
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 2,
+      "width": 375,
+      "height": 812,
+      "document": {
+        "width": 375,
+        "height": 1405
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 3,
+      "width": 980,
+      "height": 700,
+      "document": {
+        "width": 980,
+        "height": 700
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 3,
+      "width": 1440,
+      "height": 900,
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 3,
+      "width": 760,
+      "height": 560,
+      "document": {
+        "width": 760,
+        "height": 730
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    },
+    {
+      "direction": 3,
+      "width": 375,
+      "height": 812,
+      "document": {
+        "width": 375,
+        "height": 1418
+      },
+      "small": [],
+      "bodySmall": [],
+      "lowContrast": [],
+      "brokenImages": []
+    }
+  ],
+  "interactions": {
+    "1": [
+      "select skin",
+      "confirm dialog",
+      "apply demonstration",
+      "unowned disabled",
+      "favorite toggle",
+      "favorite filter",
+      "empty search",
+      "four navigation pages"
+    ],
+    "2": [
+      "select skin",
+      "confirm dialog",
+      "apply demonstration",
+      "unowned disabled",
+      "favorite toggle",
+      "favorite filter",
+      "empty search",
+      "four navigation pages"
+    ],
+    "3": [
+      "select skin",
+      "apply demonstration feedback",
+      "unowned disabled",
+      "favorite toggle",
+      "favorite filter",
+      "empty search",
+      "four navigation pages"
+    ]
+  },
+  "portal": {
+    "directionsLoaded": 3,
+    "pageErrors": []
+  },
+  "notes": [
+    "980x700 all three fully fit",
+    "760x560 workbench scrolls vertically",
+    "375px previews scroll vertically; no horizontal overflow",
+    "All five artwork images embedded; no IPC calls"
+  ]
+}

@@ -1,0 +1,244 @@
+{
+  "date": "2026-10-21",
+  "selectedDirection": "A",
+  "automatedTests": {
+    "passed": 58,
+    "failed": 0
+  },
+  "build": "npm run ui:build passed",
+  "browserChecks": {
+    "widths": [
+      375,
+      760,
+      980,
+      1440
+    ],
+    "routes": [
+      {
+        "route": "assistant",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": []
+      },
+      {
+        "route": "profile",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": []
+      },
+      {
+        "route": "news",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": []
+      },
+      {
+        "route": "settings",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": []
+      }
+    ],
+    "responsive": [
+      {
+        "width": 760,
+        "height": 560,
+        "route": "assistant",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 510,
+          "height": 496
+        }
+      },
+      {
+        "width": 760,
+        "height": 560,
+        "route": "profile",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 1774,
+          "height": 496
+        }
+      },
+      {
+        "width": 760,
+        "height": 560,
+        "route": "news",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 642,
+          "height": 496
+        }
+      },
+      {
+        "width": 760,
+        "height": 560,
+        "route": "settings",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 1478,
+          "height": 496
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "route": "assistant",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 836,
+          "height": 836
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "route": "profile",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 1113,
+          "height": 836
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "route": "news",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 836,
+          "height": 836
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "route": "settings",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 836,
+          "height": 836
+        }
+      },
+      {
+        "width": 375,
+        "height": 812,
+        "route": "assistant",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 742,
+          "height": 686
+        }
+      },
+      {
+        "width": 375,
+        "height": 812,
+        "route": "profile",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 1833,
+          "height": 686
+        }
+      },
+      {
+        "width": 375,
+        "height": 812,
+        "route": "news",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 755,
+          "height": 686
+        }
+      },
+      {
+        "width": 375,
+        "height": 812,
+        "route": "settings",
+        "small": [],
+        "bodySmall": [],
+        "lowContrast": [],
+        "broken": [],
+        "overflow": {
+          "horizontal": false,
+          "scrollHeight": 1614,
+          "height": 686
+        }
+      }
+    ],
+    "pageErrors": [],
+    "interactions": [
+      "preview does not apply",
+      "confirm applies browser demo",
+      "unowned disabled",
+      "favorite persists after reload",
+      "search empty state and reset",
+      "slash focuses search",
+      "random applies an available ordinary skin",
+      "operation log expands and collapses"
+    ]
+  },
+  "nativeChecks": {
+    "running": true,
+    "theme": "dark",
+    "accent": "gold",
+    "connection": "disconnected",
+    "maximizeRestore": "passed",
+    "profileWaiting": "passed",
+    "rankingsModes": [
+      "rift",
+      "hextech",
+      "aram",
+      "classic"
+    ],
+    "actualClientSkinWrite": "not exercised: client disconnected"
+  },
+  "limitation": "Browser preview artwork is demonstration data; native imagery still comes from client IPC."
+}

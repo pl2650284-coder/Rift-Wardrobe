@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>峡谷衣橱 · 改版方向预览</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#e9ecf0;color:#202934;font:14px/1.5 'Segoe UI','Microsoft YaHei',sans-serif}header{max-width:1100px;margin:28px auto 20px;padding:0 24px}.intro{display:flex;align-items:center;justify-content:space-between;gap:16px}.intro h1{font-size:24px;font-weight:650;letter-spacing:-.5px;margin:0}.intro p{color:#586675;margin:6px 0 20px}.intro a{color:#3f5e76;text-decoration:none;font-size:13px}nav{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}button{cursor:pointer;text-align:left;border:1px solid #ced5de;border-radius:9px;background:#f4f6f8;padding:13px 18px;color:#465565;font:inherit;min-height:64px}button strong{display:block;font-size:15px;color:#24313e}button span{display:block;font-size:12px;margin-top:4px}button[aria-selected=true]{border-color:#345665;background:#fff;box-shadow:0 2px 6px #1426380a}button[aria-selected=true] strong{color:#204e54}button:focus-visible,a:focus-visible{outline:3px solid #428697;outline-offset:4px}.preview-wrap{margin:auto;width:min(calc(100% - 48px),980px);height:700px;box-shadow:0 18px 55px #10223926;border-radius:12px;overflow:hidden;background:#10161e}iframe{display:block;border:0;width:100%;height:100%}.foot{max-width:1028px;margin:16px auto 30px;padding:0 24px;display:flex;justify-content:space-between;gap:16px;color:#5b6978;font-size:12px}.foot a{color:#345665;text-decoration:none}.foot a:hover{text-decoration:underline}#status{color:#435562}@media(min-width:1300px){header{margin-top:34px}}@media(max-width:650px){header{padding:0 16px;margin-top:20px}.intro{align-items:flex-start}.intro h1{font-size:20px}.intro a{white-space:nowrap}.intro p{font-size:13px}nav{gap:6px}button{padding:10px 9px}button strong{font-size:13px}button span{font-size:12px}.preview-wrap{width:calc(100% - 24px);height:780px}.foot{padding:0 16px;flex-direction:column;gap:4px}}
+</style>
+</head>
+<body>
+<header><div class="intro"><div><h1>为峡谷衣橱，选一种新样子。</h1><p>三个可点击的视觉初稿。试试切换皮肤、搜索与收藏。</p></div><a href="thumbs.html" target="_blank" rel="noopener">查看六个初始方向</a></div>
+<nav role="tablist" aria-label="视觉设计方向">
+<button id="tab-1" role="tab" aria-controls="preview" aria-selected="true" data-dir="1"><strong>A　沉浸衣橱</strong><span>深墨蓝与金 / 原画舞台</span></button>
+<button id="tab-2" role="tab" aria-controls="preview" aria-selected="false" tabindex="-1" data-dir="2"><strong>B　精工收藏馆</strong><span>冷白与松绿 / 多列图库</span></button>
+<button id="tab-3" role="tab" aria-controls="preview" aria-selected="false" tabindex="-1" data-dir="3"><strong>C　竞技工作台</strong><span>石墨与冰蓝 / 紧凑操作</span></button>
+</nav></header>
+<div class="preview-wrap" role="tabpanel" aria-labelledby="tab-1"><iframe id="preview" title="沉浸衣橱交互预览" src="dir-1.html"></iframe></div>
+<div class="foot"><span id="status">当前按 980 × 700 桌面窗口展示；状态与账号为演示。</span><a id="open" href="dir-1.html" target="_blank" rel="noopener">单独打开当前方案</a></div>
+<script>
+const tabs=[...document.querySelectorAll('[data-dir]')];const names=['沉浸衣橱','精工收藏馆','竞技工作台'];function select(tab){tabs.forEach(b=>{b.setAttribute('aria-selected',String(b===tab));b.tabIndex=b===tab?0:-1});let d=tab.dataset.dir;const frame=document.querySelector('iframe');frame.src='dir-'+d+'.html';frame.title=names[d-1]+'交互预览';document.querySelector('[role=tabpanel]').setAttribute('aria-labelledby',tab.id);document.querySelector('#open').href=frame.src}tabs.forEach((b,i)=>{b.addEventListener('click',()=>select(b));b.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();let n=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;select(tabs[n]);tabs[n].focus()}})});
+</script>
+</body>
+</html>

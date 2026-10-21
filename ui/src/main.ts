@@ -50,7 +50,9 @@ import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from
 import { getProfileSummary } from "./services/profile";
 import { createHextechView } from "./hextech-view";
 import { createRankingsView } from "./rankings-view";
+import { renderShell } from "./shell";
 import "./styles.css";
+import "./immersive.css";
 
 type ConnectionState = "disconnected" | "ready";
 
@@ -91,22 +93,25 @@ type WindowApi = {
 
 const demoSkins: Skin[] = [
   { id: 67000, championId: 67, name: "经典", availability: "available", available: true, selected: false, isBase: true, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
-  { id: 67064, championId: 67, name: "觅心猎手", availability: "available", available: true, selected: true, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
-  { id: 67065, championId: 67, name: "烈羽之道", availability: "available", available: true, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
-  { id: 67066, championId: 67, name: "灵魂莲华", availability: "available", available: true, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
-  { id: 67067, championId: 67, name: "摄魂使者", availability: "locked", available: false, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
-  { id: 67068, championId: 67, name: "电玩女神", availability: "available", available: true, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
-  { id: 67069, championId: 67, name: "苍穹之光", availability: "locked", available: false, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
+  { id: 67004, championId: 67, name: "觅心猎手", availability: "available", available: true, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
+  { id: 67014, championId: 67, name: "灵魂莲华", availability: "available", available: true, selected: true, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
+  { id: 67011, championId: 67, name: "源计划：净化", availability: "available", available: true, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
+  { id: 67010, championId: 67, name: "摄魂使者", availability: "locked", available: false, selected: false, isBase: false, isChroma: false, parentSkinId: null, tileImagePath: null, splashImagePath: null },
 ];
+
+const demoSkinImages: Record<number, string> = {
+  67000: "vayne-classic.jpg", 67004: "vayne-heartseeker.jpg", 67014: "vayne-spirit.jpg",
+  67011: "vayne-project.jpg", 67010: "vayne-soulstealer.jpg",
+};
 
 const demoSnapshot: Snapshot = {
   connection: "ready",
-  phase: "Champ Select",
+  phase: "ChampSelect",
   active: true,
   contextId: "demo-context",
   championId: 67,
   championName: "薇恩",
-  selectedSkinId: 67064,
+  selectedSkinId: 67014,
   writeEnabled: true,
   writeBlockReason: null,
   skins: demoSkins,
@@ -201,7 +206,7 @@ let launchAtStartup = false;
 let settingsOpen = false;
 let settingsBusy = false;
 const initialRoute = window.location.hash.slice(1);
-let currentRoute: AppRoute = isAppRoute(initialRoute) ? initialRoute : "profile";
+let currentRoute: AppRoute = isAppRoute(initialRoute) ? initialRoute : "assistant";
 let newsMode: NewsMode = "rift";
 let newsTab: NewsTab = "ranking";
 let championRole: ChampionRole = "全部";
@@ -440,6 +445,9 @@ function loadLocalPreferences(): void {
 }
 
 function skinImage(skin: Skin, large = false): string {
+  if (!isTauri && demoSkinImages[skin.id]) {
+    return `<img class="skin-image" src="/preview/${demoSkinImages[skin.id]}" alt="${escapeHtml(skin.name)}" />`;
+  }
   const paths = large
     ? [skin.splashImagePath, skin.tileImagePath]
     : [skin.tileImagePath, skin.splashImagePath];
@@ -448,7 +456,7 @@ function skinImage(skin: Skin, large = false): string {
     return `<img class="skin-image" src="${escapeHtml(imageCache.get(path) ?? "")}" alt="${escapeHtml(skin.name)}" />`;
   }
   const hue = (skin.id * 37) % 360;
-  const label = skin.isBase ? "ORIGINAL" : skin.name.slice(0, 2);
+  const label = large ? "原画暂未加载" : skin.isBase ? "经典" : skin.name.slice(0, 2);
   return `<div class="skin-art ${large ? "skin-art--large" : ""}" style="--skin-hue:${hue}deg"><span>${escapeHtml(label)}</span></div>`;
 }
 
@@ -465,7 +473,7 @@ function cacheImage(path: string, dataUrl: string): void {
 function connectionLabel(): string {
   if (snapshot.connection === "ready" && snapshot.active) return "已连接 · 选人阶段";
   if (snapshot.connection === "ready") return "已连接 · 等待选人";
-  return "连接失败";
+  return "未连接客户端";
 }
 
 function connectionTitle(): string {
@@ -536,11 +544,11 @@ function renderSkinCard(skin: Skin): string {
   const favorite = favoriteSkinIds.has(skin.id);
   return `
     <article class="skin-card-wrap">
-      <button class="skin-card ${skin.id === selectedSkinId ? "skin-card--selected" : ""} ${!skin.available ? "skin-card--locked" : ""}" data-skin-id="${skin.id}" ${busy ? "disabled" : ""}>
+      <button class="skin-card ${skin.id === selectedSkinId ? "skin-card--selected" : ""} ${!skin.available ? "skin-card--locked" : ""}" data-skin-id="${skin.id}" aria-label="预览 ${escapeHtml(skin.name)}${!skin.available ? "（不可用）" : ""}" aria-pressed="${skin.id === selectedSkinId}" ${busy ? "disabled" : ""}>
         <div class="skin-thumb">${skinImage(skin)}${skin.id === selectedSkinId ? `<span class="selected-mark">${icon("check", 13)}</span>` : ""}${!skin.available ? `<span class="lock-mark">${icon("lock", 13)}</span>` : ""}</div>
         <div class="skin-info"><strong>${escapeHtml(skin.name)}</strong><span>${skin.isBase ? "默认外观" : skin.isChroma ? "炫彩预览" : skin.available ? "可用" : "不可用"}</span></div>
       </button>
-      <button class="favorite-button ${favorite ? "favorite-button--active" : ""}" data-favorite-id="${skin.id}" aria-label="${escapeHtml(favoriteLabel(skin))}" title="${escapeHtml(favoriteLabel(skin))}">${icon("star", 13)}</button>
+      <button class="favorite-button ${favorite ? "favorite-button--active" : ""}" data-favorite-id="${skin.id}" aria-label="${escapeHtml(favoriteLabel(skin))}" aria-pressed="${favorite}" title="${escapeHtml(favoriteLabel(skin))}">${icon("heart", 15)}</button>
     </article>`;
 }
 
@@ -612,66 +620,40 @@ function renderSkinWorkspace(): void {
     && document.activeElement.matches("[data-search]");
   const current = snapshot.skins.find((skin) => skin.id === selectedSkinId) ?? snapshot.skins[0];
   const champion = snapshot.championName ?? "等待选择英雄";
-  const availableCount = snapshot.skins.filter((skin) => skin.available).length;
   const filtered = filteredSkins();
   const ready = snapshot.connection === "ready" && snapshot.active;
   const canApply = ready && snapshot.contextId !== null && snapshot.writeEnabled && !busy;
-  const statusClass = snapshot.connection === "ready" ? "status-ready" : "status-offline";
-
-  app.innerHTML = `
-    <div class="shell">
-      <header class="titlebar">
-        <div class="brand" data-action="home">
-          <img class="brand-mark" src="/app-mark.svg" alt="" />
-          <div><strong>峡谷换肤助手</strong><span>SKIN SELECTOR</span></div>
+  const blockReason = writeBlockLabel();
+  const currentFavorite = current ? favoriteSkinIds.has(current.id) : false;
+  const availability = current?.isChroma ? "炫彩预览" : current?.selected ? "当前已使用" : current?.available ? "已拥有" : "仅可预览";
+  const description = current
+    ? blockReason ?? (current.isBase ? "英雄本来的样子。" : "选好出场的样子。")
+    : snapshot.connection === "ready" ? "进入英雄选择后，在这里挑选可用皮肤。" : "启动并登录英雄联盟客户端，衣橱将自动连接。";
+  const content = `
+    <section class="wardrobe-stage ${current ? "" : "wardrobe-stage--empty"}" aria-label="当前皮肤预览">
+      <div class="wardrobe-art" aria-hidden="true">${current ? skinImage(current, true) : `<div class="empty-art">${icon("gamepad-2", 44)}</div>`}</div>
+      <div class="wardrobe-session"><span class="session-dot ${ready ? "" : "session-dot--idle"}"></span>${!isTauri ? "选人阶段 · 演示状态" : escapeHtml(phaseLabel())}<span class="wardrobe-preview-label">${current ? "原画预览" : "选好英雄，准备出场"}</span></div>
+      <div class="wardrobe-stage-body">
+        <div class="wardrobe-copy"><p class="wardrobe-champion">${escapeHtml(champion)}</p><h1>${current ? escapeHtml(current.name) : "你的下一次出场"}</h1><p class="wardrobe-description">${escapeHtml(description)}</p></div>
+        <div class="wardrobe-actions">
+          ${current ? `<span class="wardrobe-ownership">${icon(current.available ? "check" : "lock", 15)}${availability}${!isTauri ? " · 演示" : ""}</span><div class="wardrobe-action-row"><button class="primary-button" data-action="apply" ${canApply && canApplySkinImmediately(current) ? "" : "disabled"}>${icon(busy ? "loader-circle" : "check", 17)}${busy ? "正在应用" : current.selected ? "当前已使用" : current.isChroma ? "炫彩暂不支持" : !current.available ? "不可应用" : "确认使用"}</button><button class="wardrobe-favorite ${currentFavorite ? "wardrobe-favorite--active" : ""}" data-favorite-id="${current.id}" aria-label="${escapeHtml(favoriteLabel(current))}" aria-pressed="${currentFavorite}">${icon("heart", 20)}</button></div>` : `<button class="secondary-button" data-action="refresh">${icon("refresh-cw", 16)}重新连接</button>`}
+          <p class="wardrobe-action-hint">${!isTauri ? "演示预览，不连接游戏客户端" : ready ? "确认后将同步到游戏客户端" : "等待客户端进入英雄选择"}</p>
         </div>
-        ${renderWindowActions()}
-      </header>
-
-      <div class="workspace">
-        <aside class="sidebar">
-          <div class="sidebar-section">
-            <span class="eyebrow">WORKSPACE</span>
-            <button class="nav-item ${currentRoute === "profile" ? "nav-item--active" : ""}" data-route="profile">${icon("circle-user", 17)}<span>个人信息</span></button>
-            <button class="nav-item ${currentRoute === "assistant" ? "nav-item--active" : ""}" data-route="assistant">${icon("gamepad-2", 17)}<span>游戏辅助</span><b>${snapshot.skins.length}</b></button>
-            <button class="nav-item ${currentRoute === "news" ? "nav-item--active" : ""}" data-route="news">${icon("book-open", 17)}<span>游戏资讯</span></button>
-          </div>
-          <div class="sidebar-section sidebar-section--bottom">
-            <span class="eyebrow">SYSTEM</span>
-            <button class="nav-item" data-action="refresh">${icon("refresh-cw", 17)}<span>重新连接</span></button>
-            <button class="nav-item ${currentRoute === "settings" ? "nav-item--active" : ""}" data-route="settings">${icon("settings-2", 17)}<span>应用设置</span></button>
-          </div>
-          <div class="sidebar-foot"><span class="version-dot"></span><span>v0.2 · 本地运行</span></div>
-        </aside>
-
-        <main class="main-content" data-page="${currentRoute}" tabindex="0" aria-label="游戏辅助内容">
-          <section class="topline">
-            <div><span class="eyebrow">CURRENT SESSION</span><h1>${escapeHtml(champion)}</h1><p class="phase-copy">${escapeHtml(phaseLabel() || "等待游戏客户端")} <span class="slash">/</span> 皮肤选择</p></div>
-            <div class="connection ${statusClass}" title="${escapeHtml(connectionTitle())}"><span class="connection-dot"></span><span>${connectionLabel()}</span>${icon(snapshot.connection === "ready" ? "radio" : "wifi", 15)}</div>
-          </section>
-
-          <section class="hero-panel">
-            <div class="hero-copy"><span class="eyebrow">SELECTED SKIN</span><h2>${current ? escapeHtml(current.name) : "尚未选择"}</h2><p>${writeBlockLabel() ?? (current?.isBase ? "使用英雄默认外观" : current?.isChroma ? "炫彩皮肤暂仅提供预览" : current && !current.available ? "当前皮肤不可用，仅提供预览" : "客户端将使用当前选择完成换肤")}</p><button class="primary-button" data-action="apply" ${canApply && current && current.available && !current.isChroma && !current.selected ? "" : "disabled"}>${icon("check", 16)}${busy ? "正在应用" : current?.selected ? "当前已使用" : current?.isChroma ? "炫彩暂不支持" : current && !current.available ? "不可应用" : "应用皮肤"}</button></div>
-            <div class="hero-art">${current ? skinImage(current, true) : `<div class="empty-art">${icon("image-off", 30)}<span>等待皮肤数据</span></div>`}<div class="hero-art-glow"></div></div>
-            <div class="hero-meta"><div><span>英雄</span><strong>${escapeHtml(champion)}</strong></div><div><span>可用皮肤</span><strong>${availableCount}<em> / ${snapshot.skins.length}</em></strong></div><div><span>同步状态</span><strong class="meta-ready">${ready ? "实时" : "暂停"}</strong></div></div>
-          </section>
-
-          <section class="assistant-controls"><div class="assistant-control-head"><div><span class="eyebrow">AUTOMATION</span><h2>游戏辅助</h2></div><span class="assist-status ${ready ? "assist-status--ready" : "assist-status--offline"}"><i></i>${ready ? "客户端已就绪" : "等待客户端"}</span></div><div class="assist-control-grid"><label class="assist-toggle"><span class="assist-toggle-icon">${icon("zap", 16)}</span><span><strong>自动接受对局</strong><small>匹配成功后自动确认</small></span><input class="switch-input" type="checkbox" data-pref="autoAccept" ${autoAccept ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track"></span></label><label class="assist-toggle"><span class="assist-toggle-icon assist-toggle-icon--pink">${icon("sparkles", 16)}</span><span><strong>自动应用皮肤</strong><small>进入选人后应用上次选择</small></span><input class="switch-input" type="checkbox" data-pref="autoSkin" ${autoSkin ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track"></span></label><div class="assist-log"><span class="assist-log-icon">${icon("list-checks", 16)}</span><div><strong>最近动作</strong><small>${assistantLogs[0] ? `${escapeHtml(assistantLogs[0].action)} · ${escapeHtml(assistantLogs[0].time)}` : "暂无执行记录"}</small></div><button class="text-button" data-action="show-logs">${logsOpen ? "收起日志" : "查看日志"} ${icon("chevron-right", 12)}</button></div></div>${logsOpen ? `<div class="operation-log"><div class="operation-log-head"><span>时间</span><span>操作</span><span>详情</span><span>状态</span></div>${assistantLogs.map((log) => `<div class="operation-log-row"><span>${escapeHtml(log.time)}</span><strong>${escapeHtml(log.action)}</strong><span>${escapeHtml(log.detail)}</span><em class="log-status log-status--${log.status}">${log.status === "success" ? "成功" : log.status === "pending" ? "等待确认" : "失败"}</em></div>`).join("")}</div>` : ""}</section>
-
-          <section class="catalog-head"><div><span class="eyebrow">SKIN CATALOG</span><h2>选择一个外观</h2></div><div class="catalog-tools"><label class="search-box">${icon("search", 15)}<input type="search" maxlength="80" value="${escapeHtml(searchQuery)}" placeholder="搜索皮肤" aria-label="搜索皮肤" data-search /></label><div class="segmented">${(["可用", "全部", "收藏"] satisfies CatalogFilter[]).map((filter) => `<button class="segment ${activeFilter === filter ? "segment--active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}</div><button class="secondary-button" data-action="random" ${canApply ? "" : "disabled"}>${icon("shuffle", 16)}随机一款</button></div></section>
-
-          <section class="skin-grid">${filtered.length ? filtered.map(renderSkinCard).join("") : `<div class="empty-state">${icon("search-x", 22)}<span>${activeFilter === "收藏" && favoriteSkinIds.size === 0 ? "还没有收藏皮肤" : "没有符合条件的皮肤"}</span>${searchQuery ? `<button class="text-button" data-action="clear-search">清除搜索</button>` : ""}</div>`}</section>
-          <footer class="content-foot"><span>${icon("shield-check", 14)}只通过客户端接口操作，不修改游戏文件</span><span>最后同步 ${formatTime(snapshot.updatedAtMs)}</span></footer>
-        </main>
       </div>
-      ${renderSettingsDialog()}
-      <div id="toast" class="toast ${toastMessage ? "toast--visible" : ""}" data-kind="${toastKind}" aria-live="polite">${toastMessage ? escapeHtml(toastMessage) : ""}</div>
-    </div>`;
+    </section>
+    <section class="wardrobe-catalog" aria-label="皮肤衣橱">
+      <header class="catalog-head"><div class="catalog-title"><h2>${current ? `${escapeHtml(champion)}的衣橱` : "皮肤衣橱"}</h2><span>${snapshot.skins.length} 款外观</span></div><div class="catalog-tools"><label class="search-box">${icon("search", 16)}<input type="search" maxlength="80" value="${escapeHtml(searchQuery)}" placeholder="搜索皮肤" aria-label="搜索皮肤" data-search /></label><div class="segmented" role="group" aria-label="筛选皮肤">${(["可用", "全部", "收藏"] satisfies CatalogFilter[]).map((filter) => `<button class="segment ${activeFilter === filter ? "segment--active" : ""}" aria-pressed="${activeFilter === filter}" data-filter="${filter}">${filter}</button>`).join("")}</div><button class="secondary-button random-button" data-action="random" aria-label="随机一款可用皮肤" title="随机一款可用皮肤（R）" ${canApply ? "" : "disabled"}>${icon("shuffle", 18)}</button></div></header>
+      <div class="skin-grid" tabindex="0" aria-label="皮肤列表，可左右滚动">${filtered.length ? filtered.map(renderSkinCard).join("") : `<div class="empty-state">${icon(snapshot.skins.length ? "search-x" : "image-off", 22)}<span>${!snapshot.skins.length ? "进入选人阶段后，皮肤会显示在这里" : activeFilter === "收藏" && favoriteSkinIds.size === 0 ? "还没有收藏皮肤" : "没有符合条件的皮肤"}</span>${searchQuery ? `<button class="text-button" data-action="clear-search">清除搜索</button>` : ""}</div>`}</div>
+    </section>
+    <section class="wardrobe-automation" aria-label="游戏辅助设置"><div class="automation-options"><label class="automation-option"><span>${icon("zap", 16)}自动接受对局</span><input class="switch-input" type="checkbox" data-pref="autoAccept" aria-label="自动接受对局" ${autoAccept ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label><label class="automation-option"><span>${icon("sparkles", 16)}自动应用皮肤</span><input class="switch-input" type="checkbox" data-pref="autoSkin" aria-label="自动应用皮肤" ${autoSkin ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label></div><button class="text-button" data-action="show-logs">${icon("list-checks", 16)}${logsOpen ? "收起日志" : "操作日志"}</button></section>
+    ${logsOpen ? `<section class="wardrobe-logs" aria-label="操作日志"><div class="operation-log"><div class="operation-log-head"><span>时间</span><span>操作</span><span>详情</span><span>状态</span></div>${assistantLogs.length ? assistantLogs.map((log) => `<div class="operation-log-row"><span>${escapeHtml(log.time)}</span><strong>${escapeHtml(log.action)}</strong><span>${escapeHtml(log.detail)}</span><em class="log-status log-status--${log.status}">${log.status === "success" ? "成功" : log.status === "pending" ? "等待确认" : "失败"}</em></div>`).join("") : `<div class="empty-state">暂无执行记录</div>`}</div></section>` : ""}
+    <footer class="content-foot"><span>${icon("shield-check", 14)}${!isTauri ? "账号与拥有状态均为演示" : "只通过客户端接口切换皮肤"}</span><span>最后同步 ${formatTime(snapshot.updatedAtMs)}</span></footer>`;
+  app.innerHTML = renderAppShell(content);
   wireEvents();
   refreshIcons();
   if (restoreSearchFocus) {
     const input = app.querySelector<HTMLInputElement>("[data-search]");
-    input?.focus();
+    input?.focus({ preventScroll: true });
     input?.setSelectionRange(input.value.length, input.value.length);
   }
   void loadSkinImages();
@@ -885,14 +867,16 @@ function renderSettingsPage(): string {
     <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>游戏资讯优先读取 Riot Data Dragon；海克斯大乱斗选取率会标注第三方有限样本，官方未提供的胜率不会显示。</p></div></div></article></div></section>`;
 }
 
+function renderAppShell(content: string): string {
+  const connection = `<span class="shell-connection ${snapshot.connection === "ready" ? "status-ready" : "status-offline"}" title="${escapeHtml(connectionTitle())}"><span class="connection-dot"></span>${!isTauri ? "演示预览" : escapeHtml(connectionLabel())}</span>`;
+  return renderShell({ route: currentRoute, content, windowActions: renderWindowActions(), connection, connected: isTauri && snapshot.connection === "ready", icon })
+    + renderSettingsDialog()
+    + `<div id="toast" class="toast ${toastMessage ? "toast--visible" : ""}" data-kind="${toastKind}" aria-live="polite">${toastMessage ? escapeHtml(toastMessage) : ""}</div>`;
+}
+
 function renderDashboardShell(): void {
-  const routeTitle = currentRoute === "profile" ? "个人信息" : currentRoute === "news" ? "游戏资讯" : "应用设置";
   const content = currentRoute === "profile" ? renderProfilePage() : currentRoute === "news" ? renderNewsPage() : renderSettingsPage();
-  app.innerHTML = `
-    <div class="shell">
-      <header class="titlebar"><div class="brand" data-route="profile"><img class="brand-mark" src="/app-mark.svg" alt="" /><div><strong>峡谷换肤助手</strong><span>SUMMONER DESK · ${routeTitle.toUpperCase()}</span></div></div>${renderWindowActions()}</header>
-      <div class="workspace"><aside class="sidebar"><div class="sidebar-section"><span class="eyebrow">WORKSPACE</span><button class="nav-item ${currentRoute === "profile" ? "nav-item--active" : ""}" data-route="profile">${icon("circle-user", 17)}<span>个人信息</span></button><button class="nav-item ${currentRoute === "assistant" ? "nav-item--active" : ""}" data-route="assistant">${icon("gamepad-2", 17)}<span>游戏辅助</span><b>${snapshot.skins.length}</b></button><button class="nav-item ${currentRoute === "news" ? "nav-item--active" : ""}" data-route="news">${icon("book-open", 17)}<span>游戏资讯</span></button></div><div class="sidebar-section sidebar-section--bottom"><span class="eyebrow">SYSTEM</span><button class="nav-item" data-action="refresh">${icon("refresh-cw", 17)}<span>重新连接</span></button><button class="nav-item ${currentRoute === "settings" ? "nav-item--active" : ""}" data-route="settings">${icon("settings-2", 17)}<span>应用设置</span></button></div><div class="sidebar-foot"><span class="version-dot"></span><span>v0.3 · 本地运行</span></div></aside><main class="main-content main-content--dashboard" data-page="${currentRoute}" tabindex="0" aria-label="${routeTitle}内容">${content}</main></div><div id="toast" class="toast ${toastMessage ? "toast--visible" : ""}" data-kind="${toastKind}" aria-live="polite">${toastMessage ? escapeHtml(toastMessage) : ""}</div>
-    </div>`;
+  app.innerHTML = renderAppShell(content);
   wireEvents();
   applyAppearance();
   refreshIcons();
@@ -906,12 +890,15 @@ function render(): void {
   const hexCursor = hexInput?.selectionStart ?? null;
   const previousContent = app.querySelector<HTMLElement>(".main-content");
   const scrollTop = previousContent?.scrollTop ?? 0;
+  const catalogScrollLeft = app.querySelector<HTMLElement>(".skin-grid")?.scrollLeft ?? 0;
   const previousPage = previousContent?.dataset.page;
   const restoreContentFocus = previousContent === document.activeElement;
   applyAppearance();
   if (currentRoute === "assistant") renderSkinWorkspace();
   else renderDashboardShell();
   if (previousPage === currentRoute) {
+    const catalog = app.querySelector<HTMLElement>(".skin-grid");
+    if (catalog) catalog.scrollLeft = catalogScrollLeft;
     const content = app.querySelector<HTMLElement>(".main-content");
     if (content) {
       content.scrollTop = scrollTop;
@@ -952,7 +939,8 @@ async function loadSkinImages(): Promise<void> {
     [...document.querySelectorAll<HTMLButtonElement>(".skin-card")]
       .filter((card) => {
         const bounds = card.getBoundingClientRect();
-        return bounds.top < window.innerHeight + 320 && bounds.bottom > -320;
+        return bounds.top < window.innerHeight + 320 && bounds.bottom > -320
+          && bounds.left < window.innerWidth + 320 && bounds.right > -320;
       })
       .map((card) => Number(card.dataset.skinId)),
   );
@@ -1039,7 +1027,7 @@ async function applySkin(skinId: number): Promise<void> {
       markSelectedLocally(skinId);
     }
     selectedSkinId = skinId;
-    showToast(elapsedMs === undefined ? "皮肤已应用，客户端已确认" : `皮肤已应用，客户端已确认（${elapsedMs}ms）`);
+    showToast(!isTauri ? "演示：已应用所选皮肤" : elapsedMs === undefined ? "皮肤已应用，客户端已确认" : `皮肤已应用，客户端已确认（${elapsedMs}ms）`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : "换肤失败，请稍后重试", "error");
   } finally {
@@ -1163,13 +1151,10 @@ function wireEvents(): void {
     const id = Number(element.dataset.skinId);
     if (!Number.isNaN(id)) {
       const skin = snapshot.skins.find((candidate) => candidate.id === id);
-      previewOnlySelectionId = skin && (!skin.available || skin.isChroma) ? id : null;
+      if (!skin) return;
+      previewOnlySelectionId = id;
       selectedSkinId = id;
-      if (skin && canApplySkinImmediately(skin)) {
-        void applySkin(id);
-      } else {
-        render();
-      }
+      render();
     }
   }));
   app.querySelectorAll<HTMLElement>("[data-favorite-id]").forEach((element) => element.addEventListener("click", () => {
@@ -1245,7 +1230,10 @@ function wireEvents(): void {
   app.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => element.addEventListener("click", (event) => {
     const action = element.dataset.action;
     if (action === "close-settings" && element.classList.contains("modal-backdrop") && event.target !== element) return;
-    if (action === "apply" && selectedSkinId !== null) void applySkin(selectedSkinId);
+    if (action === "apply" && selectedSkinId !== null) {
+      const skin = snapshot.skins.find((candidate) => candidate.id === selectedSkinId);
+      if (skin && canApplySkinImmediately(skin)) void applySkin(skin.id);
+    }
     if (action === "random") void applyRandom();
     if (action === "minimize" || action === "maximize" || action === "close") void runWindowAction(action);
     if (action === "refresh") void reconnectClient();

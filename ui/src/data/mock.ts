@@ -2,7 +2,7 @@ import type { AppPreferences, AugmentStat, AssistantLog, ChampionStat, ProfileSu
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
   themeMode: "dark",
-  accentColor: "mint",
+  accentColor: "gold",
   compactMode: false,
   animations: true,
   launchAtStartup: false,

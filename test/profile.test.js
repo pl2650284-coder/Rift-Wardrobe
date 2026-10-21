@@ -202,7 +202,9 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./services/profile": { getProfileSummary: async () => { reads += 1; return read(); } },
     "./hextech-view": evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: readHextech } }),
     "./rankings-view": evaluate(compile("../ui/src/rankings-view.ts"), { "@tauri-apps/api/core": { invoke: readRanking } }),
+    "./shell": evaluate(compile("../ui/src/shell.ts"), {}),
     "./styles.css": {},
+    "./immersive.css": {},
   }, { window, document });
   return { app, testing: result.testing, nativeCalls, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };
 }
