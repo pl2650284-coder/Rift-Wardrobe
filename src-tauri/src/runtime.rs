@@ -1,11 +1,12 @@
 use crate::{
+    automation::{AutoAccept, AutomationSnapshot},
     discovery,
     lcu::LcuClient,
     models::{AppSnapshot, ApplyResult},
     profile::PlayerProfile,
 };
 use rand::seq::SliceRandom;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{Mutex, RwLock};
 
@@ -14,6 +15,7 @@ pub struct RuntimeState {
     client: RwLock<Option<Arc<LcuClient>>>,
     write_guard: Mutex<()>,
     image_cache: RwLock<HashMap<String, String>>,
+    automation: Mutex<AutoAccept>,
 }
 
 impl RuntimeState {
@@ -23,11 +25,42 @@ impl RuntimeState {
             client: RwLock::new(None),
             write_guard: Mutex::new(()),
             image_cache: RwLock::new(HashMap::new()),
+            automation: Mutex::new(AutoAccept::default()),
         }
     }
 
     pub async fn snapshot(&self) -> AppSnapshot {
         self.snapshot.read().await.clone()
+    }
+
+    pub fn configure_automation(&self, path: PathBuf) -> Result<(), String> {
+        let mut automation = self.automation.try_lock().map_err(|_| "自动接受设置正在使用")?;
+        *automation = AutoAccept::load(path);
+        Ok(())
+    }
+
+    pub async fn automation_snapshot(&self) -> AutomationSnapshot {
+        self.automation.lock().await.snapshot()
+    }
+
+    pub async fn set_auto_accept(&self, app: &AppHandle, enabled: bool, delay_seconds: Option<u8>) -> Result<AutomationSnapshot, String> {
+        let mut automation = self.automation.lock().await;
+        let snapshot = match delay_seconds {
+            Some(seconds) => automation.set_settings(enabled, seconds)?,
+            None => automation.set_enabled(enabled)?,
+        };
+        drop(automation);
+        let _ = app.emit("automation-changed", &snapshot);
+        Ok(snapshot)
+    }
+
+    async fn process_automation(&self, app: &AppHandle, client: &LcuClient, phase: &str) {
+        let mut automation = self.automation.lock().await;
+        let before = automation.snapshot().revision;
+        automation.tick(client, phase).await;
+        let next = automation.snapshot();
+        drop(automation);
+        if next.revision != before { let _ = app.emit("automation-changed", &next); }
     }
 
     pub async fn profile(&self) -> Result<PlayerProfile, String> {
@@ -50,6 +83,7 @@ impl RuntimeState {
         *self.client.write().await = client;
         if self.client.read().await.is_none() {
             self.image_cache.write().await.clear();
+            self.automation.lock().await.reset_offer();
         }
     }
 
@@ -185,8 +219,10 @@ pub fn start_monitor(app: AppHandle) {
             match client.get_snapshot().await {
                 Ok(snapshot) => {
                     let active = snapshot.active;
+                    let phase = snapshot.phase.clone();
                     publish_snapshot(&app, &state, snapshot).await;
-                    tokio::time::sleep(if active {
+                    state.process_automation(&app, &client, &phase).await;
+                    tokio::time::sleep(if active || phase == "ReadyCheck" {
                         Duration::from_millis(180)
                     } else {
                         Duration::from_millis(650)

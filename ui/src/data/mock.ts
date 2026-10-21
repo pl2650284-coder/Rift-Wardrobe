@@ -7,6 +7,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   animations: true,
   launchAtStartup: false,
   autoAccept: false,
+  autoAcceptDelaySeconds: 0,
   autoSkin: false,
   notify: true,
 };

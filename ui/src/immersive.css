@@ -196,7 +196,10 @@ button:focus-visible, select:focus-visible, .skin-grid:focus-visible {
 .favorite-button--active { color: #e7c785; background: #111827df; }
 .skin-grid .empty-state { flex: 1; min-height: 106px; border-color: var(--line); font-size: 14px; }
 .wardrobe-automation { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: none; min-height: 56px; padding: 6px 32px; border-top: 1px solid var(--line-soft); background: var(--bg); }
-.automation-options { display: flex; gap: 26px; }
+.automation-options { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.automation-delay { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.auto-accept-delay { min-height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
+.auto-accept-delay:disabled { opacity: .5; cursor: wait; }
 .automation-option { position: relative; display: flex; align-items: center; gap: 16px; min-height: 44px; cursor: pointer; }
 .automation-option > span:first-child { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
 .automation-option > span:first-child svg { color: var(--accent); }

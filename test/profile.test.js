@@ -161,7 +161,9 @@ test("native profile failure is surfaced without falling back to a demo account"
 const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   receiveSnapshot, hydrateProfileData, reconnectClient, refreshProfileIfNeeded, renderSettingsPage,
   renderNewsPage, selectNewsMode,
-  state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab }),
+  updateAutoAccept, updateAutoAcceptDelay, receiveAutomation,
+  state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab,
+    autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -176,23 +178,36 @@ function deferred() {
   return { promise, resolve };
 }
 
-function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); }, readRanking = async () => { throw new Error("Unexpected ranking call"); } } = {}) {
+function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); }, readRanking = async () => { throw new Error("Unexpected ranking call"); }, automation = { autoAccept: false, autoAcceptDelaySeconds: 0, configured: true, revision: 0, logs: [] }, saveAutomation, hash = "#profile" } = {}) {
   const app = { innerHTML: "", dataset: {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
-  const document = { querySelector: (selector) => selector === "#app" ? app : null, activeElement: null, hidden: false, addEventListener() {} };
+  const document = { querySelector: (selector) => selector === "#app" ? app : null, querySelectorAll: () => [], activeElement: null, hidden: false, addEventListener() {} };
   let snapshotListener;
+  let automationListener;
+  let automationState = structuredClone(automation);
   let reads = 0;
   const nativeCalls = [];
   const window = {
-    __TAURI_INTERNALS__: {}, location: { hash: "#profile" }, history: { replaceState() {} },
+    __TAURI_INTERNALS__: {}, location: { hash }, history: { replaceState() {} },
     localStorage: { getItem: (key) => storedPreferences[key] ?? null, setItem() {} }, addEventListener() {},
     setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
   };
   const result = evaluate(pageCode, {
     "@tauri-apps/api/core": { invoke: async (command, args) => {
       nativeCalls.push({ command, args });
+      if (command === "get_automation_state") return structuredClone(automationState);
+      if (command === "set_auto_accept") {
+        automationState = saveAutomation ? await saveAutomation(args.enabled, args.delaySeconds) : {
+          ...automationState, configured: true, autoAccept: args.enabled, autoAcceptDelaySeconds: args.delaySeconds ?? automationState.autoAcceptDelaySeconds, revision: automationState.revision + 1,
+        };
+        return structuredClone(automationState);
+      }
       return command === "get_snapshot" ? await initial : false;
     } },
-    "@tauri-apps/api/event": { listen: async (_name, callback) => { snapshotListener = callback; return () => {}; } },
+    "@tauri-apps/api/event": { listen: async (name, callback) => {
+      if (name === "snapshot-changed") snapshotListener = callback;
+      if (name === "automation-changed") automationListener = callback;
+      return () => {};
+    } },
     "@tauri-apps/api/window": { getCurrentWindow: () => ({
       onResized: async () => () => {},
       isMaximized: async () => false,
@@ -205,9 +220,125 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./shell": evaluate(compile("../ui/src/shell.ts"), {}),
     "./styles.css": {},
     "./immersive.css": {},
-  }, { window, document });
-  return { app, testing: result.testing, nativeCalls, reads: () => reads, emit: (snapshot) => snapshotListener({ payload: snapshot }) };
+  }, { window, document, HTMLInputElement: class HTMLInputElement {} });
+  return { app, testing: result.testing, nativeCalls, reads: () => reads,
+    emit: (snapshot) => snapshotListener({ payload: snapshot }),
+    emitAutomation: (state) => automationListener({ payload: state }),
+  };
 }
+
+test("auto accept can be enabled in the lobby, queue and ready check before champion select", async () => {
+  for (const phase of ["Lobby", "Matchmaking", "ReadyCheck"]) {
+    const ui = page({ initial: { ...connected, phase }, hash: "#assistant" });
+    await settle();
+    const input = ui.app.innerHTML.match(/<input\b[^>]*data-pref="autoAccept"[^>]*>/)?.[0];
+    assert.ok(input);
+    assert.doesNotMatch(input, /disabled/);
+    await ui.testing.updateAutoAccept(true);
+    assert.equal(ui.testing.state().autoAccept, true);
+    assert.deepEqual(ui.nativeCalls.filter(({ command }) => command === "set_auto_accept"), [
+      { command: "set_auto_accept", args: { enabled: true } },
+    ]);
+  }
+});
+
+test("auto accept waits for the native acknowledgement and preserves the old setting on save failure", async () => {
+  const pending = deferred();
+  const ui = page({ saveAutomation: () => pending.promise });
+  await settle();
+  const saving = ui.testing.updateAutoAccept(true);
+  assert.equal(ui.testing.state().autoAcceptSaving, true);
+  assert.equal(ui.testing.state().autoAccept, false);
+  pending.resolve({ autoAccept: true, autoAcceptDelaySeconds: 0, configured: true, revision: 1, logs: [] });
+  await saving;
+  assert.equal(ui.testing.state().autoAccept, true);
+  assert.equal(ui.testing.state().autoAcceptSaving, false);
+
+  const failing = page({ saveAutomation: async () => { throw new Error("无法保存自动接受设置"); } });
+  await settle();
+  await failing.testing.updateAutoAccept(true);
+  assert.equal(failing.testing.state().autoAccept, false);
+  assert.equal(failing.testing.state().autoAcceptSaving, false);
+  assert.match(failing.app.innerHTML, /无法保存自动接受设置/);
+});
+
+test("old frontend-only auto accept migrates once and cannot overwrite a saved native preference", async () => {
+  const storedPreferences = { "lol-skin-assistant:app-preferences": JSON.stringify({ autoAccept: true }) };
+  const migrating = page({ storedPreferences, automation: { autoAccept: false, autoAcceptDelaySeconds: 0, configured: false, revision: 0, logs: [] } });
+  await settle();
+  assert.equal(migrating.testing.state().autoAccept, true);
+  assert.deepEqual(migrating.nativeCalls.filter(({ command }) => command === "set_auto_accept"), [
+    { command: "set_auto_accept", args: { enabled: true } },
+  ]);
+  const configured = page({ storedPreferences });
+  await settle();
+  assert.equal(configured.testing.state().autoAccept, false);
+  assert.equal(configured.nativeCalls.some(({ command }) => command === "set_auto_accept"), false);
+});
+
+test("background automation events supply real logs and stale events cannot restore old settings", async () => {
+  const ui = page();
+  await settle();
+  assert.deepEqual(ui.testing.state().assistantLogs, []);
+  ui.emitAutomation({ autoAccept: true, autoAcceptDelaySeconds: 0, configured: true, revision: 3, logs: [{
+    id: "actual-accept", timestampMs: now, action: "自动接受对局", detail: "客户端已确认接受对局", status: "success",
+  }] });
+  ui.emitAutomation({ autoAccept: false, autoAcceptDelaySeconds: 0, configured: true, revision: 2, logs: [] });
+  assert.equal(ui.testing.state().autoAccept, true);
+  assert.equal(ui.testing.state().assistantLogs[0].id, "actual-accept");
+  assert.match(ui.testing.state().assistantLogs[0].time, /\d{2}:\d{2}/);
+});
+
+test("delay control offers 0–5 seconds and saves to the backend while auto accept is off", async () => {
+  const ui = page({ hash: "#assistant" });
+  await settle();
+  const select = ui.app.innerHTML.match(/<select\b[^>]*data-auto-accept-delay[^>]*>[\s\S]*?<\/select>/)?.[0];
+  assert.ok(select);
+  assert.doesNotMatch(select, /disabled/);
+  assert.deepEqual([...select.matchAll(/<option value="(\d+)"/g)].map(match => Number(match[1])), [0, 1, 2, 3, 4, 5]);
+  await ui.testing.updateAutoAcceptDelay(3);
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 3);
+  assert.equal(ui.testing.state().autoAccept, false);
+  assert.deepEqual(ui.nativeCalls.find(({ command }) => command === "set_auto_accept"), {
+    command: "set_auto_accept", args: { enabled: false, delaySeconds: 3 },
+  });
+  assert.match(ui.testing.renderSettingsPage(), /value="3" selected/);
+  await ui.testing.updateAutoAccept(true);
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 3);
+});
+
+test("delay save waits for acknowledgement, rolls back on failure, and rejects invalid seconds", async () => {
+  const pending = deferred();
+  const ui = page({ saveAutomation: () => pending.promise });
+  await settle();
+  const saving = ui.testing.updateAutoAcceptDelay(5);
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 0);
+  assert.equal(ui.testing.state().autoAcceptSaving, true);
+  pending.resolve({ autoAccept: false, autoAcceptDelaySeconds: 5, configured: true, revision: 1, logs: [] });
+  await saving;
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 5);
+  const failing = page({ saveAutomation: async () => { throw new Error("无法保存等待时间"); } });
+  await settle();
+  await failing.testing.updateAutoAcceptDelay(2);
+  assert.equal(failing.testing.state().autoAcceptDelaySeconds, 0);
+  assert.match(failing.app.innerHTML, /无法保存等待时间/);
+  const before = ui.nativeCalls.length;
+  for (const invalid of [-1, 6, 1.5, NaN, Infinity]) await ui.testing.updateAutoAcceptDelay(invalid);
+  assert.equal(ui.nativeCalls.length, before);
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 5);
+});
+
+test("native delay survives page reload and overrides stale browser preferences", async () => {
+  const ui = page({ automation: { autoAccept: true, autoAcceptDelaySeconds: 4, configured: true, revision: 0, logs: [] },
+    storedPreferences: { "lol-skin-assistant:app-preferences": JSON.stringify({ autoAccept: false, autoAcceptDelaySeconds: 1 }) } });
+  await settle();
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 4);
+  assert.equal(ui.testing.state().autoAccept, true);
+  assert.equal(ui.nativeCalls.some(({ command }) => command === "set_auto_accept"), false);
+  await ui.testing.updateAutoAccept(false, 0);
+  assert.equal(ui.testing.state().autoAcceptDelaySeconds, 0);
+  assert.equal(ui.testing.state().autoAccept, false);
+});
 
 test("ranking navigation starts with four modes and keeps late hextech data inside its mode", async () => {
   const pending = deferred();

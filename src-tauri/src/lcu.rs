@@ -16,6 +16,8 @@ const SKIN_CAROUSEL_ENDPOINT: &str = "/lol-champ-select/v1/skin-carousel-skins";
 const SKIN_SELECTOR_INFO_ENDPOINT: &str = "/lol-champ-select/v1/skin-selector-info";
 const PICKABLE_SKIN_IDS_ENDPOINT: &str = "/lol-champ-select/v1/pickable-skin-ids";
 const MY_SELECTION_ENDPOINT: &str = "/lol-champ-select/v1/session/my-selection";
+const READY_CHECK_ENDPOINT: &str = "/lol-matchmaking/v1/ready-check";
+const ACCEPT_READY_CHECK_ENDPOINT: &str = "/lol-matchmaking/v1/ready-check/accept";
 const MAX_IMAGE_BYTES: usize = 12 * 1024 * 1024;
 const IMAGE_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const APPLY_DEADLINE_MS: u64 = 950;
@@ -55,6 +57,11 @@ impl LcuError {
 pub struct LcuClient {
     credentials: Credentials,
     http: reqwest::Client,
+}
+
+pub struct ReadyCheck {
+    pub state: String,
+    pub player_response: String,
 }
 
 impl LcuClient {
@@ -146,6 +153,20 @@ impl LcuClient {
             .as_str()
             .map(str::to_string)
             .ok_or_else(|| LcuError::Protocol("gameflow phase was not a string".to_string()))
+    }
+
+    pub async fn get_ready_check(&self) -> Result<Option<ReadyCheck>, LcuError> {
+        let Some(value) = self.optional_json(READY_CHECK_ENDPOINT).await? else { return Ok(None); };
+        let state = value.get("state").and_then(Value::as_str)
+            .ok_or_else(|| LcuError::Protocol("ready-check state missing".to_string()))?;
+        let response = value.get("playerResponse").and_then(Value::as_str)
+            .ok_or_else(|| LcuError::Protocol("ready-check playerResponse missing".to_string()))?;
+        Ok(Some(ReadyCheck { state: state.to_string(), player_response: response.to_string() }))
+    }
+
+    pub async fn accept_ready_check(&self) -> Result<(), LcuError> {
+        self.request_json(Method::POST, ACCEPT_READY_CHECK_ENDPOINT, Some(&json!({}))).await?;
+        Ok(())
     }
 
     pub async fn get_snapshot(&self) -> Result<AppSnapshot, LcuError> {

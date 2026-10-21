@@ -1,4 +1,5 @@
 mod discovery;
+mod automation;
 mod game_assets;
 mod hextech;
 mod lcu;
@@ -9,6 +10,7 @@ mod rankings;
 mod runtime;
 
 use models::{AppSnapshot, ApplyResult};
+use automation::AutomationSnapshot;
 use official_data::NewsDataSnapshot;
 use profile::PlayerProfile;
 use runtime::RuntimeState;
@@ -21,6 +23,16 @@ use tauri::{
 #[tauri::command]
 async fn get_snapshot(state: State<'_, RuntimeState>) -> Result<AppSnapshot, String> {
     Ok(state.snapshot().await)
+}
+
+#[tauri::command]
+async fn get_automation_state(state: State<'_, RuntimeState>) -> Result<AutomationSnapshot, String> {
+    Ok(state.automation_snapshot().await)
+}
+
+#[tauri::command]
+async fn set_auto_accept(app: tauri::AppHandle, state: State<'_, RuntimeState>, enabled: bool, delay_seconds: Option<u8>) -> Result<AutomationSnapshot, String> {
+    state.set_auto_accept(&app, enabled, delay_seconds).await
 }
 
 #[tauri::command]
@@ -257,6 +269,8 @@ pub fn run() {
         .manage(RuntimeState::new())
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
+            get_automation_state,
+            set_auto_accept,
             get_profile,
             get_news_data,
             get_hextech_ranking,
@@ -275,6 +289,8 @@ pub fn run() {
             set_launch_at_startup,
         ])
         .setup(|app| {
+            app.state::<RuntimeState>().configure_automation(app.path().app_config_dir()?.join("automation.json"))
+                .map_err(std::io::Error::other)?;
             let show_item = MenuItem::with_id(app, "show", "显示助手", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;

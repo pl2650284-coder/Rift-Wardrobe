@@ -65,6 +65,14 @@ export type AssistantLog = {
   status: "success" | "pending" | "error";
 };
 
+export type AutomationSnapshot = {
+  autoAccept: boolean;
+  autoAcceptDelaySeconds: number;
+  configured: boolean;
+  revision: number;
+  logs: Array<Omit<AssistantLog, "time"> & { timestampMs: number }>;
+};
+
 export type ChampionStat = {
   id: number;
   iconPath?: string;
@@ -126,6 +134,7 @@ export type AppPreferences = {
   animations: boolean;
   launchAtStartup: boolean;
   autoAccept: boolean;
+  autoAcceptDelaySeconds: number;
   autoSkin: boolean;
   notify: boolean;
 };

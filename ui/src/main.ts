@@ -45,7 +45,7 @@ import {
   Zap,
 } from "lucide";
 import { DEFAULT_PREFERENCES } from "./data/mock";
-import type { AppPreferences, AssistantLog, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary } from "./data/types";
+import type { AppPreferences, AssistantLog, AutomationSnapshot, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary } from "./data/types";
 import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
 import { getProfileSummary } from "./services/profile";
 import { createHextechView } from "./hextech-view";
@@ -235,6 +235,10 @@ let newsDetailId: string | null = null;
 const hextech = createHextechView({ isNative: isTauri, render, escape: escapeHtml, icon, image: renderGameIcon });
 const rankings = createRankingsView({ isNative: isTauri, activeMode: () => newsMode, render, escape: escapeHtml, icon, image: renderGameIcon });
 let autoAccept = DEFAULT_PREFERENCES.autoAccept;
+let autoAcceptDelaySeconds = DEFAULT_PREFERENCES.autoAcceptDelaySeconds;
+let autoAcceptReady = !isTauri;
+let autoAcceptSaving = false;
+let automationRevision = -1;
 let autoSkin = DEFAULT_PREFERENCES.autoSkin;
 let notifyEnabled = DEFAULT_PREFERENCES.notify;
 let compactMode = DEFAULT_PREFERENCES.compactMode;
@@ -245,6 +249,7 @@ let toastTimer: number | undefined;
 let toastMessage: string | null = null;
 let toastKind: "info" | "error" = "info";
 let cleanupListener: UnlistenFn | undefined;
+let cleanupAutomationListener: UnlistenFn | undefined;
 let cleanupWindowResize: UnlistenFn | undefined;
 const imageCache = new Map<string, string>();
 const MAX_IMAGE_CACHE_ENTRIES = 24;
@@ -312,6 +317,7 @@ function currentPreferences(): AppPreferences {
     animations: animationsEnabled,
     launchAtStartup,
     autoAccept,
+    autoAcceptDelaySeconds,
     autoSkin,
     notify: notifyEnabled,
   };
@@ -352,12 +358,12 @@ async function hydrateDashboardData(force = false): Promise<void> {
           source: "demo" as const,
         },
       }));
-    const [news, logs] = await Promise.all([newsLoader, getAssistantLogs()]);
+    const [news, logs] = await Promise.all([newsLoader, isTauri ? Promise.resolve(null) : getAssistantLogs()]);
     championStats = news.champions;
     augmentStats = news.augments;
     augmentCombos = news.combos;
     newsMeta = news.meta;
-    assistantLogs = logs;
+    if (logs) assistantLogs = logs;
   } catch (error) {
     championStats = [];
     augmentStats = [];
@@ -438,6 +444,9 @@ function loadLocalPreferences(): void {
     if (typeof preferences.compactMode === "boolean") compactMode = preferences.compactMode;
     if (typeof preferences.animations === "boolean") animationsEnabled = preferences.animations;
     if (typeof preferences.autoAccept === "boolean") autoAccept = preferences.autoAccept;
+    if (Number.isInteger(preferences.autoAcceptDelaySeconds) && preferences.autoAcceptDelaySeconds! >= 0 && preferences.autoAcceptDelaySeconds! <= 5) {
+      autoAcceptDelaySeconds = preferences.autoAcceptDelaySeconds!;
+    }
     if (typeof preferences.autoSkin === "boolean") autoSkin = preferences.autoSkin;
     if (typeof preferences.notify === "boolean") notifyEnabled = preferences.notify;
     if (typeof preferences.launchAtStartup === "boolean") launchAtStartup = preferences.launchAtStartup;
@@ -500,6 +509,9 @@ function connectionTitle(): string {
 function phaseLabel(): string {
   const labels: Record<string, string> = {
     ChampSelect: "英雄选择",
+    Matchmaking: "正在匹配",
+    ReadyCheck: "等待接受对局",
+    InProgress: "游戏中",
     Lobby: "房间中",
     None: "客户端空闲",
     Disconnected: "等待客户端",
@@ -645,7 +657,7 @@ function renderSkinWorkspace(): void {
       <header class="catalog-head"><div class="catalog-title"><h2>${current ? `${escapeHtml(champion)}的衣橱` : "皮肤衣橱"}</h2><span>${snapshot.skins.length} 款外观</span></div><div class="catalog-tools"><label class="search-box">${icon("search", 16)}<input type="search" maxlength="80" value="${escapeHtml(searchQuery)}" placeholder="搜索皮肤" aria-label="搜索皮肤" data-search /></label><div class="segmented" role="group" aria-label="筛选皮肤">${(["可用", "全部", "收藏"] satisfies CatalogFilter[]).map((filter) => `<button class="segment ${activeFilter === filter ? "segment--active" : ""}" aria-pressed="${activeFilter === filter}" data-filter="${filter}">${filter}</button>`).join("")}</div><button class="secondary-button random-button" data-action="random" aria-label="随机一款可用皮肤" title="随机一款可用皮肤（R）" ${canApply ? "" : "disabled"}>${icon("shuffle", 18)}</button></div></header>
       <div class="skin-grid" tabindex="0" aria-label="皮肤列表，可左右滚动">${filtered.length ? filtered.map(renderSkinCard).join("") : `<div class="empty-state">${icon(snapshot.skins.length ? "search-x" : "image-off", 22)}<span>${!snapshot.skins.length ? "进入选人阶段后，皮肤会显示在这里" : activeFilter === "收藏" && favoriteSkinIds.size === 0 ? "还没有收藏皮肤" : "没有符合条件的皮肤"}</span>${searchQuery ? `<button class="text-button" data-action="clear-search">清除搜索</button>` : ""}</div>`}</div>
     </section>
-    <section class="wardrobe-automation" aria-label="游戏辅助设置"><div class="automation-options"><label class="automation-option"><span>${icon("zap", 16)}自动接受对局</span><input class="switch-input" type="checkbox" data-pref="autoAccept" aria-label="自动接受对局" ${autoAccept ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label><label class="automation-option"><span>${icon("sparkles", 16)}自动应用皮肤</span><input class="switch-input" type="checkbox" data-pref="autoSkin" aria-label="自动应用皮肤" ${autoSkin ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label></div><button class="text-button" data-action="show-logs">${icon("list-checks", 16)}${logsOpen ? "收起日志" : "操作日志"}</button></section>
+    <section class="wardrobe-automation" aria-label="游戏辅助设置"><div class="automation-options"><label class="automation-option"><span>${icon("zap", 16)}自动接受对局</span><input class="switch-input" type="checkbox" data-pref="autoAccept" aria-label="自动接受对局" ${autoAccept ? "checked" : ""} ${!autoAcceptReady || autoAcceptSaving ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label><label class="automation-delay"><span>等待</span>${autoAcceptDelaySelect()}<span>未确认时接受</span></label><label class="automation-option"><span>${icon("sparkles", 16)}自动应用皮肤</span><input class="switch-input" type="checkbox" data-pref="autoSkin" aria-label="自动应用皮肤" ${autoSkin ? "checked" : ""} ${!ready ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label></div><button class="text-button" data-action="show-logs">${icon("list-checks", 16)}${logsOpen ? "收起日志" : "操作日志"}</button></section>
     ${logsOpen ? `<section class="wardrobe-logs" aria-label="操作日志"><div class="operation-log"><div class="operation-log-head"><span>时间</span><span>操作</span><span>详情</span><span>状态</span></div>${assistantLogs.length ? assistantLogs.map((log) => `<div class="operation-log-row"><span>${escapeHtml(log.time)}</span><strong>${escapeHtml(log.action)}</strong><span>${escapeHtml(log.detail)}</span><em class="log-status log-status--${log.status}">${log.status === "success" ? "成功" : log.status === "pending" ? "等待确认" : "失败"}</em></div>`).join("") : `<div class="empty-state">暂无执行记录</div>`}</div></section>` : ""}
     <footer class="content-foot"><span>${icon("shield-check", 14)}${!isTauri ? "账号与拥有状态均为演示" : "只通过客户端接口切换皮肤"}</span><span>最后同步 ${formatTime(snapshot.updatedAtMs)}</span></footer>`;
   app.innerHTML = renderAppShell(content);
@@ -856,15 +868,19 @@ function renderNewsDetail(): string {
   return `<div class="detail-backdrop" data-action="close-news-detail"><aside class="detail-drawer"><header><div><span class="eyebrow">AUGMENT DETAIL</span><h2>${escapeHtml(augment.name)}</h2></div><button class="icon-button" data-action="close-news-detail" aria-label="关闭详情">${icon("x", 17)}</button></header><div class="detail-hero">${renderGameIcon(augment.name, augment.color, augment.iconPath, augment.iconUrl, "augment", "detail-token")}<div><strong>${escapeHtml(augment.tier)} 级符文</strong><p>${escapeHtml(augment.description || "暂无官方描述")}</p></div></div><div class="detail-stat-grid"><div><span>胜率</span><strong>${newsPercent(augment.winRate)}</strong></div><div><span>选择率</span><strong>${newsPercent(augment.pickRate)}</strong></div><div><span>样本数</span><strong>${augment.sampleSize === null ? "未提供" : augment.sampleSize.toLocaleString("zh-CN")}</strong></div><div><span>模式</span><strong>海克斯大乱斗</strong></div></div><div class="detail-copy"><span class="eyebrow">数据说明</span><h3>选取率来自第三方有限样本</h3><p>Riot 官方公开接口未提供海克斯胜率，应用不会从选取率推导胜率。</p></div><footer>${escapeHtml(newsSourceLabel())}</footer></aside></div>`;
 }
 
+function autoAcceptDelaySelect(): string {
+  return `<select class="auto-accept-delay" data-auto-accept-delay aria-label="自动接受等待时间" ${!autoAcceptReady || autoAcceptSaving ? "disabled" : ""}>${[0, 1, 2, 3, 4, 5].map((seconds) => `<option value="${seconds}" ${autoAcceptDelaySeconds === seconds ? "selected" : ""}>${seconds} 秒</option>`).join("")}</select>`;
+}
+
 function preferenceRow(key: string, title: string, description: string, checked: boolean): string {
-  return `<label class="preference-row"><span><strong>${title}</strong><small>${description}</small></span><input class="switch-input" type="checkbox" data-pref="${key}" ${checked ? "checked" : ""} /><span class="switch-track" aria-hidden="true"></span></label>`;
+  return `<label class="preference-row"><span><strong>${title}</strong><small>${description}</small></span><input class="switch-input" type="checkbox" data-pref="${key}" ${checked ? "checked" : ""} ${key === "autoAccept" && (!autoAcceptReady || autoAcceptSaving) ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label>`;
 }
 
 function renderSettingsPage(): string {
   const colors = ["mint", "blue", "gold", "rose"];
   return `
     <section class="page-head"><div><span class="eyebrow">APP CONTROL CENTER</span><h1>应用设置</h1><p>调整外观、自动化行为和本地数据偏好。</p></div><span class="settings-saved">${icon("check-circle-2", 14)}设置自动保存</span></section>
-    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "检测到匹配成功后自动确认进入房间", autoAccept)}${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>游戏资讯优先读取 Riot Data Dragon；海克斯大乱斗选取率会标注第三方有限样本，官方未提供的胜率不会显示。</p></div></div></article></div></section>`;
+    <section class="settings-layout"><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">APPEARANCE</span><h2>外观</h2></div><span class="settings-panel-icon">${icon("palette", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--static"><span><strong>主题模式</strong><small>选择适合当前环境的显示模式</small></span><div class="theme-choice"><button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 14)}深色</button><button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 14)}浅色</button></div></div><div class="preference-row preference-row--static"><span><strong>主题色</strong><small>用于强调按钮、状态和选中项</small></span><div class="accent-choice">${colors.map((color) => `<button class="accent-swatch accent-swatch--${color} ${accentColor === color ? "accent-swatch--active" : ""}" data-accent="${color}" aria-label="${color}主题色"></button>`).join("")}</div></div>${preferenceRow("compact", "紧凑布局", "减少列表间距，显示更多信息", compactMode)}${preferenceRow("animations", "界面动效", "保留页面切换和反馈动效", animationsEnabled)}</div></article><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">LOCAL DATA</span><h2>本地数据</h2></div><span class="settings-panel-icon">${icon("database", 17)}</span></header><div class="preference-content"><div class="preference-row preference-row--button"><span><strong>皮肤图片缓存</strong><small>缓存仅保存在本机内存中，当前占用约 18 MB</small></span><button class="secondary-button" data-action="clear-image-cache">清理缓存</button></div><div class="preference-row preference-row--button"><span><strong>恢复默认设置</strong><small>清除外观和行为偏好，不影响收藏皮肤</small></span><button class="secondary-button" data-action="reset-preferences">恢复默认</button></div></div></article></div><div class="settings-column"><article class="settings-panel"><header class="panel-heading"><div><span class="eyebrow">AUTOMATION</span><h2>行为偏好</h2></div><span class="settings-panel-icon">${icon("settings-2", 17)}</span></header><div class="preference-content">${preferenceRow("autoAccept", "自动接受对局", "匹配成功后等待指定时间，仍未确认才自动接受", autoAccept)}<div class="preference-row"><span><strong>自动接受等待时间</strong><small>0 秒立即接受；等待期间可手动确认，托盘运行也生效</small></span>${autoAcceptDelaySelect()}</div>${preferenceRow("autoSkin", "自动应用皮肤", "进入选人阶段后使用上次选择的皮肤", autoSkin)}${preferenceRow("notify", "桌面通知", "在后台完成自动化操作时提醒我", notifyEnabled)}${preferenceRow("launchAtStartup", "开机启动", "登录 Windows 后自动运行助手", launchAtStartup)}</div></article><article class="settings-panel settings-info-panel"><div class="info-block"><span class="info-icon">${icon("shield-check", 17)}</span><div><strong>本地优先</strong><p>账号信息、收藏和偏好仅保存在当前设备。换肤操作通过客户端接口完成，不修改游戏文件。</p></div></div><div class="info-block"><span class="info-icon info-icon--blue">${icon("wifi", 17)}</span><div><strong>数据状态</strong><p>游戏资讯优先读取 Riot Data Dragon；海克斯大乱斗选取率会标注第三方有限样本，官方未提供的胜率不会显示。</p></div></div></article></div></section>`;
 }
 
 function renderAppShell(content: string): string {
@@ -1199,11 +1215,18 @@ function wireEvents(): void {
     render();
     window.setTimeout(() => app.querySelector<HTMLInputElement>("[data-news-search]")?.focus(), 0);
   });
+  app.querySelector<HTMLSelectElement>("[data-auto-accept-delay]")?.addEventListener("change", (event) => {
+    const select = event.currentTarget as HTMLSelectElement;
+    void updateAutoAcceptDelay(Number(select.value));
+  });
   app.querySelectorAll<HTMLInputElement>("[data-pref]").forEach((element) => element.addEventListener("change", (event) => {
     const input = event.currentTarget;
     if (!(input instanceof HTMLInputElement)) return;
     const key = input.dataset.pref;
-    if (key === "autoAccept") autoAccept = input.checked;
+    if (key === "autoAccept") {
+      void updateAutoAccept(input.checked);
+      return;
+    }
     if (key === "autoSkin") autoSkin = input.checked;
     if (key === "notify") notifyEnabled = input.checked;
     if (key === "launchAtStartup") void updateLaunchAtStartup(input.checked);
@@ -1269,7 +1292,7 @@ function wireEvents(): void {
       accentColor = DEFAULT_PREFERENCES.accentColor;
       compactMode = DEFAULT_PREFERENCES.compactMode;
       animationsEnabled = DEFAULT_PREFERENCES.animations;
-      autoAccept = DEFAULT_PREFERENCES.autoAccept;
+      void updateAutoAccept(DEFAULT_PREFERENCES.autoAccept, DEFAULT_PREFERENCES.autoAcceptDelaySeconds);
       autoSkin = DEFAULT_PREFERENCES.autoSkin;
       notifyEnabled = DEFAULT_PREFERENCES.notify;
       persistAppPreferences();
@@ -1330,6 +1353,69 @@ async function hydrateNativePreferences(): Promise<void> {
   render();
 }
 
+function receiveAutomation(next: AutomationSnapshot): void {
+  if (!next || typeof next.autoAccept !== "boolean" || typeof next.configured !== "boolean"
+    || !Number.isInteger(next.autoAcceptDelaySeconds) || next.autoAcceptDelaySeconds < 0 || next.autoAcceptDelaySeconds > 5
+    || !Number.isSafeInteger(next.revision) || !Array.isArray(next.logs)) {
+    throw new Error("自动接受设置格式不兼容，请重启应用");
+  }
+  if (next.revision < automationRevision) return;
+  automationRevision = next.revision;
+  autoAccept = next.autoAccept;
+  autoAcceptDelaySeconds = next.autoAcceptDelaySeconds;
+  autoAcceptReady = true;
+  assistantLogs = next.logs.map((log) => ({ ...log, time: formatTime(log.timestampMs) }));
+  persistAppPreferences();
+  render();
+}
+
+async function hydrateAutomation(): Promise<void> {
+  const legacyEnabled = autoAccept;
+  try {
+    let state = await invokeCommand<AutomationSnapshot>("get_automation_state", {});
+    // Migrate the old frontend-only switch once; the persisted Rust setting
+    // becomes authoritative on subsequent loads, including tray operation.
+    if (state && state.configured === false) {
+      state = await invokeCommand<AutomationSnapshot>("set_auto_accept", { enabled: legacyEnabled });
+    }
+    receiveAutomation(state);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "读取自动接受设置失败，请重启应用", "error");
+  }
+}
+
+async function updateAutoAcceptDelay(seconds: number): Promise<void> {
+  await updateAutoAccept(autoAccept, seconds);
+}
+
+async function updateAutoAccept(enabled: boolean, delaySeconds?: number): Promise<void> {
+  if (delaySeconds !== undefined && (!Number.isInteger(delaySeconds) || delaySeconds < 0 || delaySeconds > 5)) {
+    showToast("等待时间请选择 0–5 秒的整数", "error");
+    render();
+    return;
+  }
+  if (!autoAcceptReady || autoAcceptSaving) return;
+  if (!isTauri) {
+    autoAccept = enabled;
+    if (delaySeconds !== undefined) autoAcceptDelaySeconds = delaySeconds;
+    persistAppPreferences();
+    render();
+    showToast("演示模式：仅预览自动接受设置");
+    return;
+  }
+  autoAcceptSaving = true;
+  render();
+  try {
+    receiveAutomation(await invokeCommand<AutomationSnapshot>("set_auto_accept", { enabled, ...(delaySeconds === undefined ? {} : { delaySeconds }) }));
+    showToast(delaySeconds !== undefined ? `等待时间已保存：${delaySeconds} 秒${enabled ? "，后台持续生效" : "，开启自动接受后生效"}` : enabled ? "自动接受对局已开启，后台持续生效" : "自动接受对局已关闭");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "保存自动接受设置失败", "error");
+  } finally {
+    autoAcceptSaving = false;
+    render();
+  }
+}
+
 function receiveSnapshot(next: Snapshot): void {
   if (next.revision < snapshot.revision) return;
   const previous = snapshot;
@@ -1374,6 +1460,8 @@ async function bootstrap(): Promise<void> {
   }
   try {
     // Listen first so a connection established during startup cannot be missed.
+    cleanupAutomationListener = await listen<AutomationSnapshot>("automation-changed", (event: { payload: AutomationSnapshot }) => receiveAutomation(event.payload));
+    void hydrateAutomation();
     cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => receiveSnapshot(event.payload));
     receiveSnapshot(await invokeCommand<Snapshot>("get_snapshot", {}));
     profileRefreshTimer = window.setInterval(refreshProfileIfNeeded, 5_000);
@@ -1384,6 +1472,7 @@ async function bootstrap(): Promise<void> {
 
 window.addEventListener("beforeunload", () => {
   cleanupListener?.();
+  cleanupAutomationListener?.();
   cleanupWindowResize?.();
   window.clearInterval(profileRefreshTimer);
 });
