@@ -1,14 +1,16 @@
 import type { AppPreferences, AugmentStat, AssistantLog, ChampionStat, ProfileSummary } from "./types";
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
-  themeMode: "dark",
-  accentColor: "gold",
+  themeMode: "system",
+  accentColor: "blue",
   compactMode: false,
   animations: true,
   launchAtStartup: false,
   autoAccept: false,
   autoAcceptDelaySeconds: 0,
   autoSkin: false,
+  autoPopupCompanion: true,
+  companionAlwaysOnTop: true,
   notify: true,
 };
 

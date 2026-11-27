@@ -1,0 +1,1939 @@
+{
+ "version": "16.21.1",
+ "champions": {
+  "Vayne": "暗夜猎手",
+  "Jinx": "暴走萝莉",
+  "Ezreal": "探险家",
+  "Kaisa": "虚空之女",
+  "Caitlyn": "皮城女警",
+  "Ashe": "寒冰射手",
+  "MissFortune": "赏金猎人",
+  "Jhin": "戏命师",
+  "Thresh": "魂锁典狱长",
+  "Leona": "曙光女神",
+  "Nautilus": "深海泰坦",
+  "Lulu": "仙灵女巫",
+  "Senna": "涤魂圣枪",
+  "LeeSin": "盲僧",
+  "JarvanIV": "德玛西亚皇子",
+  "Viego": "破败之王",
+  "Khazix": "虚空掠夺者",
+  "Graves": "法外狂徒",
+  "Ahri": "九尾妖狐",
+  "Yasuo": "疾风剑豪",
+  "Lux": "光辉女郎",
+  "Orianna": "发条魔灵",
+  "Zed": "影流之主",
+  "Syndra": "暗黑元首",
+  "Gwen": "灵罗娃娃",
+  "Darius": "诺克萨斯之手",
+  "Garen": "德玛西亚之力",
+  "Aatrox": "暗裔剑魔",
+  "Sett": "腕豪",
+  "Camille": "青钢影",
+  "Yone": "封魔剑魂",
+  "Sylas": "解脱者",
+  "Ornn": "山隐之焰",
+  "Seraphine": "星籁歌姬"
+ },
+ "items": {
+  "1001": "鞋子",
+  "1055": "多兰之刃",
+  "2003": "生命药水",
+  "3006": "狂战士胫甲",
+  "3009": "轻灵之靴",
+  "3020": "法师之靴",
+  "3026": "守护天使",
+  "3031": "无尽之刃",
+  "3033": "凡性的提醒",
+  "3036": "多米尼克领主的致意",
+  "3046": "幻影之舞",
+  "3047": "铁板靴",
+  "3053": "斯特拉克的挑战护手",
+  "3065": "振奋盔甲",
+  "3071": "黑色切割者",
+  "3072": "饮血剑",
+  "3075": "荆棘之甲",
+  "3085": "卢安娜的飓风",
+  "3087": "斯塔缇克电刃",
+  "3089": "灭世者的死亡之帽",
+  "3091": "智慧末刃",
+  "3094": "疾射火炮",
+  "3100": "巫妖之祸",
+  "3107": "救赎",
+  "3111": "水银之靴",
+  "3115": "纳什之牙",
+  "3116": "瑞莱的冰晶节杖",
+  "3124": "鬼索的狂暴之刃",
+  "3135": "虚空之杖",
+  "3143": "兰顿之兆",
+  "3153": "破败王者之刃",
+  "3157": "中娅沙漏",
+  "3158": "明朗之靴",
+  "3165": "莫雷洛秘典",
+  "3190": "钢铁烈阳之匣",
+  "3222": "米凯尔的祝福",
+  "3302": "界弓",
+  "3340": "侦察守卫",
+  "3364": "神谕透镜",
+  "3742": "亡者的板甲",
+  "4645": "影焰",
+  "6631": "挺进破坏者",
+  "6653": "兰德里的折磨",
+  "6672": "海妖杀手",
+  "6675": "纳沃利烁刃"
+ },
+ "spells": {
+  "SummonerFlash": "闪现",
+  "SummonerHeal": "治疗术",
+  "SummonerDot": "引燃",
+  "SummonerTeleport": "传送",
+  "SummonerSmite": "惩戒",
+  "SummonerExhaust": "虚弱",
+  "SummonerBarrier": "屏障",
+  "SummonerHaste": "幽灵疾步",
+  "SummonerSnowball": "标记",
+  "SummonerBoost": "净化"
+ },
+ "runes": [
+  {
+   "id": 8100,
+   "key": "Domination",
+   "name": "主宰",
+   "slots": [
+    [
+     {
+      "id": 8112,
+      "name": "电刑"
+     },
+     {
+      "id": 8128,
+      "name": "黑暗收割"
+     },
+     {
+      "id": 9923,
+      "name": "丛刃"
+     }
+    ],
+    [
+     {
+      "id": 8126,
+      "name": "恶意中伤"
+     },
+     {
+      "id": 8139,
+      "name": "血之滋味"
+     },
+     {
+      "id": 8143,
+      "name": "猛然冲击"
+     }
+    ],
+    [
+     {
+      "id": 8137,
+      "name": "第六感"
+     },
+     {
+      "id": 8140,
+      "name": "可怖纪念品"
+     },
+     {
+      "id": 8141,
+      "name": "深入守卫"
+     }
+    ],
+    [
+     {
+      "id": 8135,
+      "name": "寻宝猎人"
+     },
+     {
+      "id": 8105,
+      "name": "无情猎手"
+     },
+     {
+      "id": 8106,
+      "name": "终极猎人"
+     }
+    ]
+   ]
+  },
+  {
+   "id": 8300,
+   "key": "Inspiration",
+   "name": "启迪",
+   "slots": [
+    [
+     {
+      "id": 8351,
+      "name": "冰川增幅"
+     },
+     {
+      "id": 8360,
+      "name": "启封的秘籍"
+     },
+     {
+      "id": 8369,
+      "name": "先攻"
+     }
+    ],
+    [
+     {
+      "id": 8306,
+      "name": "海克斯科技闪现罗网"
+     },
+     {
+      "id": 8304,
+      "name": "神奇之鞋"
+     },
+     {
+      "id": 8321,
+      "name": "返现"
+     }
+    ],
+    [
+     {
+      "id": 8313,
+      "name": "三重补药"
+     },
+     {
+      "id": 8352,
+      "name": "时间扭曲补药"
+     },
+     {
+      "id": 8345,
+      "name": "饼干配送"
+     }
+    ],
+    [
+     {
+      "id": 8347,
+      "name": "星界洞悉"
+     },
+     {
+      "id": 8410,
+      "name": "行近速率"
+     },
+     {
+      "id": 8316,
+      "name": "多面手"
+     }
+    ]
+   ]
+  },
+  {
+   "id": 8000,
+   "key": "Precision",
+   "name": "精密",
+   "slots": [
+    [
+     {
+      "id": 8005,
+      "name": "强攻"
+     },
+     {
+      "id": 8008,
+      "name": "致命节奏"
+     },
+     {
+      "id": 8021,
+      "name": "迅捷步法"
+     },
+     {
+      "id": 8010,
+      "name": "征服者"
+     }
+    ],
+    [
+     {
+      "id": 9101,
+      "name": "吸收生命力"
+     },
+     {
+      "id": 9111,
+      "name": "凯旋"
+     },
+     {
+      "id": 8009,
+      "name": "气定神闲"
+     }
+    ],
+    [
+     {
+      "id": 9104,
+      "name": "传说：欢欣"
+     },
+     {
+      "id": 9105,
+      "name": "传说：急速"
+     },
+     {
+      "id": 9103,
+      "name": "传说：血统"
+     }
+    ],
+    [
+     {
+      "id": 8014,
+      "name": "致命一击"
+     },
+     {
+      "id": 8017,
+      "name": "砍倒"
+     },
+     {
+      "id": 8299,
+      "name": "坚毅不倒"
+     }
+    ]
+   ]
+  },
+  {
+   "id": 8400,
+   "key": "Resolve",
+   "name": "坚决",
+   "slots": [
+    [
+     {
+      "id": 8437,
+      "name": "不灭之握"
+     },
+     {
+      "id": 8439,
+      "name": "余震"
+     },
+     {
+      "id": 8465,
+      "name": "守护者"
+     }
+    ],
+    [
+     {
+      "id": 8446,
+      "name": "爆破"
+     },
+     {
+      "id": 8463,
+      "name": "生命源泉"
+     },
+     {
+      "id": 8401,
+      "name": "护盾猛击"
+     }
+    ],
+    [
+     {
+      "id": 8429,
+      "name": "调节"
+     },
+     {
+      "id": 8444,
+      "name": "复苏之风"
+     },
+     {
+      "id": 8473,
+      "name": "骸骨镀层"
+     }
+    ],
+    [
+     {
+      "id": 8451,
+      "name": "过度生长"
+     },
+     {
+      "id": 8453,
+      "name": "复苏"
+     },
+     {
+      "id": 8242,
+      "name": "坚定"
+     }
+    ]
+   ]
+  },
+  {
+   "id": 8200,
+   "key": "Sorcery",
+   "name": "巫术",
+   "slots": [
+    [
+     {
+      "id": 8214,
+      "name": "召唤：艾黎"
+     },
+     {
+      "id": 8229,
+      "name": "奥术彗星"
+     },
+     {
+      "id": 8230,
+      "name": "风暴掠袭者的狂涌"
+     },
+     {
+      "id": 8992,
+      "name": "冥火之触"
+     }
+    ],
+    [
+     {
+      "id": 8224,
+      "name": "公理秘术"
+     },
+     {
+      "id": 8226,
+      "name": "法力流系带"
+     },
+     {
+      "id": 8275,
+      "name": "灵光披风"
+     }
+    ],
+    [
+     {
+      "id": 8210,
+      "name": "超然"
+     },
+     {
+      "id": 8234,
+      "name": "迅捷"
+     },
+     {
+      "id": 8233,
+      "name": "绝对专注"
+     }
+    ],
+    [
+     {
+      "id": 8237,
+      "name": "焦灼"
+     },
+     {
+      "id": 8232,
+      "name": "水上行走"
+     },
+     {
+      "id": 8236,
+      "name": "风暴聚集"
+     }
+    ]
+   ]
+  }
+ ],
+ "allChampions": [
+  {
+   "id": "Aatrox",
+   "name": "暗裔剑魔",
+   "title": "亚托克斯",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Ahri",
+   "name": "九尾妖狐",
+   "title": "阿狸",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Akali",
+   "name": "离群之刺",
+   "title": "阿卡丽",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Akshan",
+   "name": "影哨",
+   "title": "阿克尚",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Alistar",
+   "name": "牛头酋长",
+   "title": "阿利斯塔",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Ambessa",
+   "name": "铁血狼母",
+   "title": "安蓓萨",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Amumu",
+   "name": "殇之木乃伊",
+   "title": "阿木木",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Anivia",
+   "name": "冰晶凤凰",
+   "title": "艾尼维亚",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Annie",
+   "name": "黑暗之女",
+   "title": "安妮",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Aphelios",
+   "name": "残月之肃",
+   "title": "厄斐琉斯",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Ashe",
+   "name": "寒冰射手",
+   "title": "艾希",
+   "tags": [
+    "Marksman",
+    "Support"
+   ]
+  },
+  {
+   "id": "AurelionSol",
+   "name": "铸星龙王",
+   "title": "奥瑞利安·索尔",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Aurora",
+   "name": "双界灵兔",
+   "title": "阿萝拉",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Azir",
+   "name": "沙漠皇帝",
+   "title": "阿兹尔",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Bard",
+   "name": "星界游神",
+   "title": "巴德",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Belveth",
+   "name": "虚空女皇",
+   "title": "卑尔维斯",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Blitzcrank",
+   "name": "蒸汽机器人",
+   "title": "布里茨",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Brand",
+   "name": "复仇焰魂",
+   "title": "布兰德",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Braum",
+   "name": "弗雷尔卓德之心",
+   "title": "布隆",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Briar",
+   "name": "狂厄蔷薇",
+   "title": "贝蕾亚",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Caitlyn",
+   "name": "皮城女警",
+   "title": "凯特琳",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Camille",
+   "name": "青钢影",
+   "title": "卡蜜尔",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Cassiopeia",
+   "name": "魔蛇之拥",
+   "title": "卡西奥佩娅",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Chogath",
+   "name": "虚空恐惧",
+   "title": "科加斯",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Corki",
+   "name": "英勇投弹手",
+   "title": "库奇",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Darius",
+   "name": "诺克萨斯之手",
+   "title": "德莱厄斯",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Diana",
+   "name": "皎月女神",
+   "title": "黛安娜",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Draven",
+   "name": "荣耀行刑官",
+   "title": "德莱文",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "DrMundo",
+   "name": "祖安狂人",
+   "title": "蒙多医生",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Ekko",
+   "name": "时间刺客",
+   "title": "艾克",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Elise",
+   "name": "蜘蛛女皇",
+   "title": "伊莉丝",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Evelynn",
+   "name": "痛苦之拥",
+   "title": "伊芙琳",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Ezreal",
+   "name": "探险家",
+   "title": "伊泽瑞尔",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Fiddlesticks",
+   "name": "远古恐惧",
+   "title": "费德提克",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Fiora",
+   "name": "无双剑姬",
+   "title": "菲奥娜",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Fizz",
+   "name": "潮汐海灵",
+   "title": "菲兹",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Galio",
+   "name": "正义巨像",
+   "title": "加里奥",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Gangplank",
+   "name": "海洋之灾",
+   "title": "普朗克",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Garen",
+   "name": "德玛西亚之力",
+   "title": "盖伦",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Gnar",
+   "name": "迷失之牙",
+   "title": "纳尔",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Gragas",
+   "name": "酒桶",
+   "title": "古拉加斯",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Graves",
+   "name": "法外狂徒",
+   "title": "格雷福斯",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Gwen",
+   "name": "灵罗娃娃",
+   "title": "格温",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Hecarim",
+   "name": "战争之影",
+   "title": "赫卡里姆",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Heimerdinger",
+   "name": "大发明家",
+   "title": "黑默丁格",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Hwei",
+   "name": "异画师",
+   "title": "彗",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Illaoi",
+   "name": "海兽祭司",
+   "title": "俄洛伊",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Irelia",
+   "name": "刀锋舞者",
+   "title": "艾瑞莉娅",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Ivern",
+   "name": "翠神",
+   "title": "艾翁",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Janna",
+   "name": "风暴之怒",
+   "title": "迦娜",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "JarvanIV",
+   "name": "德玛西亚皇子",
+   "title": "嘉文四世",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Jax",
+   "name": "武器大师",
+   "title": "贾克斯",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Jayce",
+   "name": "未来守护者",
+   "title": "杰斯",
+   "tags": [
+    "Fighter",
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Jhin",
+   "name": "戏命师",
+   "title": "烬",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Jinx",
+   "name": "暴走萝莉",
+   "title": "金克丝",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Kaisa",
+   "name": "虚空之女",
+   "title": "卡莎",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Kalista",
+   "name": "复仇之矛",
+   "title": "卡莉丝塔",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Karma",
+   "name": "天启者",
+   "title": "卡尔玛",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Karthus",
+   "name": "死亡颂唱者",
+   "title": "卡尔萨斯",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Kassadin",
+   "name": "虚空行者",
+   "title": "卡萨丁",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Katarina",
+   "name": "不祥之刃",
+   "title": "卡特琳娜",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Kayle",
+   "name": "正义天使",
+   "title": "凯尔",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Kayn",
+   "name": "影流之镰",
+   "title": "凯隐",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Kennen",
+   "name": "狂暴之心",
+   "title": "凯南",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Khazix",
+   "name": "虚空掠夺者",
+   "title": "卡兹克",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Kindred",
+   "name": "永猎双子",
+   "title": "千珏",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Kled",
+   "name": "暴怒骑士",
+   "title": "克烈",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "KogMaw",
+   "name": "深渊巨口",
+   "title": "克格莫",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "KSante",
+   "name": "纳祖芒荣耀",
+   "title": "奎桑提",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Leblanc",
+   "name": "诡术妖姬",
+   "title": "乐芙兰",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "LeeSin",
+   "name": "盲僧",
+   "title": "李青",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Leona",
+   "name": "曙光女神",
+   "title": "蕾欧娜",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Lillia",
+   "name": "含羞蓓蕾",
+   "title": "莉莉娅",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Lissandra",
+   "name": "冰霜女巫",
+   "title": "丽桑卓",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Locke",
+   "name": "灰烬驱魔人",
+   "title": "洛克",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Lucian",
+   "name": "圣枪游侠",
+   "title": "卢锡安",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Lulu",
+   "name": "仙灵女巫",
+   "title": "璐璐",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Lux",
+   "name": "光辉女郎",
+   "title": "拉克丝",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Malphite",
+   "name": "熔岩巨兽",
+   "title": "墨菲特",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Malzahar",
+   "name": "虚空先知",
+   "title": "玛尔扎哈",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Maokai",
+   "name": "扭曲树精",
+   "title": "茂凯",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "MasterYi",
+   "name": "无极剑圣",
+   "title": "易",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Mel",
+   "name": "流光镜影",
+   "title": "梅尔",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Milio",
+   "name": "明烛",
+   "title": "米利欧",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "MissFortune",
+   "name": "赏金猎人",
+   "title": "厄运小姐",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "MonkeyKing",
+   "name": "齐天大圣",
+   "title": "孙悟空",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Mordekaiser",
+   "name": "铁铠冥魂",
+   "title": "莫德凯撒",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Morgana",
+   "name": "堕落天使",
+   "title": "莫甘娜",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Naafiri",
+   "name": "百裂冥犬",
+   "title": "纳亚菲利",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Nami",
+   "name": "唤潮鲛姬",
+   "title": "娜美",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Nasus",
+   "name": "沙漠死神",
+   "title": "内瑟斯",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Nautilus",
+   "name": "深海泰坦",
+   "title": "诺提勒斯",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Neeko",
+   "name": "万花通灵",
+   "title": "妮蔻",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Nidalee",
+   "name": "狂野女猎手",
+   "title": "奈德丽",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Nilah",
+   "name": "不羁之悦",
+   "title": "尼菈",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Nocturne",
+   "name": "永恒梦魇",
+   "title": "魔腾",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Nunu",
+   "name": "雪原双子",
+   "title": "努努和威朗普",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Olaf",
+   "name": "狂战士",
+   "title": "奥拉夫",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Orianna",
+   "name": "发条魔灵",
+   "title": "奥莉安娜",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Ornn",
+   "name": "山隐之焰",
+   "title": "奥恩",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "id": "Pantheon",
+   "name": "不屈之枪",
+   "title": "潘森",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Poppy",
+   "name": "圣锤之毅",
+   "title": "波比",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Pyke",
+   "name": "血港鬼影",
+   "title": "派克",
+   "tags": [
+    "Support",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Qiyana",
+   "name": "元素女皇",
+   "title": "奇亚娜",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Quinn",
+   "name": "德玛西亚之翼",
+   "title": "奎因",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Rakan",
+   "name": "幻翎",
+   "title": "洛",
+   "tags": [
+    "Support"
+   ]
+  },
+  {
+   "id": "Rammus",
+   "name": "披甲龙龟",
+   "title": "拉莫斯",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "id": "RekSai",
+   "name": "虚空遁地兽",
+   "title": "雷克塞",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Rell",
+   "name": "镕铁少女",
+   "title": "芮尔",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Renata",
+   "name": "炼金男爵",
+   "title": "烈娜塔 · 戈拉斯克",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Renekton",
+   "name": "荒漠屠夫",
+   "title": "雷克顿",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Rengar",
+   "name": "傲之追猎者",
+   "title": "雷恩加尔",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Riven",
+   "name": "放逐之刃",
+   "title": "锐雯",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Rumble",
+   "name": "机械公敌",
+   "title": "兰博",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Ryze",
+   "name": "符文法师",
+   "title": "瑞兹",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Samira",
+   "name": "沙漠玫瑰",
+   "title": "莎弥拉",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Sejuani",
+   "name": "北地之怒",
+   "title": "瑟庄妮",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "id": "Senna",
+   "name": "涤魂圣枪",
+   "title": "赛娜",
+   "tags": [
+    "Support",
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Seraphine",
+   "name": "星籁歌姬",
+   "title": "萨勒芬妮",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Sett",
+   "name": "腕豪",
+   "title": "瑟提",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Shaco",
+   "name": "恶魔小丑",
+   "title": "萨科",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Shen",
+   "name": "暮光之眼",
+   "title": "慎",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "id": "Shyvana",
+   "name": "龙血武姬",
+   "title": "希瓦娜",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Singed",
+   "name": "炼金术士",
+   "title": "辛吉德",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Sion",
+   "name": "亡灵战神",
+   "title": "赛恩",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Sivir",
+   "name": "战争女神",
+   "title": "希维尔",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Skarner",
+   "name": "上古领主",
+   "title": "斯卡纳",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Smolder",
+   "name": "炽炎雏龙",
+   "title": "斯莫德",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Sona",
+   "name": "琴瑟仙女",
+   "title": "娑娜",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Soraka",
+   "name": "众星之子",
+   "title": "索拉卡",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Swain",
+   "name": "诺克萨斯统领",
+   "title": "斯维因",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Sylas",
+   "name": "解脱者",
+   "title": "塞拉斯",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Syndra",
+   "name": "暗黑元首",
+   "title": "辛德拉",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "TahmKench",
+   "name": "河流之王",
+   "title": "塔姆",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "id": "Taliyah",
+   "name": "岩雀",
+   "title": "塔莉垭",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Talon",
+   "name": "刀锋之影",
+   "title": "泰隆",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Taric",
+   "name": "瓦洛兰之盾",
+   "title": "塔里克",
+   "tags": [
+    "Support",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Teemo",
+   "name": "迅捷斥候",
+   "title": "提莫",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Thresh",
+   "name": "魂锁典狱长",
+   "title": "锤石",
+   "tags": [
+    "Support",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Tristana",
+   "name": "麦林炮手",
+   "title": "崔丝塔娜",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Trundle",
+   "name": "巨魔之王",
+   "title": "特朗德尔",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Tryndamere",
+   "name": "蛮族之王",
+   "title": "泰达米尔",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "TwistedFate",
+   "name": "卡牌大师",
+   "title": "崔斯特",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Twitch",
+   "name": "瘟疫之源",
+   "title": "图奇",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Udyr",
+   "name": "兽灵行者",
+   "title": "乌迪尔",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Urgot",
+   "name": "无畏战车",
+   "title": "厄加特",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Varus",
+   "name": "惩戒之箭",
+   "title": "韦鲁斯",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Vayne",
+   "name": "暗夜猎手",
+   "title": "薇恩",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Veigar",
+   "name": "邪恶小法师",
+   "title": "维迦",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Velkoz",
+   "name": "虚空之眼",
+   "title": "维克兹",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "Vex",
+   "name": "愁云使者",
+   "title": "薇古丝",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Vi",
+   "name": "皮城执法官",
+   "title": "蔚",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Viego",
+   "name": "破败之王",
+   "title": "佛耶戈",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Viktor",
+   "name": "奥术先驱",
+   "title": "维克托",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Vladimir",
+   "name": "猩红收割者",
+   "title": "弗拉基米尔",
+   "tags": [
+    "Mage",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Volibear",
+   "name": "不灭狂雷",
+   "title": "沃利贝尔",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Warwick",
+   "name": "祖安怒兽",
+   "title": "沃里克",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Xayah",
+   "name": "逆羽",
+   "title": "霞",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Xerath",
+   "name": "远古巫灵",
+   "title": "泽拉斯",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "id": "XinZhao",
+   "name": "德邦总管",
+   "title": "赵信",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Yasuo",
+   "name": "疾风剑豪",
+   "title": "亚索",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Yone",
+   "name": "封魔剑魂",
+   "title": "永恩",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Yorick",
+   "name": "牧魂人",
+   "title": "约里克",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "id": "Yunara",
+   "name": "不破之誓",
+   "title": "芸阿娜",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Yuumi",
+   "name": "魔法猫咪",
+   "title": "悠米",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Zaahen",
+   "name": "不落魔锋",
+   "title": "亚恒",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Zac",
+   "name": "生化魔人",
+   "title": "扎克",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "id": "Zed",
+   "name": "影流之主",
+   "title": "劫",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "id": "Zeri",
+   "name": "祖安花火",
+   "title": "泽丽",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "id": "Ziggs",
+   "name": "爆破鬼才",
+   "title": "吉格斯",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Zilean",
+   "name": "时光守护者",
+   "title": "基兰",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "id": "Zoe",
+   "name": "暮光星灵",
+   "title": "佐伊",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "id": "Zyra",
+   "name": "荆棘之兴",
+   "title": "婕拉",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  }
+ ]
+}

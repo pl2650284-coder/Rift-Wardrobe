@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "英雄联盟皮肤助手",
+  "productName": "峡印",
   "version": "0.2.0",
   "identifier": "com.sea.lol-skin-assistant",
   "build": {
@@ -13,9 +13,9 @@
     "windows": [
       {
         "label": "main",
-        "title": "英雄联盟皮肤助手",
-        "width": 980,
-        "height": 700,
+        "title": "峡印",
+        "width": 1180,
+        "height": 780,
         "minWidth": 760,
         "minHeight": 560,
         "center": true,
@@ -25,6 +25,21 @@
         "alwaysOnTop": false,
         "shadow": true,
         "focus": true
+      },
+      {
+        "label": "companion",
+        "title": "峡印 · 选人小窗",
+        "url": "index.html?window=companion",
+        "width": 392,
+        "height": 680,
+        "minWidth": 340,
+        "minHeight": 500,
+        "visible": false,
+        "decorations": false,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "shadow": true,
+        "focus": false
       }
     ],
     "security": {

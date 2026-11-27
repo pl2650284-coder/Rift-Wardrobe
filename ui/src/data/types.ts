@@ -128,7 +128,7 @@ export type NewsData = {
 };
 
 export type AppPreferences = {
-  themeMode: "dark" | "light";
+  themeMode: "system" | "dark" | "light";
   accentColor: string;
   compactMode: boolean;
   animations: boolean;
@@ -136,5 +136,7 @@ export type AppPreferences = {
   autoAccept: boolean;
   autoAcceptDelaySeconds: number;
   autoSkin: boolean;
+  autoPopupCompanion: boolean;
+  companionAlwaysOnTop: boolean;
   notify: boolean;
 };

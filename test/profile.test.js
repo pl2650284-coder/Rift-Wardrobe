@@ -179,7 +179,7 @@ function deferred() {
 }
 
 function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); }, readRanking = async () => { throw new Error("Unexpected ranking call"); }, automation = { autoAccept: false, autoAcceptDelaySeconds: 0, configured: true, revision: 0, logs: [] }, saveAutomation, hash = "#profile" } = {}) {
-  const app = { innerHTML: "", dataset: {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
+  const app = { innerHTML: "", dataset: {}, style: { setProperty() {}, removeProperty() {} }, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
   const document = { querySelector: (selector) => selector === "#app" ? app : null, querySelectorAll: () => [], activeElement: null, hidden: false, addEventListener() {} };
   let snapshotListener;
   let automationListener;
@@ -187,10 +187,17 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
   let reads = 0;
   const nativeCalls = [];
   const window = {
-    __TAURI_INTERNALS__: {}, location: { hash }, history: { replaceState() {} },
+    __TAURI_INTERNALS__: {}, location: { hash, search: "", pathname: "/" }, history: { replaceState() {} },
     localStorage: { getItem: (key) => storedPreferences[key] ?? null, setItem() {} }, addEventListener() {},
+    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
     setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
   };
+  const hextechModule = evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: readHextech } });
+  const themeModule = evaluate(compile("../ui/src/theme.ts"), {}, { window });
+  const companionModule = evaluate(compile("../ui/src/companion.ts"), {
+    "@tauri-apps/api/core": { invoke: readHextech },
+    "./hextech-view": hextechModule,
+  });
   const result = evaluate(pageCode, {
     "@tauri-apps/api/core": { invoke: async (command, args) => {
       nativeCalls.push({ command, args });
@@ -215,9 +222,11 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./data/mock": { DEFAULT_PREFERENCES },
     "./services/mock": { getChampionStats: async () => [], getAugmentStats: async () => [], getAssistantLogs: async () => [] },
     "./services/profile": { getProfileSummary: async () => { reads += 1; return read(); } },
-    "./hextech-view": evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: readHextech } }),
+    "./hextech-view": hextechModule,
     "./rankings-view": evaluate(compile("../ui/src/rankings-view.ts"), { "@tauri-apps/api/core": { invoke: readRanking } }),
     "./shell": evaluate(compile("../ui/src/shell.ts"), {}),
+    "./companion": companionModule,
+    "./theme": themeModule,
     "./styles.css": {},
     "./immersive.css": {},
   }, { window, document, HTMLInputElement: class HTMLInputElement {} });

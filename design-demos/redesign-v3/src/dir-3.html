@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>方向 3 · 复古未来图录对剖（秒数轮盘 web-07 太空图录语言）</title>
+<style>
+  :root {
+    --paper: #f2efe9;
+    --paper-deep: #e7e2d8;
+    --paper-line: #cbc4b6;
+    --ink: #161b26;
+    --ink-muted: #505766;
+    --night: #131926;
+    --night-panel: #1b2334;
+    --night-line: rgba(242, 239, 233, 0.16);
+    --night-ink: #f2efe9;
+    --night-muted: #a6b0c4;
+    --copper: #c4682d;
+    --copper-dark: #9e501e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: none; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+  .serif { font-family: "Songti SC", "STSong", "Noto Serif SC", Georgia, serif; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+  .atlas {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(420px, 42%) minmax(0, 58%);
+  }
+
+  /* Left: warm paper catalog & orbital timer */
+  .folio {
+    background: var(--paper);
+    border-right: 1px solid var(--paper-line);
+    padding: 20px 28px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .folio-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--paper-line);
+    gap: 12px;
+  }
+  .atlas-mark {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .folio-nav { display: flex; gap: 14px; }
+  .fnav {
+    font-size: 13px;
+    color: var(--ink-muted);
+    padding-bottom: 2px;
+    border-bottom: 2px solid transparent;
+  }
+  .fnav.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--copper); }
+
+  .plate-head { padding: 6px 0 4px; }
+  .plate-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin-bottom: 8px;
+  }
+  .plate-title {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  .plate-table {
+    margin-top: 16px;
+    border-top: 1px solid var(--paper-line);
+    border-bottom: 1px solid var(--paper-line);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .plate-cell {
+    padding: 10px 10px 10px 0;
+    border-right: 1px solid var(--paper-line);
+  }
+  .plate-cell:last-child { border-right: none; padding-left: 12px; }
+  .plate-cell:nth-child(2) { padding-left: 12px; }
+  .cell-k { font-size: 12px; color: var(--ink-muted); }
+  .cell-v { font-size: 14px; font-weight: 600; color: var(--ink); margin-top: 2px; }
+
+  .folio-actions {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .btn-ink {
+    min-height: 46px;
+    padding: 0 20px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 3px;
+  }
+  .btn-ink:hover:not(:disabled) { background: #262f42; }
+  .btn-ink:disabled { background: #c9c3b6; color: #545047; cursor: not-allowed; }
+  .btn-ink.applied { background: var(--copper); color: #fff; }
+  .btn-line {
+    min-height: 46px;
+    padding: 0 14px;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .btn-line.on { border-color: var(--copper); color: var(--copper); font-weight: 600; background: rgba(196,104,45,0.08); }
+
+  /* Orbital 0-5s auto-accept instrument */
+  .orbit-box {
+    border: 1px solid var(--paper-line);
+    background: #ebe6dc;
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 16px;
+    align-items: center;
+  }
+  .orbit-dial {
+    position: relative;
+    width: 128px;
+    height: 108px;
+    display: grid;
+    place-items: center;
+  }
+  .orbit-dial svg { width: 128px; height: 108px; display: block; }
+  .orbit-val {
+    position: absolute;
+    bottom: 14px;
+    text-align: center;
+  }
+  .orbit-num { font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1; }
+  .orbit-unit { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+  .orbit-info-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .orbit-title { font-size: 15px; font-weight: 700; }
+  .orbit-toggle {
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .orbit-toggle.on { background: var(--copper); border-color: var(--copper); color: #fff; }
+  .orbit-steps {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .ostep {
+    min-height: 32px;
+    border: 1px solid var(--paper-line);
+    background: var(--paper);
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+  .ostep.active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .ostep:disabled { opacity: 0.45; cursor: not-allowed; }
+  .orbit-note { font-size: 13px; color: var(--ink-muted); margin-top: 8px; }
+
+  /* Compact ledger log at folio bottom */
+  .ledger {
+    border-top: 1px solid var(--paper-line);
+    padding-top: 12px;
+  }
+  .ledger-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin-bottom: 6px;
+  }
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 68px 1fr;
+    gap: 10px;
+    font-size: 13px;
+    padding: 4px 0;
+  }
+  .ledger-row .mono { color: var(--ink-muted); font-size: 12px; }
+
+  /* Right: deep indigo observation viewport */
+  .observatory {
+    background: var(--night);
+    color: var(--night-ink);
+    padding: 18px 24px 22px;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 16px;
+  }
+  .obs-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .obs-search-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    max-width: 520px;
+  }
+  .obs-input-wrap { position: relative; flex: 1; }
+  .obs-input {
+    width: 100%;
+    height: 38px;
+    padding: 0 36px 0 12px;
+    border-radius: 3px;
+    background: var(--night-panel);
+    border: 1px solid var(--night-line);
+    color: var(--night-ink);
+    font-size: 14px;
+  }
+  .obs-input::placeholder { color: #8c96ab; }
+  .obs-kbd {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--night-muted);
+    border: 1px solid var(--night-line);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .obs-filter {
+    display: flex;
+    border: 1px solid var(--night-line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .of-btn {
+    padding: 0 12px;
+    height: 38px;
+    font-size: 13px;
+    color: var(--night-muted);
+    border-right: 1px solid var(--night-line);
+  }
+  .of-btn:last-child { border-right: none; }
+  .of-btn.active { background: var(--paper); color: var(--ink); font-weight: 600; }
+
+  .obs-win {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--night-muted);
+    font-size: 13px;
+  }
+  .obs-win-btns { display: flex; gap: 6px; }
+  .obs-win-btns span {
+    width: 28px; height: 28px; border: 1px solid var(--night-line);
+    display: grid; place-items: center; font-size: 12px; border-radius: 3px;
+  }
+
+  .obs-frame {
+    position: relative;
+    border: 1px solid var(--night-line);
+    background: #0c1018;
+    overflow: hidden;
+    min-height: 400px;
+  }
+  .obs-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 62% 20%;
+    display: block;
+  }
+  .obs-caption {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    background: rgba(19, 25, 38, 0.86);
+    border: 1px solid var(--night-line);
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--night-ink);
+  }
+
+  .film-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .film-card {
+    border: 1px solid var(--night-line);
+    background: var(--night-panel);
+    text-align: left;
+    overflow: hidden;
+    border-radius: 3px;
+    transition: border-color 0.14s ease;
+  }
+  .film-card:hover { border-color: rgba(242,239,233,0.45); }
+  .film-card.selected { border-color: var(--copper); box-shadow: 0 0 0 1px var(--copper); }
+  .film-card.unowned img { filter: grayscale(0.75) brightness(0.65); }
+  .film-card img {
+    width: 100%;
+    height: 82px;
+    object-fit: cover;
+    object-position: 60% 22%;
+    display: block;
+  }
+  .film-meta {
+    padding: 8px 9px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--night-ink);
+  }
+  .film-meta span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .film-tag {
+    font-size: 12px;
+    color: #e6a36c;
+    flex-shrink: 0;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--paper);
+    border: 1px solid var(--copper);
+    padding: 9px 18px;
+    border-radius: 3px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+    z-index: 30;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 1020px) {
+    .atlas { grid-template-columns: 1fr; }
+    .observatory { order: -1; }
+    .obs-frame { min-height: 280px; }
+    .film-strip { grid-template-columns: repeat(2, 1fr); }
+    .folio-nav, .obs-win { display: none; }
+    .orbit-box { grid-template-columns: 1fr; }
+    .orbit-dial { margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+  <div class="atlas">
+    <section class="folio" aria-label="皮肤图录与控制">
+      <div>
+        <header class="folio-top">
+          <div class="atlas-mark serif">皮肤星图</div>
+          <nav class="folio-nav" aria-label="主模块">
+            <button class="fnav active" data-nav="皮肤图鉴">皮肤图鉴</button>
+            <button class="fnav" data-nav="英雄榜">英雄榜</button>
+            <button class="fnav" data-nav="个人档案">个人档案</button>
+            <button class="fnav" data-nav="设置">设置</button>
+          </nav>
+        </header>
+
+        <div class="plate-head">
+          <div class="plate-meta">
+            <span>薇恩 / 下路</span>
+            <span id="plateNum" class="mono">图版 3 / 5</span>
+          </div>
+          <h1 id="plateTitle" class="plate-title serif">灵魂莲华</h1>
+
+          <div class="plate-table">
+            <div class="plate-cell">
+              <div class="cell-k">拥有状态</div>
+              <div id="cellOwn" class="cell-v">已拥有</div>
+            </div>
+            <div class="plate-cell">
+              <div class="cell-k">客户端当前</div>
+              <div id="cellApplied" class="cell-v">觅心猎手</div>
+            </div>
+            <div class="plate-cell">
+              <div class="cell-k">连接模式</div>
+              <div class="cell-v">演示预览</div>
+            </div>
+          </div>
+
+          <div class="folio-actions">
+            <button id="applyBtn" class="btn-ink">确认出场</button>
+            <button id="favBtn" class="btn-line on">已收藏</button>
+            <button id="randBtn" class="btn-line" title="快捷键 R">随机 R</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="orbit-box" aria-label="自动接受对局轨道计时仪">
+        <div class="orbit-dial">
+          <svg viewBox="0 0 128 108" aria-hidden="true">
+            <path d="M 18 82 A 48 48 0 1 1 110 82" fill="none" stroke="#c7bfb0" stroke-width="2" />
+            <path id="orbitArc" d="M 18 82 A 48 48 0 1 1 110 82" fill="none" stroke="#c4682d" stroke-width="3" stroke-dasharray="198" stroke-dashoffset="118" />
+            <circle cx="64" cy="56" r="34" fill="none" stroke="#d5cec0" stroke-width="1" stroke-dasharray="3 3" />
+          </svg>
+          <div class="orbit-val">
+            <div id="orbitNum" class="orbit-num mono">2s</div>
+            <div class="orbit-unit">延迟确认</div>
+          </div>
+        </div>
+        <div>
+          <div class="orbit-info-top">
+            <span class="orbit-title">自动接受对局</span>
+            <button id="autoBtn" class="orbit-toggle on" aria-pressed="true">开启</button>
+          </div>
+          <div id="orbitSteps" class="orbit-steps"></div>
+          <div id="orbitNote" class="orbit-note">检测到匹配成功 2 秒后自动确认，托盘驻留期间照常运行</div>
+        </div>
+      </div>
+
+      <div class="ledger" aria-label="运行记录">
+        <div class="ledger-head">
+          <span>本次运行记录</span>
+          <span class="mono">LOCAL ONLY</span>
+        </div>
+        <div id="ledgerBody"></div>
+      </div>
+    </section>
+
+    <main class="observatory" aria-label="深靛原画观测窗">
+      <div class="obs-bar">
+        <div class="obs-search-group">
+          <div class="obs-input-wrap">
+            <input id="searchInput" class="obs-input" type="search" placeholder="搜索薇恩皮肤" aria-label="搜索薇恩皮肤" />
+            <span class="obs-kbd mono">/</span>
+          </div>
+          <div class="obs-filter" role="tablist">
+            <button class="of-btn active" data-filter="all">全部</button>
+            <button class="of-btn" data-filter="owned">可用</button>
+            <button class="of-btn" data-filter="fav">收藏</button>
+          </div>
+        </div>
+        <div class="obs-win">
+          <span>选人阶段</span>
+          <div class="obs-win-btns" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div>
+        </div>
+      </div>
+
+      <div class="obs-frame">
+        <img id="obsArt" data-a="spirit" alt="皮肤原画预览" />
+        <div id="obsCaption" class="obs-caption">灵魂莲华（已拥有，点击左侧确认同步）</div>
+      </div>
+
+      <div id="filmStrip" class="film-strip" role="listbox" aria-label="皮肤索引条"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!--ASSETS-->
+  <script>
+    (function () {
+      const SKINS = [
+        { id: "classic", name: "经典", asset: "classic", owned: true, fav: false },
+        { id: "heart", name: "觅心猎手", asset: "heart", owned: true, fav: true },
+        { id: "spirit", name: "灵魂莲华", asset: "spirit", owned: true, fav: true },
+        { id: "project", name: "源计划：净化", asset: "project", owned: true, fav: false },
+        { id: "soul", name: "摄魂使者", asset: "soul", owned: false, fav: false }
+      ];
+      const LOGS = [
+        { time: "14:32:08", text: "换肤完成：薇恩 觅心猎手" },
+        { time: "14:31:54", text: "检测到选人：召唤师峡谷 薇恩" },
+        { time: "14:28:41", text: "自动接受对局：已确认进入房间" }
+      ];
+
+      let selectedId = "spirit";
+      let appliedId = "heart";
+      let filter = "all";
+      let query = "";
+      let autoAccept = true;
+      let delaySec = 2;
+
+      const plateNum = document.getElementById("plateNum");
+      const plateTitle = document.getElementById("plateTitle");
+      const cellOwn = document.getElementById("cellOwn");
+      const cellApplied = document.getElementById("cellApplied");
+      const applyBtn = document.getElementById("applyBtn");
+      const favBtn = document.getElementById("favBtn");
+      const randBtn = document.getElementById("randBtn");
+      const orbitArc = document.getElementById("orbitArc");
+      const orbitNum = document.getElementById("orbitNum");
+      const autoBtn = document.getElementById("autoBtn");
+      const orbitSteps = document.getElementById("orbitSteps");
+      const orbitNote = document.getElementById("orbitNote");
+      const ledgerBody = document.getElementById("ledgerBody");
+      const searchInput = document.getElementById("searchInput");
+      const obsArt = document.getElementById("obsArt");
+      const obsCaption = document.getElementById("obsCaption");
+      const filmStrip = document.getElementById("filmStrip");
+      const toastEl = document.getElementById("toast");
+
+      let timer = null;
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(timer);
+        timer = setTimeout(() => toastEl.classList.remove("show"), 2000);
+      }
+      function pushLog(text) {
+        const d = new Date();
+        const t = [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, "0")).join(":");
+        LOGS.unshift({ time: t, text });
+        if (LOGS.length > 4) LOGS.pop();
+        renderLogs();
+      }
+      function renderLogs() {
+        ledgerBody.innerHTML = LOGS.map(l =>
+          '<div class="ledger-row"><span class="mono">' + l.time + '</span><span>' + l.text + '</span></div>'
+        ).join("");
+      }
+
+      function render() {
+        const cur = SKINS.find(s => s.id === selectedId) || SKINS[0];
+        const app = SKINS.find(s => s.id === appliedId);
+        const idx = SKINS.findIndex(s => s.id === cur.id) + 1;
+
+        plateNum.textContent = "图版 " + idx + " / " + SKINS.length;
+        plateTitle.textContent = cur.name;
+        cellOwn.textContent = cur.owned ? (cur.fav ? "已拥有 / 收藏" : "已拥有") : "未拥有";
+        cellApplied.textContent = app.name;
+
+        obsArt.src = window.ASSETS[cur.asset];
+        obsCaption.textContent = !cur.owned
+          ? cur.name + "（未拥有，仅支持只读原画预览）"
+          : (cur.id === appliedId ? cur.name + "（当前客户端正在使用）" : cur.name + "（已拥有，点击左侧确认同步）");
+
+        if (!cur.owned) {
+          applyBtn.disabled = true;
+          applyBtn.className = "btn-ink";
+          applyBtn.textContent = "未拥有，仅预览";
+        } else if (cur.id === appliedId) {
+          applyBtn.disabled = false;
+          applyBtn.className = "btn-ink applied";
+          applyBtn.textContent = "当前已使用";
+        } else {
+          applyBtn.disabled = false;
+          applyBtn.className = "btn-ink";
+          applyBtn.textContent = "确认出场";
+        }
+
+        favBtn.className = cur.fav ? "btn-line on" : "btn-line";
+        favBtn.textContent = cur.fav ? "已收藏" : "收藏";
+
+        autoBtn.className = autoAccept ? "orbit-toggle on" : "orbit-toggle";
+        autoBtn.textContent = autoAccept ? "开启" : "关闭";
+        autoBtn.setAttribute("aria-pressed", String(autoAccept));
+        orbitNum.textContent = autoAccept ? delaySec + "s" : "关";
+        const arcTotal = 198;
+        const ratio = autoAccept ? (delaySec === 0 ? 1 : (delaySec / 5)) : 0;
+        orbitArc.style.strokeDashoffset = String(Math.round(arcTotal * (1 - ratio)));
+
+        orbitSteps.innerHTML = [0, 1, 2, 3, 4, 5].map(n =>
+          '<button class="ostep mono ' + (delaySec === n ? "active" : "") + '" data-sec="' + n + '"' + (autoAccept ? "" : " disabled") + '>' + n + 's</button>'
+        ).join("");
+        orbitNote.textContent = !autoAccept
+          ? "自动接受已关闭，匹配成功时需手动确认"
+          : (delaySec === 0 ? "检测到匹配成功立即自动确认，托盘驻留期间照常运行" : "检测到匹配成功 " + delaySec + " 秒后自动确认，托盘驻留期间照常运行");
+
+        const list = SKINS.filter(s => {
+          if (filter === "owned" && !s.owned) return false;
+          if (filter === "fav" && !s.fav) return false;
+          if (query && !s.name.includes(query)) return false;
+          return true;
+        });
+
+        filmStrip.innerHTML = list.map(s => {
+          const isSel = s.id === selectedId;
+          const isApp = s.id === appliedId;
+          const tag = !s.owned ? "锁" : (isApp ? "用" : (s.fav ? "藏" : ""));
+          return '<button class="film-card ' + (isSel ? "selected " : "") + (!s.owned ? "unowned" : "") + '" data-id="' + s.id + '">' +
+            '<img src="' + window.ASSETS[s.asset] + '" alt="' + s.name + '" />' +
+            '<div class="film-meta"><span>' + s.name + '</span>' + (tag ? '<em class="film-tag">' + tag + '</em>' : '') + '</div>' +
+            '</button>';
+        }).join("");
+      }
+
+      filmStrip.addEventListener("click", e => {
+        const card = e.target.closest("[data-id]");
+        if (!card) return;
+        selectedId = card.dataset.id;
+        render();
+      });
+
+      applyBtn.addEventListener("click", () => {
+        const cur = SKINS.find(s => s.id === selectedId);
+        if (!cur || !cur.owned) return;
+        if (cur.id === appliedId) { toast("已在使用「" + cur.name + "」"); return; }
+        appliedId = cur.id;
+        pushLog("换肤完成：薇恩 " + cur.name);
+        toast("已切换为「" + cur.name + "」（演示）");
+        render();
+      });
+
+      favBtn.addEventListener("click", () => {
+        const cur = SKINS.find(s => s.id === selectedId);
+        cur.fav = !cur.fav;
+        toast(cur.fav ? "已收藏「" + cur.name + "」" : "已取消收藏");
+        render();
+      });
+
+      randBtn.addEventListener("click", () => {
+        const pool = SKINS.filter(s => s.owned && s.id !== appliedId);
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        selectedId = pick.id;
+        appliedId = pick.id;
+        pushLog("随机换肤：薇恩 " + pick.name);
+        toast("已随机切换为「" + pick.name + "」");
+        render();
+      });
+
+      autoBtn.addEventListener("click", () => {
+        autoAccept = !autoAccept;
+        pushLog(autoAccept ? "开启自动接受（" + delaySec + "s）" : "关闭自动接受");
+        render();
+      });
+      orbitSteps.addEventListener("click", e => {
+        const b = e.target.closest("[data-sec]");
+        if (!b || b.disabled) return;
+        delaySec = Number(b.dataset.sec);
+        pushLog("自动接受延迟设为 " + delaySec + " 秒");
+        render();
+      });
+
+      searchInput.addEventListener("input", e => { query = e.target.value.trim(); render(); });
+      document.querySelectorAll("[data-filter]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          filter = btn.dataset.filter;
+          document.querySelectorAll("[data-filter]").forEach(b => b.classList.toggle("active", b === btn));
+          render();
+        });
+      });
+
+      document.querySelectorAll("[data-nav]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (btn.dataset.nav === "皮肤图鉴") return;
+          toast("当前为换肤主屏示例，选定方向后可扩展「" + btn.dataset.nav + "」");
+        });
+      });
+
+      window.addEventListener("keydown", e => {
+        if (e.key === "/" && document.activeElement !== searchInput) {
+          e.preventDefault(); searchInput.focus();
+        } else if ((e.key === "r" || e.key === "R") && document.activeElement !== searchInput) {
+          randBtn.click();
+        }
+      });
+
+      render();
+      renderLogs();
+    })();
+  </script>
+</body>
+</html>

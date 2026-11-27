@@ -17,7 +17,7 @@ use runtime::RuntimeState;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, State, WindowEvent,
+    Emitter, Manager, State, WindowEvent,
 };
 
 #[tauri::command]
@@ -178,6 +178,77 @@ fn disable_always_on_top(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_companion_window(
+    app: tauri::AppHandle,
+    tab: Option<String>,
+    hero_id: Option<u32>,
+) -> Result<(), String> {
+    runtime::show_companion_window(&app, true, tab.as_deref(), hero_id);
+    Ok(())
+}
+
+#[tauri::command]
+fn hide_companion_window(app: tauri::AppHandle) -> Result<(), String> {
+    runtime::hide_companion_window(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn show_main_window_cmd(app: tauri::AppHandle) -> Result<(), String> {
+    show_main_window(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_companion_pin(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
+    let window = app
+        .get_webview_window("companion")
+        .ok_or_else(|| "找不到选人小窗".to_string())?;
+    window
+        .set_always_on_top(enabled)
+        .map_err(|error| error.to_string())?;
+
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE,
+            SWP_NOMOVE, SWP_NOSIZE,
+        };
+
+        let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+        let z = if enabled { HWND_TOPMOST } else { HWND_NOTOPMOST };
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                Some(z),
+                0,
+                0,
+                0,
+                0,
+                SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+            )
+        }
+        .map_err(|error| error.to_string())?;
+    }
+    Ok(enabled)
+}
+
+#[tauri::command]
+fn set_auto_popup_companion(
+    state: State<'_, RuntimeState>,
+    enabled: bool,
+) -> Result<bool, String> {
+    state.set_auto_popup_companion(enabled);
+    Ok(enabled)
+}
+
+#[tauri::command]
+fn sync_appearance(app: tauri::AppHandle, appearance: serde_json::Value) -> Result<(), String> {
+    app.emit("appearance-changed", appearance)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn get_launch_at_startup() -> Result<bool, String> {
     startup_enabled()
 }
@@ -244,20 +315,25 @@ fn show_main_window(app: &tauri::AppHandle) {
 
 fn tray_icon() -> tauri::image::Image<'static> {
     let mut rgba = vec![0_u8; 16 * 16 * 4];
-    for y in 1_usize..15 {
-        let y_i32 = y as i32;
-        let half: i32 = if y < 3 { 2 + y_i32 } else if y < 12 { 6 } else { 6 - (y_i32 - 11) };
-        let center = 8_i32;
-        for x in (center - half)..=(center + half) {
-            if !(0_i32..16).contains(&x) {
+    let seal = [201_u8, 59, 43, 255]; // #C93B2B 朱砂红
+    let ink = [250_u8, 247, 240, 255]; // #FAF7F0 宣纸白
+    for y in 1_i32..15 {
+        for x in 1_i32..15 {
+            // Rounded corners on 14x14 seal
+            let corner = (x == 1 || x == 14) && (y == 1 || y == 14);
+            if corner {
                 continue;
             }
-            let offset = (y * 16 + x as usize) * 4;
-            rgba[offset..offset + 4].copy_from_slice(if y < 4 {
-                &[200, 169, 106, 255]
+            let offset = (y as usize * 16 + x as usize) * 4;
+            let on_slash = (x + y - 15).abs() <= 1 && (3..=12).contains(&x) && (3..=12).contains(&y);
+            let top_left_dot = (x - 4).pow(2) + (y - 4).pow(2) <= 2;
+            let bottom_right_dot = (x - 11).pow(2) + (y - 11).pow(2) <= 2;
+            let color = if on_slash || top_left_dot || bottom_right_dot {
+                &ink
             } else {
-                &[79, 169, 155, 255]
-            });
+                &seal
+            };
+            rgba[offset..offset + 4].copy_from_slice(color);
         }
     }
     tauri::image::Image::new_owned(rgba, 16, 16)
@@ -265,7 +341,11 @@ fn tray_icon() -> tauri::image::Image<'static> {
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_denylist(&["companion"])
+                .build(),
+        )
         .manage(RuntimeState::new())
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
@@ -285,22 +365,45 @@ pub fn run() {
             hide_main_window,
             minimize_main_window,
             disable_always_on_top,
+            open_companion_window,
+            hide_companion_window,
+            show_main_window_cmd,
+            set_companion_pin,
+            set_auto_popup_companion,
+            sync_appearance,
             get_launch_at_startup,
             set_launch_at_startup,
         ])
         .setup(|app| {
             app.state::<RuntimeState>().configure_automation(app.path().app_config_dir()?.join("automation.json"))
                 .map_err(std::io::Error::other)?;
-            let show_item = MenuItem::with_id(app, "show", "显示助手", true, None::<&str>)?;
+            let app_icon = app
+                .default_window_icon()
+                .map(|icon| {
+                    tauri::image::Image::new_owned(
+                        icon.rgba().to_vec(),
+                        icon.width(),
+                        icon.height(),
+                    )
+                })
+                .unwrap_or_else(tray_icon);
+            for label in ["main", "companion"] {
+                if let Some(window) = app.get_webview_window(label) {
+                    let _ = window.set_icon(app_icon.clone());
+                }
+            }
+            let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let companion_item = MenuItem::with_id(app, "companion", "打开选人小窗", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&show_item, &companion_item, &quit_item])?;
             let tray = TrayIconBuilder::with_id("main-tray")
-                .icon(tray_icon())
-                .tooltip("英雄联盟皮肤助手")
+                .icon(app_icon)
+                .tooltip("峡印")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => show_main_window(app),
+                    "companion" => runtime::show_companion_window(app, true, None, None),
                     "quit" => app.exit(0),
                     _ => {}
                 })

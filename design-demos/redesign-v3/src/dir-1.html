@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>方向 1 · 精密硬件控制台（Dieter Rams 工业设计语言）</title>
+<style>
+  :root {
+    --chassis: #eae8e1;
+    --panel: #e0ddd4;
+    --surface: #f4f2ec;
+    --line: #c7c3b8;
+    --line-strong: #9f9b90;
+    --screen: #141517;
+    --ink: #17181a;
+    --muted: #52514b;
+    --signal: #d94a1e;
+    --signal-dark: #b63b14;
+    --ok: #21754f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--chassis);
+    color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: none; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .app {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: 52px 1fr;
+    max-width: 1600px;
+    margin: 0 auto;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    background: var(--chassis);
+  }
+
+  /* Top industrial header */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    gap: 16px;
+  }
+  .brand-group { display: flex; align-items: center; gap: 14px; }
+  .device-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+  .led {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.45);
+  }
+  .nav-tabs {
+    display: flex;
+    gap: 4px;
+    background: #d5d2c8;
+    padding: 3px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+  }
+  .nav-tab {
+    padding: 5px 14px;
+    font-size: 13px;
+    border-radius: 3px;
+    color: var(--muted);
+    font-weight: 500;
+    min-height: 32px;
+  }
+  .nav-tab.active {
+    background: var(--surface);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .status-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  .win-btns { display: flex; gap: 6px; margin-left: 6px; }
+  .win-btn {
+    width: 28px; height: 28px; border-radius: 3px;
+    border: 1px solid var(--line);
+    background: var(--chassis);
+    color: var(--muted);
+    display: grid; place-items: center; font-size: 12px;
+  }
+  .win-btn:hover { background: var(--surface); color: var(--ink); }
+
+  /* Main asymmetric hardware chassis */
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.78fr) minmax(360px, 1fr);
+    min-height: 0;
+  }
+
+  /* Left: dark viewfinder + physical 5-key skin strip */
+  .left-bay {
+    padding: 22px 24px 24px;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 18px;
+    border-right: 1px solid var(--line);
+  }
+  .viewfinder {
+    background: var(--screen);
+    border-radius: 6px;
+    border: 2px solid #26282c;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 1fr 40px;
+    min-height: 420px;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .art-wrap {
+    position: relative;
+    overflow: hidden;
+    background: #0d0e10;
+  }
+  .art-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 62% 20%;
+    display: block;
+    transition: opacity 0.18s ease;
+  }
+  .vf-meter {
+    background: #1a1c1f;
+    border-top: 1px solid #2c2f34;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #c8cbd2;
+    font-size: 13px;
+  }
+  .vf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .vf-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); }
+  .vf-dot.locked { background: #7f848e; }
+
+  .strip-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .strip-head h2 { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .strip-count { font-size: 13px; color: var(--muted); }
+
+  .skin-keys {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .skin-key {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    overflow: hidden;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.14s ease, transform 0.12s ease;
+    box-shadow: 0 2px 0 #cfcbbF;
+  }
+  .skin-key:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+  .skin-key.selected {
+    border-color: var(--signal);
+    box-shadow: 0 0 0 1.5px var(--signal), 0 2px 0 rgba(217,74,30,0.28);
+  }
+  .skin-key.unowned .key-thumb img { filter: grayscale(0.65) brightness(0.72); }
+  .key-thumb {
+    position: relative;
+    height: 92px;
+    background: #181a1d;
+    overflow: hidden;
+  }
+  .key-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 60% 22%;
+    display: block;
+  }
+  .key-leds {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    right: 7px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .key-pill {
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(20,21,23,0.86);
+    color: #f3f2ee;
+    font-weight: 500;
+  }
+  .key-pill.active { background: var(--signal); color: #fff; }
+  .key-label {
+    padding: 9px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .key-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fav-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--signal);
+    flex-shrink: 0;
+  }
+
+  /* Right: tactile hardware control console */
+  .right-console {
+    padding: 22px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background: var(--chassis);
+  }
+  .section {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px;
+  }
+  .section:last-child { border-bottom: none; padding-bottom: 0; margin-top: auto; }
+
+  .champ-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .skin-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--ink);
+  }
+  .skin-desc {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .btn-primary {
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 4px;
+    background: var(--signal);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: 0 2px 0 var(--signal-dark);
+    transition: background 0.14s ease;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--signal-dark); }
+  .btn-primary:disabled {
+    background: #c8c4b9;
+    color: #4f4e48;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  .btn-primary.applied {
+    background: #232529;
+    color: #f4f2ec;
+    box-shadow: 0 2px 0 #111214;
+  }
+  .btn-sec {
+    min-height: 46px;
+    min-width: 46px;
+    padding: 0 14px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    box-shadow: 0 2px 0 #cfcbbF;
+  }
+  .btn-sec:hover { border-color: var(--line-strong); }
+  .btn-sec.on { border-color: var(--signal); color: var(--signal); font-weight: 600; }
+
+  /* Search + filter */
+  .search-wrap {
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .search-input {
+    width: 100%;
+    height: 42px;
+    padding: 0 42px 0 12px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 14px;
+  }
+  .kbd {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .filter-seg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .seg-btn {
+    min-height: 36px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .seg-btn.active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Auto-accept physical dial module */
+  .dial-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .dial-title { font-size: 15px; font-weight: 600; }
+  .dial-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .rocker {
+    min-width: 72px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .rocker .dot { width: 8px; height: 8px; border-radius: 50%; background: #8f8c83; }
+  .rocker.on {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+  .rocker.on .dot { background: var(--signal); }
+
+  .delay-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .delay-btn {
+    min-height: 40px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .delay-btn.active {
+    background: var(--signal);
+    border-color: var(--signal);
+    color: #fff;
+  }
+  .delay-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .dial-note {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Logs */
+  .log-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .log-list {
+    margin-top: 8px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .log-item {
+    display: grid;
+    grid-template-columns: 68px 1fr;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--panel);
+    font-size: 13px;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-time { color: var(--muted); font-size: 12px; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 40;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 980px) {
+    .body { grid-template-columns: 1fr; }
+    .left-bay { border-right: none; border-bottom: 1px solid var(--line); }
+    .viewfinder { min-height: 260px; }
+    .skin-keys { grid-template-columns: repeat(2, 1fr); }
+    .nav-tabs { display: none; }
+    .win-btns { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand-group">
+        <div class="device-mark"><span class="led" aria-hidden="true"></span><span>RIFT-01 换肤控制台</span></div>
+        <nav class="nav-tabs" aria-label="主模块">
+          <button class="nav-tab active" data-nav="换肤衣橱">换肤衣橱</button>
+          <button class="nav-tab" data-nav="英雄榜">英雄榜</button>
+          <button class="nav-tab" data-nav="个人战绩">个人战绩</button>
+          <button class="nav-tab" data-nav="偏好设置">偏好设置</button>
+        </nav>
+      </div>
+      <div class="status-right">
+        <span class="mono">选人阶段</span>
+        <span>演示预览（不连接客户端）</span>
+        <div class="win-btns" aria-hidden="true">
+          <button class="win-btn" tabindex="-1">−</button>
+          <button class="win-btn" tabindex="-1">□</button>
+          <button class="win-btn" tabindex="-1">×</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="body">
+      <section class="left-bay" aria-label="皮肤原画取景与选择">
+        <div class="viewfinder">
+          <div class="art-wrap">
+            <img id="heroArt" data-a="spirit" alt="皮肤原画预览" />
+          </div>
+          <div class="vf-meter">
+            <div class="vf-badge">
+              <span id="vfDot" class="vf-dot"></span>
+              <span id="vfStatus">已拥有，可立即同步到客户端</span>
+            </div>
+            <span id="vfIndex" class="mono">3 / 5</span>
+          </div>
+        </div>
+
+        <div>
+          <div class="strip-head">
+            <h2>薇恩皮肤库</h2>
+            <span id="stripCount" class="strip-count">共 5 款，可用 4 款</span>
+          </div>
+          <div id="skinGrid" class="skin-keys" role="listbox" aria-label="皮肤列表"></div>
+        </div>
+      </section>
+
+      <aside class="right-console" aria-label="换肤与自动接受控制">
+        <div class="section">
+          <div class="champ-line">
+            <span>当前锁定：薇恩（下路）</span>
+            <span id="appliedLabel" class="mono">当前使用：觅心猎手</span>
+          </div>
+          <h1 id="skinTitle" class="skin-title">灵魂莲华</h1>
+          <p id="skinDesc" class="skin-desc">点击下方物理按键切换原画预览，按确认后才同步到游戏客户端。</p>
+          <div class="action-row">
+            <button id="applyBtn" class="btn-primary">确认使用</button>
+            <button id="favBtn" class="btn-sec" aria-label="收藏当前皮肤">收藏</button>
+            <button id="randBtn" class="btn-sec" title="快捷键 R">随机 R</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="search-wrap">
+            <input id="searchInput" class="search-input" type="search" placeholder="搜索薇恩皮肤名称" aria-label="搜索皮肤" />
+            <span class="kbd mono">/</span>
+          </div>
+          <div class="filter-seg" role="tablist" aria-label="筛选条件">
+            <button class="seg-btn active" data-filter="all">全部</button>
+            <button class="seg-btn" data-filter="owned">仅可用</button>
+            <button class="seg-btn" data-filter="fav">仅收藏</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="dial-head">
+            <div>
+              <div class="dial-title">自动接受对局</div>
+              <div class="dial-sub">匹配成功时由后台自动确认，最小化到托盘也生效</div>
+            </div>
+            <button id="autoToggle" class="rocker on" aria-pressed="true">
+              <span class="dot"></span><span id="autoText">已开启</span>
+            </button>
+          </div>
+          <div id="delayGrid" class="delay-grid" role="group" aria-label="等待延迟秒数"></div>
+          <div id="dialNote" class="dial-note">当前档位：等待 2 秒后自动接受（手动确认会取消自动操作）</div>
+        </div>
+
+        <div class="section">
+          <button id="logToggle" class="log-toggle" aria-expanded="true">
+            <span>本次运行日志（3）</span>
+            <span id="logChevron">收起</span>
+          </button>
+          <div id="logList" class="log-list"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!--ASSETS-->
+  <script>
+    (function () {
+      const SKINS = [
+        { id: "classic", name: "经典", asset: "classic", owned: true, fav: false, note: "默认外观，随时可切回。" },
+        { id: "heart", name: "觅心猎手", asset: "heart", owned: true, fav: true, note: "已拥有并加入收藏，当前客户端正在使用。" },
+        { id: "spirit", name: "灵魂莲华", asset: "spirit", owned: true, fav: true, note: "已拥有并加入收藏，点击确认即可同步出场。" },
+        { id: "project", name: "源计划：净化", asset: "project", owned: true, fav: false, note: "已拥有，支持本地原画预览与一键切换。" },
+        { id: "soul", name: "摄魂使者", asset: "soul", owned: false, fav: false, note: "未拥有，本助手仅提供只读原画预览，不解锁未拥有皮肤。" }
+      ];
+      const LOGS = [
+        { time: "14:32:08", text: "换肤完成：薇恩 觅心猎手" },
+        { time: "14:31:54", text: "检测到选人：召唤师峡谷 薇恩" },
+        { time: "14:28:41", text: "自动接受对局：已确认进入房间" }
+      ];
+
+      let selectedId = "spirit";
+      let appliedId = "heart";
+      let filter = "all";
+      let query = "";
+      let autoAccept = true;
+      let delaySec = 2;
+      let logsOpen = true;
+
+      const heroArt = document.getElementById("heroArt");
+      const vfDot = document.getElementById("vfDot");
+      const vfStatus = document.getElementById("vfStatus");
+      const vfIndex = document.getElementById("vfIndex");
+      const skinGrid = document.getElementById("skinGrid");
+      const stripCount = document.getElementById("stripCount");
+      const skinTitle = document.getElementById("skinTitle");
+      const skinDesc = document.getElementById("skinDesc");
+      const appliedLabel = document.getElementById("appliedLabel");
+      const applyBtn = document.getElementById("applyBtn");
+      const favBtn = document.getElementById("favBtn");
+      const randBtn = document.getElementById("randBtn");
+      const searchInput = document.getElementById("searchInput");
+      const autoToggle = document.getElementById("autoToggle");
+      const autoText = document.getElementById("autoText");
+      const delayGrid = document.getElementById("delayGrid");
+      const dialNote = document.getElementById("dialNote");
+      const logToggle = document.getElementById("logToggle");
+      const logChevron = document.getElementById("logChevron");
+      const logList = document.getElementById("logList");
+      const toastEl = document.getElementById("toast");
+
+      let toastTimer = null;
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2000);
+      }
+
+      function addLog(text) {
+        const now = new Date();
+        const t = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, "0")).join(":");
+        LOGS.unshift({ time: t, text });
+        if (LOGS.length > 5) LOGS.pop();
+        renderLogs();
+      }
+
+      function filteredSkins() {
+        return SKINS.filter(s => {
+          if (filter === "owned" && !s.owned) return false;
+          if (filter === "fav" && !s.fav) return false;
+          if (query && !s.name.includes(query)) return false;
+          return true;
+        });
+      }
+
+      function render() {
+        const current = SKINS.find(s => s.id === selectedId) || SKINS[0];
+        const applied = SKINS.find(s => s.id === appliedId);
+        const idx = SKINS.findIndex(s => s.id === current.id) + 1;
+
+        heroArt.src = window.ASSETS[current.asset];
+        skinTitle.textContent = current.name;
+        skinDesc.textContent = current.note;
+        appliedLabel.textContent = "当前使用：" + applied.name;
+        vfIndex.textContent = idx + " / " + SKINS.length;
+
+        if (!current.owned) {
+          vfDot.className = "vf-dot locked";
+          vfStatus.textContent = "未拥有，仅提供只读原画预览";
+          applyBtn.disabled = true;
+          applyBtn.className = "btn-primary";
+          applyBtn.textContent = "未拥有，仅预览";
+        } else if (current.id === appliedId) {
+          vfDot.className = "vf-dot";
+          vfStatus.textContent = "当前已同步到英雄联盟客户端";
+          applyBtn.disabled = false;
+          applyBtn.className = "btn-primary applied";
+          applyBtn.textContent = "当前已使用";
+        } else {
+          vfDot.className = "vf-dot";
+          vfStatus.textContent = "已拥有，点击确认后同步到客户端";
+          applyBtn.disabled = false;
+          applyBtn.className = "btn-primary";
+          applyBtn.textContent = "确认使用";
+        }
+
+        favBtn.className = current.fav ? "btn-sec on" : "btn-sec";
+        favBtn.textContent = current.fav ? "已收藏" : "收藏";
+
+        const list = filteredSkins();
+        stripCount.textContent = "显示 " + list.length + " 款，可用 " + SKINS.filter(s => s.owned).length + " 款";
+        skinGrid.innerHTML = list.map(s => {
+          const isSel = s.id === selectedId;
+          const isApp = s.id === appliedId;
+          const badge = !s.owned ? '<span class="key-pill">未拥有</span>' : (isApp ? '<span class="key-pill active">使用中</span>' : "");
+          return '<button class="skin-key ' + (isSel ? "selected " : "") + (!s.owned ? "unowned" : "") + '" data-id="' + s.id + '">' +
+            '<div class="key-thumb"><img src="' + window.ASSETS[s.asset] + '" alt="' + s.name + '" />' +
+            '<div class="key-leds">' + badge + '</div></div>' +
+            '<div class="key-label"><span>' + s.name + '</span>' + (s.fav ? '<i class="fav-dot" title="已收藏"></i>' : '') + '</div>' +
+            '</button>';
+        }).join("");
+
+        autoToggle.className = autoAccept ? "rocker on" : "rocker";
+        autoToggle.setAttribute("aria-pressed", String(autoAccept));
+        autoText.textContent = autoAccept ? "已开启" : "已关闭";
+        delayGrid.innerHTML = [0, 1, 2, 3, 4, 5].map(n =>
+          '<button class="delay-btn mono ' + (delaySec === n ? "active" : "") + '" data-sec="' + n + '"' + (autoAccept ? "" : " disabled") + '>' + n + 's</button>'
+        ).join("");
+        dialNote.textContent = autoAccept
+          ? (delaySec === 0 ? "当前档位：检测到匹配成功立即接受" : "当前档位：等待 " + delaySec + " 秒后自动接受（手动确认会取消）")
+          : "自动接受已关闭，匹配成功时需手动点击确认";
+      }
+
+      function renderLogs() {
+        logToggle.querySelector("span").textContent = "本次运行日志（" + LOGS.length + "）";
+        logChevron.textContent = logsOpen ? "收起" : "展开";
+        logList.style.display = logsOpen ? "block" : "none";
+        logList.innerHTML = LOGS.map(l =>
+          '<div class="log-item"><span class="log-time mono">' + l.time + '</span><span>' + l.text + '</span></div>'
+        ).join("");
+      }
+
+      skinGrid.addEventListener("click", e => {
+        const btn = e.target.closest("[data-id]");
+        if (!btn) return;
+        selectedId = btn.dataset.id;
+        render();
+      });
+
+      applyBtn.addEventListener("click", () => {
+        const cur = SKINS.find(s => s.id === selectedId);
+        if (!cur || !cur.owned) return;
+        if (cur.id === appliedId) { showToast("当前已在使用「" + cur.name + "」"); return; }
+        appliedId = cur.id;
+        addLog("换肤完成：薇恩 " + cur.name);
+        showToast("已切换为「" + cur.name + "」（演示）");
+        render();
+      });
+
+      favBtn.addEventListener("click", () => {
+        const cur = SKINS.find(s => s.id === selectedId);
+        if (!cur) return;
+        cur.fav = !cur.fav;
+        showToast(cur.fav ? "已收藏「" + cur.name + "」" : "已取消收藏「" + cur.name + "」");
+        render();
+      });
+
+      randBtn.addEventListener("click", () => {
+        const owned = SKINS.filter(s => s.owned && s.id !== appliedId);
+        const pick = owned[Math.floor(Math.random() * owned.length)];
+        selectedId = pick.id;
+        appliedId = pick.id;
+        addLog("随机换肤：薇恩 " + pick.name);
+        showToast("已随机应用「" + pick.name + "」");
+        render();
+      });
+
+      searchInput.addEventListener("input", e => {
+        query = e.target.value.trim();
+        render();
+      });
+
+      document.querySelectorAll("[data-filter]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          filter = btn.dataset.filter;
+          document.querySelectorAll("[data-filter]").forEach(b => b.classList.toggle("active", b === btn));
+          render();
+        });
+      });
+
+      autoToggle.addEventListener("click", () => {
+        autoAccept = !autoAccept;
+        addLog(autoAccept ? "开启自动接受（等待 " + delaySec + " 秒）" : "关闭自动接受");
+        showToast(autoAccept ? "已开启自动接受对局" : "已关闭自动接受对局");
+        render();
+      });
+
+      delayGrid.addEventListener("click", e => {
+        const btn = e.target.closest("[data-sec]");
+        if (!btn || btn.disabled) return;
+        delaySec = Number(btn.dataset.sec);
+        addLog("自动接受延迟设为 " + delaySec + " 秒");
+        render();
+      });
+
+      logToggle.addEventListener("click", () => {
+        logsOpen = !logsOpen;
+        logToggle.setAttribute("aria-expanded", String(logsOpen));
+        renderLogs();
+      });
+
+      document.querySelectorAll("[data-nav]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (btn.dataset.nav === "换肤衣橱") return;
+          showToast("当前设计示例聚焦核心主屏，选定方向后可扩展「" + btn.dataset.nav + "」");
+        });
+      });
+
+      window.addEventListener("keydown", e => {
+        if (e.key === "/" && document.activeElement !== searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+        } else if ((e.key === "r" || e.key === "R") && document.activeElement !== searchInput) {
+          randBtn.click();
+        }
+      });
+
+      render();
+      renderLogs();
+    })();
+  </script>
+</body>
+</html>

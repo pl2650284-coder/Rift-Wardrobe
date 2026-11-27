@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>方向 2 · 现代桌面效率双栏（Raycast / Arc 桌面语言）</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --sidebar: #14171d;
+    --card: #1b1f27;
+    --card-hover: #222731;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --ink: #f1f3f7;
+    --muted: #9aa2b4;
+    --accent: #3ecfaa;
+    --accent-ink: #081a15;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: none; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .shell {
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 368px minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  /* Left master list panel */
+  .sidebar {
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .side-top {
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .app-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .app-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+  .conn-chip {
+    font-size: 12px;
+    color: var(--accent);
+    background: rgba(62, 207, 170, 0.12);
+    border: 1px solid rgba(62, 207, 170, 0.28);
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+
+  .champ-bar {
+    padding: 14px 18px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .champ-meta { display: flex; align-items: center; gap: 10px; }
+  .champ-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid var(--border-strong);
+  }
+  .champ-name { font-size: 15px; font-weight: 600; }
+  .champ-sub { font-size: 12px; color: var(--muted); }
+  .rand-btn {
+    min-height: 34px;
+    padding: 0 11px;
+    border-radius: 7px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rand-btn:hover { background: var(--card-hover); border-color: var(--border-strong); }
+
+  .search-box {
+    padding: 0 18px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .input-wrap { position: relative; }
+  .search-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 40px 0 13px;
+    border-radius: 8px;
+    background: #0d0f13;
+    border: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .search-input::placeholder { color: #788092; }
+  .kbd {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: #232833;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .input-wrap .kbd { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); }
+
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .pill {
+    min-height: 34px;
+    border-radius: 7px;
+    font-size: 13px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+  }
+  .pill:hover { background: var(--card); color: var(--ink); }
+  .pill.active {
+    background: var(--card-hover);
+    border-color: var(--border-strong);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .skin-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .skin-row {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    text-align: left;
+    transition: background 0.14s ease, border-color 0.14s ease;
+  }
+  .skin-row:hover { background: var(--card); }
+  .skin-row.selected {
+    background: var(--card-hover);
+    border-color: rgba(62, 207, 170, 0.55);
+  }
+  .skin-row.unowned img { filter: grayscale(0.7) brightness(0.68); }
+  .row-thumb {
+    width: 74px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    object-position: 60% 22%;
+    display: block;
+    background: #0d0f13;
+  }
+  .row-name { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-state { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row-state.live { color: var(--accent); font-weight: 500; }
+  .row-fav {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: var(--muted);
+  }
+  .row-fav.on { color: #f0be67; background: rgba(240, 190, 103, 0.12); }
+
+  /* Bottom auto-accept panel inside sidebar */
+  .auto-card {
+    margin: 0 12px 12px;
+    padding: 13px 14px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  .auto-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .auto-title { font-size: 14px; font-weight: 600; }
+  .switch {
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    background: #303644;
+    position: relative;
+    transition: background 0.15s ease;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.15s ease;
+  }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { transform: translateX(20px); background: var(--accent-ink); }
+
+  .sec-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 5px;
+  }
+  .sec-btn {
+    min-height: 32px;
+    border-radius: 6px;
+    background: #12151b;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .sec-btn.active {
+    background: rgba(62, 207, 170, 0.16);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .sec-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .auto-foot {
+    margin-top: 9px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .log-link { color: var(--ink); font-size: 12px; padding: 3px 8px; border-radius: 5px; background: #262c38; }
+  .log-link:hover { background: #313847; }
+
+  /* Right immersive stage */
+  .stage {
+    position: relative;
+    overflow: hidden;
+    background: #0a0c10;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .stage-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 60% 22%;
+  }
+  .stage-vignette {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(14,16,20,0.45) 0%, rgba(14,16,20,0.02) 28%, rgba(14,16,20,0.08) 66%, rgba(14,16,20,0.84) 100%);
+    pointer-events: none;
+  }
+
+  .stage-head {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+  }
+  .stage-nav {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 9px;
+    background: rgba(17, 20, 26, 0.78);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  .snav-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #c2c8d6;
+  }
+  .snav-btn.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-weight: 600;
+  }
+  .win-ctrl {
+    display: inline-flex;
+    gap: 6px;
+  }
+  .win-ctrl span {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: rgba(17, 20, 26, 0.74);
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    color: #c2c8d6;
+  }
+
+  /* Bottom floating command bar */
+  .dock-wrap {
+    position: relative;
+    z-index: 2;
+    padding: 0 24px 22px;
+  }
+  .command-dock {
+    background: rgba(20, 23, 29, 0.88);
+    border: 1px solid var(--border-strong);
+    backdrop-filter: blur(16px);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+  }
+  .dock-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .dock-sub {
+    margin-top: 4px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .dock-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .btn-fav {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .btn-fav.on {
+    border-color: rgba(240, 190, 103, 0.55);
+    color: #f0be67;
+    background: rgba(240, 190, 103, 0.12);
+  }
+  .btn-apply {
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-apply:disabled {
+    background: #2b303c;
+    color: #9ba3b4;
+    cursor: not-allowed;
+  }
+  .btn-apply.applied {
+    background: rgba(62, 207, 170, 0.16);
+    color: var(--accent);
+    border: 1px solid rgba(62, 207, 170, 0.45);
+  }
+  .enter-key {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(8, 26, 21, 0.16);
+  }
+
+  /* Log slide drawer */
+  .drawer {
+    position: absolute;
+    top: 66px;
+    right: 20px;
+    width: 310px;
+    background: rgba(20, 23, 29, 0.94);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    backdrop-filter: blur(16px);
+    padding: 14px;
+    z-index: 6;
+    display: none;
+  }
+  .drawer.open { display: block; }
+  .drawer-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .drawer-row {
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .drawer-time { font-size: 12px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #232834;
+    border: 1px solid var(--border-strong);
+    color: #fff;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+    z-index: 30;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 960px) {
+    .shell { height: auto; min-height: 100vh; grid-template-columns: 1fr; overflow: visible; }
+    .stage { order: -1; min-height: 360px; }
+    .stage-nav, .win-ctrl { display: none; }
+    .command-dock { flex-direction: column; align-items: flex-start; }
+    .dock-actions { width: 100%; }
+    .btn-apply { flex: 1; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="皮肤检索与自动接受">
+      <div class="side-top">
+        <div class="app-name"><span class="app-dot"></span><span>峡谷中枢</span></div>
+        <span class="conn-chip">选人中 · 演示</span>
+      </div>
+
+      <div class="champ-bar">
+        <div class="champ-meta">
+          <img class="champ-avatar" data-a="Vayne" alt="薇恩头像" />
+          <div>
+            <div class="champ-name">薇恩</div>
+            <div class="champ-sub">下路 · 已拥有 4 / 5 款皮肤</div>
+          </div>
+        </div>
+        <button id="randBtn" class="rand-btn"><span>随机</span><span class="kbd">R</span></button>
+      </div>
+
+      <div class="search-box">
+        <div class="input-wrap">
+          <input id="searchInput" class="search-input" type="search" placeholder="快速检索皮肤" aria-label="快速检索皮肤" />
+          <span class="kbd">/</span>
+        </div>
+        <div class="filters" role="tablist">
+          <button class="pill active" data-filter="all">全部 5</button>
+          <button class="pill" data-filter="owned">可用 4</button>
+          <button class="pill" data-filter="fav">收藏 2</button>
+        </div>
+      </div>
+
+      <div id="skinList" class="skin-list" role="listbox" aria-label="薇恩皮肤列表"></div>
+
+      <div class="auto-card">
+        <div class="auto-top">
+          <span class="auto-title">自动接受对局</span>
+          <button id="autoSwitch" class="switch on" role="switch" aria-checked="true" aria-label="开关自动接受对局"></button>
+        </div>
+        <div id="secRow" class="sec-row" role="group" aria-label="等待延迟秒数"></div>
+        <div class="auto-foot">
+          <span id="autoHint">匹配成功立即接受</span>
+          <button id="logBtn" class="log-link">操作日志</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="stage" aria-label="皮肤原画舞台">
+      <img id="stageArt" class="stage-bg" data-a="heart" alt="皮肤原画" />
+      <div class="stage-vignette"></div>
+
+      <header class="stage-head">
+        <nav class="stage-nav" aria-label="一级导航">
+          <button class="snav-btn active" data-nav="换肤衣橱">换肤衣橱</button>
+          <button class="snav-btn" data-nav="英雄榜">英雄榜</button>
+          <button class="snav-btn" data-nav="个人战绩">个人战绩</button>
+          <button class="snav-btn" data-nav="偏好设置">偏好设置</button>
+        </nav>
+        <div class="win-ctrl" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div>
+      </header>
+
+      <div id="logDrawer" class="drawer" aria-label="操作日志">
+        <div class="drawer-head">
+          <span>本次运行日志</span>
+          <button id="closeDrawer" style="color:#9aa2b4;font-size:13px">关闭</button>
+        </div>
+        <div id="drawerBody"></div>
+      </div>
+
+      <div class="dock-wrap">
+        <div class="command-dock">
+          <div>
+            <h1 id="dockTitle" class="dock-title">觅心猎手</h1>
+            <p id="dockSub" class="dock-sub">当前客户端正在使用该皮肤，点击左侧列表可即时预览其他原画</p>
+          </div>
+          <div class="dock-actions">
+            <button id="favBtn" class="btn-fav on">已收藏</button>
+            <button id="applyBtn" class="btn-apply applied">当前已使用</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!--ASSETS-->
+  <script>
+    (function () {
+      const SKINS = [
+        { id: "classic", name: "经典", asset: "classic", owned: true, fav: false, desc: "默认皮肤，随时可切回基础外观" },
+        { id: "heart", name: "觅心猎手", asset: "heart", owned: true, fav: true, desc: "已拥有并加入收藏，支持一键同步至选人界面" },
+        { id: "spirit", name: "灵魂莲华", asset: "spirit", owned: true, fav: true, desc: "已拥有并加入收藏，按 Enter 或点击右侧确认应用" },
+        { id: "project", name: "源计划：净化", asset: "project", owned: true, fav: false, desc: "已拥有，支持本地高速原画预览" },
+        { id: "soul", name: "摄魂使者", asset: "soul", owned: false, fav: false, desc: "未拥有，仅支持只读原画预览，不会修改客户端数据" }
+      ];
+      const LOGS = [
+        { time: "14:32:08", text: "换肤完成 · 薇恩 觅心猎手" },
+        { time: "14:31:54", text: "检测到选人 · 召唤师峡谷 薇恩" },
+        { time: "14:28:41", text: "自动接受对局 · 已确认进入房间" }
+      ];
+
+      let selectedId = "heart";
+      let appliedId = "heart";
+      let filter = "all";
+      let query = "";
+      let autoAccept = true;
+      let delaySec = 0;
+
+      const skinList = document.getElementById("skinList");
+      const stageArt = document.getElementById("stageArt");
+      const dockTitle = document.getElementById("dockTitle");
+      const dockSub = document.getElementById("dockSub");
+      const favBtn = document.getElementById("favBtn");
+      const applyBtn = document.getElementById("applyBtn");
+      const randBtn = document.getElementById("randBtn");
+      const searchInput = document.getElementById("searchInput");
+      const autoSwitch = document.getElementById("autoSwitch");
+      const secRow = document.getElementById("secRow");
+      const autoHint = document.getElementById("autoHint");
+      const logBtn = document.getElementById("logBtn");
+      const logDrawer = document.getElementById("logDrawer");
+      const closeDrawer = document.getElementById("closeDrawer");
+      const drawerBody = document.getElementById("drawerBody");
+      const toastEl = document.getElementById("toast");
+
+      let timer = null;
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(timer);
+        timer = setTimeout(() => toastEl.classList.remove("show"), 2000);
+      }
+      function pushLog(text) {
+        const d = new Date();
+        const t = [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, "0")).join(":");
+        LOGS.unshift({ time: t, text });
+        renderLogs();
+      }
+
+      function renderLogs() {
+        drawerBody.innerHTML = LOGS.map(l =>
+          '<div class="drawer-row"><span class="drawer-time">' + l.time + '</span><span>' + l.text + '</span></div>'
+        ).join("");
+      }
+
+      function render() {
+        const cur = SKINS.find(s => s.id === selectedId) || SKINS[0];
+        stageArt.src = window.ASSETS[cur.asset];
+        dockTitle.textContent = cur.name;
+        dockSub.textContent = cur.id === appliedId ? "当前客户端正在使用该皮肤，点击左侧列表可即时预览其他原画" : cur.desc;
+
+        favBtn.className = cur.fav ? "btn-fav on" : "btn-fav";
+        favBtn.textContent = cur.fav ? "已收藏" : "收藏";
+
+        if (!cur.owned) {
+          applyBtn.disabled = true;
+          applyBtn.className = "btn-apply";
+          applyBtn.innerHTML = "未拥有，仅预览";
+        } else if (cur.id === appliedId) {
+          applyBtn.disabled = false;
+          applyBtn.className = "btn-apply applied";
+          applyBtn.innerHTML = "当前已使用";
+        } else {
+          applyBtn.disabled = false;
+          applyBtn.className = "btn-apply";
+          applyBtn.innerHTML = '<span>确认使用</span><span class="enter-key">Enter</span>';
+        }
+
+        const favCount = SKINS.filter(s => s.fav).length;
+        document.querySelector('[data-filter="fav"]').textContent = "收藏 " + favCount;
+
+        const list = SKINS.filter(s => {
+          if (filter === "owned" && !s.owned) return false;
+          if (filter === "fav" && !s.fav) return false;
+          if (query && !s.name.includes(query)) return false;
+          return true;
+        });
+
+        skinList.innerHTML = list.map(s => {
+          const isSel = s.id === selectedId;
+          const isApp = s.id === appliedId;
+          const stateText = !s.owned ? "未拥有，仅预览" : (isApp ? "当前使用中" : "已拥有");
+          return '<button class="skin-row ' + (isSel ? "selected " : "") + (!s.owned ? "unowned" : "") + '" data-id="' + s.id + '">' +
+            '<img class="row-thumb" src="' + window.ASSETS[s.asset] + '" alt="' + s.name + '" />' +
+            '<div><div class="row-name">' + s.name + '</div><div class="row-state ' + (isApp ? "live" : "") + '">' + stateText + '</div></div>' +
+            '<span class="row-fav ' + (s.fav ? "on" : "") + '">' + (s.fav ? "收藏" : "") + '</span>' +
+            '</button>';
+        }).join("");
+
+        autoSwitch.className = autoAccept ? "switch on" : "switch";
+        autoSwitch.setAttribute("aria-checked", String(autoAccept));
+        secRow.innerHTML = [0, 1, 2, 3, 4, 5].map(n =>
+          '<button class="sec-btn ' + (delaySec === n ? "active" : "") + '" data-sec="' + n + '"' + (autoAccept ? "" : " disabled") + '>' + n + 's</button>'
+        ).join("");
+        autoHint.textContent = !autoAccept ? "已关闭，需手动确认" : (delaySec === 0 ? "匹配成功立即接受" : "等待 " + delaySec + " 秒后自动接受");
+      }
+
+      skinList.addEventListener("click", e => {
+        const row = e.target.closest("[data-id]");
+        if (!row) return;
+        selectedId = row.dataset.id;
+        render();
+      });
+
+      applyBtn.addEventListener("click", () => {
+        const cur = SKINS.find(s => s.id === selectedId);
+        if (!cur || !cur.owned) return;
+        if (cur.id === appliedId) { toast("已在使用「" + cur.name + "」"); return; }
+        appliedId = cur.id;
+        pushLog("换肤完成 · 薇恩 " + cur.name);
+        toast("已切换为「" + cur.name + "」（演示）");
+        render();
+      });
+
+      favBtn.addEventListener("click", () => {
+        const cur = SKINS.find(s => s.id === selectedId);
+        cur.fav = !cur.fav;
+        toast(cur.fav ? "已收藏「" + cur.name + "」" : "已取消收藏");
+        render();
+      });
+
+      randBtn.addEventListener("click", () => {
+        const pool = SKINS.filter(s => s.owned && s.id !== appliedId);
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        selectedId = pick.id;
+        appliedId = pick.id;
+        pushLog("随机换肤 · 薇恩 " + pick.name);
+        toast("已随机切换为「" + pick.name + "」");
+        render();
+      });
+
+      searchInput.addEventListener("input", e => { query = e.target.value.trim(); render(); });
+      document.querySelectorAll("[data-filter]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          filter = btn.dataset.filter;
+          document.querySelectorAll("[data-filter]").forEach(b => b.classList.toggle("active", b === btn));
+          render();
+        });
+      });
+
+      autoSwitch.addEventListener("click", () => {
+        autoAccept = !autoAccept;
+        pushLog(autoAccept ? "开启自动接受（" + delaySec + "s）" : "关闭自动接受");
+        render();
+      });
+      secRow.addEventListener("click", e => {
+        const btn = e.target.closest("[data-sec]");
+        if (!btn || btn.disabled) return;
+        delaySec = Number(btn.dataset.sec);
+        pushLog("自动接受延迟设为 " + delaySec + " 秒");
+        render();
+      });
+
+      logBtn.addEventListener("click", () => logDrawer.classList.toggle("open"));
+      closeDrawer.addEventListener("click", () => logDrawer.classList.remove("open"));
+      document.querySelectorAll("[data-nav]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (btn.dataset.nav === "换肤衣橱") return;
+          toast("当前为换肤主屏示例，选定方向后可扩展「" + btn.dataset.nav + "」");
+        });
+      });
+
+      window.addEventListener("keydown", e => {
+        if (e.key === "/" && document.activeElement !== searchInput) {
+          e.preventDefault(); searchInput.focus();
+        } else if ((e.key === "r" || e.key === "R") && document.activeElement !== searchInput) {
+          randBtn.click();
+        } else if (e.key === "Enter" && document.activeElement !== searchInput) {
+          applyBtn.click();
+        }
+      });
+
+      render();
+      renderLogs();
+    })();
+  </script>
+</body>
+</html>

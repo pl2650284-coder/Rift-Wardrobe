@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 2 · 网格对照表 · 峡谷衣橱</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f0eb;color:#141414;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+img{display:block}
+:root{--ink:#141414;--mute:#5d5b56;--gold:#7d5f1c;--rule:#141414;--hair:#cfcbc2;--ally:#2f6f95;--enemy:#a33f3f}
+#app{min-height:100vh;display:flex;flex-direction:column}
+.top{height:56px;display:flex;align-items:center;padding:0 12px 0 40px;border-bottom:2px solid var(--rule);flex:none}
+.word{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;margin-right:36px}.word img{width:22px;height:22px;filter:grayscale(1) brightness(.2)}
+.nav{display:flex;gap:28px}.nav button{height:54px;font-size:14px;color:var(--mute)}.nav button:hover{color:var(--ink)}
+.nav button.on{color:var(--ink);font-weight:700;box-shadow:inset 0 -3px 0 var(--gold)}
+.top .r{margin-left:auto;display:flex;align-items:center;gap:22px;font-size:13px;font-variant-numeric:tabular-nums}
+.win{display:flex}.win span{width:38px;text-align:center;color:var(--mute)}
+
+.grid{flex:1;display:grid;grid-template-columns:5fr 7fr;gap:0 40px;padding:28px 40px 0;min-height:0}
+.lead h1{font-size:76px;line-height:1;font-weight:700;letter-spacing:-3px}
+.lead h2{font-size:26px;font-weight:400;margin-top:12px}
+.use{margin-top:20px;height:44px;padding:0 26px;background:var(--ink);color:#fff;font-size:14px}
+.use:hover{background:#333}
+.use:disabled{background:transparent;color:var(--mute);box-shadow:inset 0 0 0 1px var(--hair);cursor:default}
+
+.roster{margin-top:30px;display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+.roster h3{font-size:12px;font-weight:400;color:var(--mute);padding-bottom:5px;border-bottom:2px solid var(--rule);display:flex;justify-content:space-between}
+.roster h3 b{font-weight:700;color:var(--ink)}
+.row{width:100%;display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;height:40px;border-bottom:1px solid var(--hair)}
+.row img{width:28px;height:28px;object-fit:cover;filter:saturate(.9)}
+.row span{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row span small{font-size:12px;color:var(--mute);margin-left:6px}
+.row em{font-style:normal;font-variant-numeric:tabular-nums;font-size:14px}
+.row:hover{background:#e8e5de}.row.on{background:#141414;color:#fff}.row.on small{color:#c9c5bc}
+.me span{font-weight:700}
+.detail{display:flex;gap:16px;padding:8px 0 10px;font-size:12px;color:var(--mute);border-bottom:1px solid var(--hair)}.detail b{color:var(--ink);font-size:14px;font-weight:600;margin-left:4px;font-variant-numeric:tabular-nums}
+
+.art{position:relative;height:100%;max-height:470px;min-height:300px;background-size:cover;background-position:60% 28%}
+.skins{display:flex;flex-wrap:wrap;gap:4px 26px;padding-top:14px}
+.skins button{height:36px;font-size:15px;color:var(--mute);box-shadow:inset 0 -1px 0 transparent}
+.skins button:hover{color:var(--ink)}
+.skins button.on{color:var(--ink);font-weight:700;box-shadow:inset 0 -3px 0 var(--gold)}
+.skins button.used::before{content:"●";color:var(--gold);font-size:9px;margin-right:6px;vertical-align:2px}
+.skins button.no{color:#8e8a82}.skins button.no small{font-size:12px;margin-left:4px}
+
+.foot{display:flex;align-items:center;gap:30px;margin:22px 40px 0;height:52px;border-top:2px solid var(--rule);font-size:13px;flex:none}
+.sw{display:flex;align-items:center;gap:10px;height:44px}
+.sw i{width:34px;height:18px;border-radius:9px;background:#c9c5bc;position:relative;transition:.15s}
+.sw i::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.15s}
+.sw.on i{background:var(--ink)}.sw.on i::after{left:18px}
+.foot .r{margin-left:auto;color:var(--mute);font-size:12px}
+
+.empty{padding:60px 40px}.empty h1{font-size:76px;letter-spacing:-3px}.empty p{color:var(--mute);margin-top:8px}
+#toast{position:fixed;left:50%;bottom:76px;transform:translate(-50%,8px);opacity:0;background:var(--ink);color:#fff;padding:9px 18px;font-size:13px;transition:.2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(min-width:1200px){.lead h1{font-size:96px}.grid{padding-top:40px}}
+@media(max-width:860px){.grid{gap:0 26px;padding:24px 24px 0}.top{padding-left:24px}.foot{margin:18px 24px 0}.lead h1{font-size:60px}.roster{grid-template-columns:1fr;}.roster>div+div{margin-top:14px}.win{display:none}}
+@media(max-width:600px){
+  .word span{display:none}.word{margin-right:16px}.nav{gap:16px}.top .r .ph{display:none}
+  .grid{grid-template-columns:1fr;padding:20px 18px 0}.grid>section:last-child{order:-1}
+  .art{height:210px;min-height:0;margin:-20px -18px 10px}
+  .skins{margin-bottom:14px;padding-top:0;gap:2px 16px}.skins button{font-size:14px;height:32px}
+  .lead h1{font-size:52px}
+  .foot{margin:18px 18px 0;gap:18px;flex-wrap:wrap;height:auto;padding:6px 0}.foot .r{display:none}
+}
+</style></head><body>
+<div id="app"></div><div id="toast" role="status"></div>
+<!--ASSETS--><!--COMMON-->
+<script>
+function row(p){
+  var on=S.player===p.id;
+  var h='<button class="row'+(p.id==='a1'?' me':'')+(on?' on':'')+'" data-player="'+p.id+'"><img data-a="'+p.a+'" alt=""><span>'+esc(p.champ)+'<small>'+esc(p.role)+'</small></span><em>'+p.rate+'%</em></button>';
+  if(on) h+='<div class="detail"><span>KDA<b>'+p.kda+'</b></span><span>近 5 场<b>'+p.rec+'</b></span></div>';
+  return h;
+}
+window.render=function(){
+  var s=SKINS[S.skin];
+  var h='<header class="top"><div class="word"><img data-a="logo" alt=""><span>峡谷衣橱</span></div><nav class="nav">'
+   +NAV.map(function(n){return '<button class="'+(S.route===n[0]?'on':'')+'" data-route="'+n[0]+'">'+n[1]+'</button>';}).join('')
+   +'</nav><div class="r"><span class="ph">选人中 0:42</span><div class="win" aria-hidden="true"><span>–</span><span>□</span><span>×</span></div></div></header>';
+  if(S.route==='match'){
+    h+='<main class="grid"><section class="lead"><h1>薇恩</h1><h2>'+esc(s.name)+'</h2>'
+     +'<button class="use" data-use '+(useDisabled()?'disabled':'')+'>'+useLabel()+'</button>'
+     +'<div class="roster"><div><h3><b>我方</b><span>近期胜率</span></h3>'+ALLIES.map(row).join('')+'</div>'
+     +'<div><h3><b>对方</b><span>近期胜率</span></h3>'+ENEMIES.map(row).join('')+'</div></div></section>'
+     +'<section><div class="art" data-a="'+s.key+'" role="img" aria-label="'+esc(s.name)+'原画"></div>'
+     +'<div class="skins">'+SKINS.map(function(k,i){return '<button class="'+(i===S.skin?'on ':'')+(i===S.used?'used ':'')+(k.owned?'':'no')+'" data-skin="'+i+'">'+esc(k.name)+(k.owned?'':'<small>未拥有</small>')+'</button>';}).join('')+'</div></section></main>'
+     +'<footer class="foot"><button class="sw'+(S.autoAccept?' on':'')+'" data-toggle="autoAccept" role="switch" aria-checked="'+S.autoAccept+'"><i></i>自动接受 · 2 秒</button>'
+     +'<button class="sw'+(S.autoSkin?' on':'')+'" data-toggle="autoSkin" role="switch" aria-checked="'+S.autoSkin+'"><i></i>自动换肤</button><span class="r">演示数据</span></footer>';
+  } else {
+    h+='<div class="empty"><h1>'+{player:'玩家',guide:'攻略',settings:'设置'}[S.route]+'</h1><p>选定方向后按同一网格展开。</p></div>';
+  }
+  document.getElementById('app').innerHTML=h;
+};
+rerender();
+</script>
+</body></html>

@@ -1,0 +1,494 @@
+[
+  {
+    "variant": "a",
+    "view": "1440",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "phase": "房间",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "phase": "匹配",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "phase": "游戏中",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "phase": "结算",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "980",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "980",
+    "route": "history",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "980",
+    "route": "guide",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "980",
+    "route": "auto",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "980",
+    "route": "tools",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "980",
+    "route": "settings",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "375",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "375",
+    "route": "history",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "375",
+    "route": "guide",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "375",
+    "route": "auto",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "375",
+    "route": "tools",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "a",
+    "view": "375",
+    "route": "settings",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "A · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "1440",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "phase": "房间",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "phase": "匹配",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "phase": "游戏中",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "phase": "结算",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "980",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "980",
+    "route": "history",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "980",
+    "route": "guide",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "980",
+    "route": "auto",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "980",
+    "route": "tools",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "980",
+    "route": "settings",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "375",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "375",
+    "route": "history",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "375",
+    "route": "guide",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "375",
+    "route": "auto",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "375",
+    "route": "tools",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "b",
+    "view": "375",
+    "route": "settings",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "B · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "1440",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "phase": "房间",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "phase": "匹配",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "phase": "游戏中",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "phase": "结算",
+    "width": 1440,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "980",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "980",
+    "route": "history",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "980",
+    "route": "guide",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "980",
+    "route": "auto",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "980",
+    "route": "tools",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "980",
+    "route": "settings",
+    "width": 980,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "375",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "375",
+    "route": "history",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "375",
+    "route": "guide",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "375",
+    "route": "auto",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "375",
+    "route": "tools",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "variant": "c",
+    "view": "375",
+    "route": "settings",
+    "width": 375,
+    "bodyOverflow": false,
+    "mainOverflow": false,
+    "brokenImages": [],
+    "title": "C · 峡谷衣橱融合原型"
+  },
+  {
+    "runtimeErrors": []
+  }
+]

@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Main window permissions","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-start-dragging","core:window:allow-toggle-maximize"]}}
+{"default":{"identifier":"default","description":"Main and companion window permissions","local":true,"windows":["main","companion"],"permissions":["core:default","core:window:allow-start-dragging","core:window:allow-toggle-maximize","core:window:allow-set-always-on-top"]}}

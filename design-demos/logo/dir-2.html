@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Logo 方向 2 · 双阵裂谷</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1200px;height:760px;overflow:hidden;background:#0d121b;color:#eaedf3;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif;padding:34px 40px;display:grid;grid-template-columns:460px 1fr;gap:28px}
+svg{display:block;width:100%;height:100%}
+.hero{background:radial-gradient(circle at 50% 42%,#1f2637,#0b0f18 72%);border:1px solid #232d3d;border-radius:10px;padding:32px;display:flex;flex-direction:column;justify-content:space-between}
+.hero-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#8e99ab;letter-spacing:1px}
+.hero-top b{color:#e5c478;font-weight:600}
+.hero-mark{width:260px;height:260px;margin:20px auto;filter:drop-shadow(0 22px 44px #000b)}
+.hero-copy h1{font:600 26px/1.25 "Microsoft YaHei UI",sans-serif}
+.hero-copy p{font-size:13px;color:#9aa5b6;margin-top:8px}
+.swatches{display:flex;gap:10px;margin-top:16px}
+.sw{flex:1;height:40px;border-radius:4px;padding:0 10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-variant-numeric:tabular-nums;border:1px solid #ffffff1a;white-space:nowrap}
+
+.right{display:grid;grid-template-rows:auto auto 1fr;gap:20px}
+.panel{background:#131a26;border:1px solid #232d3d;border-radius:10px;padding:20px 24px}
+.panel h2{font-size:12px;color:#8e99ab;letter-spacing:1.5px;font-weight:500;margin-bottom:14px;display:flex;justify-content:space-between}
+.scale-row{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 8px 2px}
+.sc{display:flex;flex-direction:column;align-items:center;gap:8px}
+.sc span{font-size:12px;color:#8e99ab;font-variant-numeric:tabular-nums}
+.mono{display:flex;gap:14px;align-items:center;padding-left:20px;border-left:1px solid #232d3d}
+.mono-box{width:56px;height:56px;border-radius:8px;display:grid;place-items:center;padding:10px}
+.mono-box.light{background:#f3f0e8;color:#111}
+.mono-box.dark{background:#090d14;border:1px solid #2a3446}
+
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mock{background:#0b1018;border:1px solid #202938;border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;height:132px}
+.mock small{font-size:12px;color:#7e8a9c}
+.topbar{height:44px;background:#070c14;border:1px solid #1d2636;border-radius:4px;display:flex;align-items:center;padding:0 14px;gap:16px;font-size:13px;color:#9aa6b8}
+.topbar .ico{width:22px;height:22px}
+.topbar .on{color:#fff;border-bottom:2px solid #e5c478;padding:11px 0}
+.taskbar{height:44px;background:#1a202c;border:1px solid #2c3546;border-radius:4px;display:flex;align-items:center;padding:0 14px;justify-content:space-between}
+.tb-apps{display:flex;align-items:center;gap:14px}
+.tb-dot{width:22px;height:22px;border-radius:4px;background:#2f394b}
+.tb-active{width:34px;height:34px;padding:4px;border-radius:5px;background:#ffffff14;border-bottom:2px solid #e5c478}
+.tray{display:flex;align-items:center;gap:10px;background:#111620;padding:6px 10px;border-radius:4px;font-size:12px;color:#b8c2d1}
+.tray .t16{width:16px;height:16px}
+
+.bottom{display:grid;grid-template-columns:230px 1fr;gap:20px}
+.grid-box{background:#0b1018;border:1px solid #202938;border-radius:6px;height:100%;display:grid;place-items:center;position:relative;overflow:hidden}
+.rationale{display:flex;flex-direction:column;justify-content:center;gap:12px;padding:4px 6px}
+.rationale div h3{font-size:14px;color:#e5c57e;margin-bottom:3px}
+.rationale div p{font-size:13px;color:#a5b0c0}
+</style></head><body>
+
+<section class="hero">
+  <div class="hero-top"><b>方向 2 · 综合对局助手方向</b><span>512 × 512 MASTER</span></div>
+  <div class="hero-mark" id="master"></div>
+  <div class="hero-copy">
+    <h1>双阵裂谷 · The Rift Diagonal</h1>
+    <p>直接取自召唤师峡谷俯视地图的几何本质：一方八角切面印章，被左下至右上的金色裂谷一分为二——左上我方青蓝、右下敌方暗绯，中心嵌一枚对局金核。</p>
+    <div class="swatches">
+      <div class="sw" style="background:#0a0f18;color:#9aa5b6">#0A0F18</div>
+      <div class="sw" style="background:#3d8fb8;color:#fff">#3D8FB8</div>
+      <div class="sw" style="background:#c25959;color:#fff">#C25959</div>
+      <div class="sw" style="background:#e5c478;color:#111">#E5C478</div>
+    </div>
+  </div>
+</section>
+
+<div class="right">
+  <section class="panel">
+    <h2><span>多尺寸实寸核验（像素级渲染）</span><span>单色镂空适配</span></h2>
+    <div class="scale-row">
+      <div class="sc"><div style="width:128px;height:128px" class="use-logo"></div><span>128 px · 桌面大图</span></div>
+      <div class="sc"><div style="width:64px;height:64px" class="use-logo"></div><span>64 px · 应用列表</span></div>
+      <div class="sc"><div style="width:32px;height:32px" class="use-logo"></div><span>32 px · 窗口图标</span></div>
+      <div class="sc"><div style="width:24px;height:24px" class="use-logo"></div><span>24 px · 顶栏</span></div>
+      <div class="sc"><div style="width:16px;height:16px" class="use-logo"></div><span>16 px · 托盘</span></div>
+      <div class="mono">
+        <div class="sc"><div class="mono-box dark" id="mono-w"></div><span>反白</span></div>
+        <div class="sc"><div class="mono-box light" id="mono-b"></div><span>纯黑</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2><span>真实场景实装预览</span><span>DARK UI & WINDOWS TRAY</span></h2>
+    <div class="scenes">
+      <div class="mock">
+        <small>App 顶栏导航（22×22 px）</small>
+        <div class="topbar">
+          <div class="ico use-logo"></div>
+          <span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span>
+        </div>
+      </div>
+      <div class="mock">
+        <small>Windows 任务栏（26px）与右下角托盘常驻（16×16 px）</small>
+        <div class="taskbar">
+          <div class="tb-apps"><div class="tb-dot"></div><div class="tb-active use-logo"></div><div class="tb-dot"></div></div>
+          <div class="tray"><div class="t16 use-logo"></div><span>22:00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel bottom">
+    <div class="grid-box" id="construct"></div>
+    <div class="rationale">
+      <div><h3>Form 来自哪里？</h3><p>来自英雄联盟玩家最熟悉的空间记忆——5v5 双方沿着对角线交锋的峡谷地形，并且直接呼应首页里「我方青蓝 vs 对方绯红 + 金色主按钮」的配色体系。</p></div>
+      <div><h3>为什么适合综合助手？</h3><p>当产品从单一「换皮肤」扩展为包含本局双方阵容、战绩、自动化的全能助手时，这个标志一眼就能传达「掌控整场对局」的气场。</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const MASTER = `<svg viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0a0f18"/>
+  <path d="M168 96 H356 L96 356 V168 L168 96 Z" fill="#3d8fb8"/>
+  <path d="M416 156 V344 L344 416 H156 L416 156 Z" fill="#c25959"/>
+  <polygon points="392,92 420,120 120,420 92,392" fill="#e5c478"/>
+  <polygon points="256,192 320,256 256,320 192,256" fill="#0a0f18"/>
+  <polygon points="256,216 296,256 256,296 216,256" fill="#f3dfb0"/>
+</svg>`;
+const MONO = (c) => `<svg viewBox="0 0 512 512">
+  <path d="M156 76 H364 L76 364 V156 Z" fill="${c}" opacity=".55"/>
+  <path d="M436 148 V356 L356 436 H148 Z" fill="${c}"/>
+  <polygon points="256,196 316,256 256,316 196,256" fill="${c}"/>
+</svg>`;
+const CONSTRUCT = `<svg viewBox="0 0 512 512">
+  <g stroke="#243249" stroke-width="2">
+    <rect x="96" y="96" width="320" height="320" fill="none"/>
+    <line x1="0" y1="512" x2="512" y2="0"/><line x1="0" y1="0" x2="512" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/><line x1="0" y1="256" x2="512" y2="256"/>
+    <circle cx="256" cy="256" r="64" fill="none" stroke="#e5c47866" stroke-dasharray="5 5"/>
+  </g>
+  <path d="M168 96 H356 L96 356 V168 Z" fill="#3d8fb866" stroke="#5cc0f0" stroke-width="3"/>
+  <path d="M416 156 V344 L344 416 H156 Z" fill="#c2595966" stroke="#f07878" stroke-width="3"/>
+  <polygon points="392,92 420,120 120,420 92,392" fill="#e5c47888" stroke="#ffe29a" stroke-width="2"/>
+  <polygon points="256,216 296,256 256,296 216,256" fill="#f3dfb0" stroke="#fff" stroke-width="2"/>
+</svg>`;
+document.getElementById('master').innerHTML = MASTER;
+document.querySelectorAll('.use-logo').forEach(el => el.innerHTML = MASTER);
+document.getElementById('mono-w').innerHTML = MONO('#f3dfb0');
+document.getElementById('mono-b').innerHTML = MONO('#141414');
+document.getElementById('construct').innerHTML = CONSTRUCT;
+</script>
+</body></html>

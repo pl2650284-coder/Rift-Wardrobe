@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Logo 方向 1 · 双扉金枢</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1200px;height:760px;overflow:hidden;background:#0d121b;color:#eaedf3;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif;padding:34px 40px;display:grid;grid-template-columns:460px 1fr;gap:28px}
+svg{display:block;width:100%;height:100%}
+.hero{background:radial-gradient(circle at 50% 42%,#1c293c,#0b1019 72%);border:1px solid #232d3d;border-radius:10px;padding:32px;display:flex;flex-direction:column;justify-content:space-between}
+.hero-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#8e99ab;letter-spacing:1px}
+.hero-top b{color:#d9b772;font-weight:600}
+.hero-mark{width:260px;height:260px;margin:20px auto;filter:drop-shadow(0 22px 44px #000b)}
+.hero-copy h1{font:600 26px/1.25 "Microsoft YaHei UI",sans-serif}
+.hero-copy p{font-size:13px;color:#9aa5b6;margin-top:8px}
+.swatches{display:flex;gap:10px;margin-top:16px}
+.sw{flex:1;height:40px;border-radius:4px;padding:0 10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-variant-numeric:tabular-nums;border:1px solid #ffffff1a;white-space:nowrap}
+
+.right{display:grid;grid-template-rows:auto auto 1fr;gap:20px}
+.panel{background:#131a26;border:1px solid #232d3d;border-radius:10px;padding:20px 24px}
+.panel h2{font-size:12px;color:#8e99ab;letter-spacing:1.5px;font-weight:500;margin-bottom:14px;display:flex;justify-content:space-between}
+.scale-row{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 8px 2px}
+.sc{display:flex;flex-direction:column;align-items:center;gap:8px}
+.sc span{font-size:12px;color:#8e99ab;font-variant-numeric:tabular-nums}
+.mono{display:flex;gap:14px;align-items:center;padding-left:20px;border-left:1px solid #232d3d}
+.mono-box{width:56px;height:56px;border-radius:8px;display:grid;place-items:center;padding:10px}
+.mono-box.light{background:#f3f0e8;color:#111}
+.mono-box.dark{background:#090d14;border:1px solid #2a3446}
+
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mock{background:#0b1018;border:1px solid #202938;border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;height:132px}
+.mock small{font-size:12px;color:#7e8a9c}
+.topbar{height:44px;background:#070c14;border:1px solid #1d2636;border-radius:4px;display:flex;align-items:center;padding:0 14px;gap:16px;font-size:13px;color:#9aa6b8}
+.topbar .ico{width:22px;height:22px}
+.topbar .on{color:#fff;border-bottom:2px solid #d9b772;padding:11px 0}
+.taskbar{height:44px;background:#1a202c;border:1px solid #2c3546;border-radius:4px;display:flex;align-items:center;padding:0 14px;justify-content:space-between}
+.tb-apps{display:flex;align-items:center;gap:14px}
+.tb-dot{width:22px;height:22px;border-radius:4px;background:#2f394b}
+.tb-active{width:34px;height:34px;padding:4px;border-radius:5px;background:#ffffff14;border-bottom:2px solid #d9b772}
+.tray{display:flex;align-items:center;gap:10px;background:#111620;padding:6px 10px;border-radius:4px;font-size:12px;color:#b8c2d1}
+.tray .t16{width:16px;height:16px}
+
+.bottom{display:grid;grid-template-columns:230px 1fr;gap:20px}
+.grid-box{background:#0b1018;border:1px solid #202938;border-radius:6px;height:100%;display:grid;place-items:center;position:relative;overflow:hidden}
+.rationale{display:flex;flex-direction:column;justify-content:center;gap:12px;padding:4px 6px}
+.rationale div h3{font-size:14px;color:#e5c57e;margin-bottom:3px}
+.rationale div p{font-size:13px;color:#a5b0c0}
+</style></head><body>
+
+<section class="hero">
+  <div class="hero-top"><b>方向 1 · 峡谷衣橱 / 展柜方向</b><span>512 × 512 MASTER</span></div>
+  <div class="hero-mark" id="master"></div>
+  <div class="hero-copy">
+    <h1>双扉金枢 · The Vault Doors</h1>
+    <p>灵感来自田中一光的几何色块构成。不画具象衣架，只用左右两扇斜切滑开的门扉与中央悬浮的菱形光核，定格「选人阶段推开衣橱、亮出皮肤」的瞬间。</p>
+    <div class="swatches">
+      <div class="sw" style="background:#0b111c;color:#9aa5b6">#0B111C</div>
+      <div class="sw" style="background:#1d3549;color:#e3ecf5">#1D3549</div>
+      <div class="sw" style="background:#c9a55c;color:#111">#C9A55C</div>
+      <div class="sw" style="background:#f3dfb0;color:#111">#F3DFB0</div>
+    </div>
+  </div>
+</section>
+
+<div class="right">
+  <section class="panel">
+    <h2><span>多尺寸实寸核验（像素级渲染）</span><span>单色镂空适配</span></h2>
+    <div class="scale-row">
+      <div class="sc"><div style="width:128px;height:128px" class="use-logo"></div><span>128 px · 桌面大图</span></div>
+      <div class="sc"><div style="width:64px;height:64px" class="use-logo"></div><span>64 px · 应用列表</span></div>
+      <div class="sc"><div style="width:32px;height:32px" class="use-logo"></div><span>32 px · 窗口图标</span></div>
+      <div class="sc"><div style="width:24px;height:24px" class="use-logo"></div><span>24 px · 顶栏</span></div>
+      <div class="sc"><div style="width:16px;height:16px" class="use-logo"></div><span>16 px · 托盘</span></div>
+      <div class="mono">
+        <div class="sc"><div class="mono-box dark" id="mono-w"></div><span>反白</span></div>
+        <div class="sc"><div class="mono-box light" id="mono-b"></div><span>纯黑</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2><span>真实场景实装预览</span><span>DARK UI & WINDOWS TRAY</span></h2>
+    <div class="scenes">
+      <div class="mock">
+        <small>App 顶栏导航（22×22 px）</small>
+        <div class="topbar">
+          <div class="ico use-logo"></div>
+          <span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span>
+        </div>
+      </div>
+      <div class="mock">
+        <small>Windows 任务栏（26px）与右下角托盘常驻（16×16 px）</small>
+        <div class="taskbar">
+          <div class="tb-apps"><div class="tb-dot"></div><div class="tb-active use-logo"></div><div class="tb-dot"></div></div>
+          <div class="tray"><div class="t16 use-logo"></div><span>22:00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel bottom">
+    <div class="grid-box" id="construct"></div>
+    <div class="rationale">
+      <div><h3>为什么换掉旧盾牌？</h3><p>旧版「盾牌 + V」是典型安全卫士/杀毒软件母题；新标用「开启的双扉 + 居中珍藏」直接对应「峡谷衣橱」的名字与选皮肤的核心动作。</p></div>
+      <div><h3>16×16 托盘为什么不糊？</h3><p>全标只有 3 个几何块（左扉、右扉、中核），门缝留有 64 单位宽的深色负空间，缩到 16px 依然能看清「左、中、右」三段结构。</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const MASTER = `<svg viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0b111c"/>
+  <path d="M96 124 L224 88 V372 L96 416 Z" fill="#1d3549"/>
+  <path d="M96 124 L224 88 V152 L96 188 Z" fill="#c9a55c"/>
+  <path d="M416 96 L288 132 V424 L416 388 Z" fill="#c9a55c"/>
+  <path d="M416 324 L288 360 V424 L416 388 Z" fill="#1d3549"/>
+  <polygon points="256,162 318,256 256,350 194,256" fill="#f3dfb0"/>
+</svg>`;
+const MONO = (c) => `<svg viewBox="0 0 512 512">
+  <path d="M72 108 L216 68 V388 L72 436 Z" fill="${c}" opacity=".55"/>
+  <path d="M440 76 L296 116 V444 L440 404 Z" fill="${c}"/>
+  <polygon points="256,148 326,256 256,364 186,256" fill="${c}"/>
+</svg>`;
+const CONSTRUCT = `<svg viewBox="0 0 512 512">
+  <g stroke="#243249" stroke-width="2">
+    <line x1="0" y1="256" x2="512" y2="256"/><line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="96" y1="0" x2="96" y2="512"/><line x1="224" y1="0" x2="224" y2="512"/>
+    <line x1="288" y1="0" x2="288" y2="512"/><line x1="416" y1="0" x2="416" y2="512"/>
+    <line x1="0" y1="140" x2="512" y2="40"/><line x1="0" y1="440" x2="512" y2="340"/>
+    <circle cx="256" cy="256" r="96" fill="none" stroke="#c9a55c55" stroke-dasharray="6 6"/>
+  </g>
+  <path d="M96 124 L224 88 V372 L96 416 Z" fill="#1d354988" stroke="#4aa3b5" stroke-width="3"/>
+  <path d="M416 96 L288 132 V424 L416 388 Z" fill="#c9a55c66" stroke="#dfc07a" stroke-width="3"/>
+  <polygon points="256,162 318,256 256,350 194,256" fill="#f3dfb0aa" stroke="#fff" stroke-width="3"/>
+</svg>`;
+document.getElementById('master').innerHTML = MASTER;
+document.querySelectorAll('.use-logo').forEach(el => el.innerHTML = MASTER);
+document.getElementById('mono-w').innerHTML = MONO('#f3dfb0');
+document.getElementById('mono-b').innerHTML = MONO('#141414');
+document.getElementById('construct').innerHTML = CONSTRUCT;
+</script>
+</body></html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 3 · 选人三栏 · 峡谷衣橱</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#091120;color:#e8eef6;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+img{display:block}
+:root{--gold:#c8a96a;--gold2:#f0dba6;--ally:#4f97c4;--enemy:#c46262;--line:#1d2a3e;--mute:#93a3b8}
+#app{height:100vh;min-height:600px;display:flex;flex-direction:column}
+.top{height:52px;flex:none;display:flex;align-items:center;padding:0 10px 0 20px;background:#050b15;position:relative}
+.top img{width:24px;height:24px;margin-right:22px}
+.nav{display:flex;gap:2px}.nav button{height:52px;padding:0 14px;color:var(--mute)}.nav button:hover{color:#fff}.nav button.on{color:var(--gold2)}
+.timer{position:absolute;left:50%;transform:translateX(-50%);font-size:13px;color:var(--gold2);font-variant-numeric:tabular-nums;letter-spacing:1px}
+.bar{position:absolute;left:0;bottom:0;height:2px;width:70%;background:linear-gradient(90deg,#7b6334,var(--gold))}
+.win{margin-left:auto;display:flex}.win span{width:40px;text-align:center;color:#7d8ba0;font-size:15px}
+
+.stage{flex:1;display:grid;grid-template-columns:214px 1fr 214px;min-height:0}
+.team{display:flex;flex-direction:column;background:#0b1526;padding:14px 12px 0}
+.team h2{font-size:12px;font-weight:400;color:var(--mute);letter-spacing:2px;padding:0 4px 8px}
+.ally h2{color:#8fc2e2}.enemy h2{color:#e3a1a1;text-align:right}
+.p{width:100%;display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;height:66px;padding:0 10px;margin-bottom:6px;background:#101d31;border-left:3px solid var(--ally);transition:background .15s}
+.enemy .p{border-left:0;border-right:3px solid var(--enemy);grid-template-columns:auto 1fr 44px;text-align:right}
+.enemy .p img{order:3}.enemy .p .n{order:2}.enemy .p em{order:1}
+.p:hover,.p.on{background:#17283f}
+.p img{width:44px;height:44px;object-fit:cover;border:1px solid #33465f}
+.p .n{min-width:0}.p b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.p small{font-size:12px;color:var(--mute)}
+.p em{font-style:normal;font-size:16px;font-variant-numeric:tabular-nums;color:#dfe7f1}
+.p.me{background:#1a2a42;box-shadow:inset 0 0 0 1px #c8a96a55}.p.me b{color:var(--gold2)}
+.more{display:flex;justify-content:space-between;margin:-4px 0 8px;padding:8px 12px;background:#0e1a2c;font-size:12px;color:var(--mute)}.more b{color:#fff;font-size:14px;font-weight:600;margin-left:4px}
+
+.mid{position:relative;overflow:hidden;background:#060c16}
+.mid .art{position:absolute;inset:0;background-size:cover;background-position:58% 24%}
+.mid .sh{position:absolute;inset:0;background:linear-gradient(0deg,#091120 0,#091120e6 18%,transparent 52%),linear-gradient(90deg,#0b1526aa,transparent 14%,transparent 86%,#0b1526aa)}
+.title{position:absolute;left:0;right:0;bottom:178px;text-align:center}
+.title small{font-size:13px;color:var(--gold);letter-spacing:3px}
+.title h1{font:400 clamp(32px,4vw,46px)/1.2 "Noto Serif SC","Source Han Serif SC",SimSun,serif;margin-top:2px;text-shadow:0 2px 18px #000a}
+.use{position:absolute;left:50%;bottom:122px;transform:translateX(-50%);height:42px;min-width:150px;text-align:center;padding:0 30px;color:var(--gold2);border:1px solid var(--gold);background:linear-gradient(#1c2a3f,#0e1828);letter-spacing:2px}
+.use:hover{border-color:var(--gold2);color:#fff}
+.use:disabled{color:#9aa8ba;border-color:#3a4a60;cursor:default}
+.film{position:absolute;left:0;right:0;bottom:26px;display:flex;justify-content:center;gap:8px}
+.film button{position:relative;width:86px;height:70px;background-size:cover;background-position:center 22%;opacity:.5;outline:1px solid #2c3d55;transition:.15s}
+.film button:hover{opacity:.8}.film button.on{opacity:1;outline:2px solid var(--gold);transform:translateY(-3px)}
+.film button.used::after{content:"";position:absolute;left:50%;bottom:-9px;width:6px;height:6px;margin-left:-3px;background:var(--gold);transform:rotate(45deg)}
+.film .lock{position:absolute;inset:0;display:grid;place-items:center;background:#060c1699}.film svg{width:15px;height:15px;stroke:#d9e2ee;fill:none;stroke-width:2}
+
+.dock{margin-top:auto;padding:12px 4px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.sw{display:flex;align-items:center;justify-content:space-between;height:40px;font-size:13px;color:#cbd5e2;width:100%}
+.sw i{width:32px;height:18px;border-radius:9px;background:#26354b;position:relative;transition:.15s}
+.sw i::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#7d8ba0;transition:.15s}
+.sw.on i{background:#6b5630}.sw.on i::after{left:16px;background:var(--gold2)}
+.enemy .dock{justify-content:flex-end;align-items:flex-end;font-size:12px;color:var(--mute);height:96px}
+
+.empty{flex:1;display:grid;place-items:center;text-align:center}.empty h1{font:400 46px "Noto Serif SC",SimSun,serif}.empty p{color:var(--mute);margin-top:6px}
+#toast{position:fixed;left:50%;top:64px;transform:translate(-50%,-8px);opacity:0;padding:8px 18px;background:#0e1828;border:1px solid var(--gold);color:var(--gold2);font-size:13px;transition:.2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(min-width:1300px){.stage{grid-template-columns:260px 1fr 260px}.p{height:76px}}
+@media(max-width:860px){.stage{grid-template-columns:180px 1fr 180px}.p{grid-template-columns:36px 1fr auto;gap:8px;padding:0 8px}.enemy .p{grid-template-columns:auto 1fr 36px}.p img{width:36px;height:36px}.film button{width:64px;height:54px}.win{display:none}}
+@media(max-width:600px){
+  #app{height:auto}.timer{display:none}.nav button{padding:0 9px}
+  .stage{display:flex;flex-direction:column}
+  .mid{order:-1;height:420px;flex:none}.film{overflow-x:auto;justify-content:flex-start;padding:0 14px}.film button{flex:none}
+  .team{padding:12px 14px 0}.enemy .dock{display:none}
+}
+</style></head><body>
+<div id="app"></div><div id="toast" role="status"></div>
+<!--ASSETS--><!--COMMON-->
+<script>
+var lock='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function p(x){
+  var on=S.player===x.id;
+  var h='<button class="p'+(x.id==='a1'?' me':'')+(on?' on':'')+'" data-player="'+x.id+'"><img data-a="'+x.a+'" alt=""><span class="n"><b>'+esc(x.champ)+'</b><small>'+esc(x.role)+'</small></span><em>'+x.rate+'%</em></button>';
+  if(on) h+='<div class="more"><span>KDA<b>'+x.kda+'</b></span><span>近 5 场<b>'+x.rec+'</b></span></div>';
+  return h;
+}
+window.render=function(){
+  var s=SKINS[S.skin];
+  var h='<header class="top"><img data-a="logo" alt="峡谷衣橱"><nav class="nav">'
+   +NAV.map(function(n){return '<button class="'+(S.route===n[0]?'on':'')+'" data-route="'+n[0]+'">'+n[1]+'</button>';}).join('')
+   +'</nav>'+(S.route==='match'?'<span class="timer">选人中 · 0:42</span><span class="bar"></span>':'')
+   +'<div class="win" aria-hidden="true"><span>–</span><span>□</span><span>×</span></div></header>';
+  if(S.route==='match'){
+    h+='<main class="stage"><section class="team ally"><h2>我方</h2>'+ALLIES.map(p).join('')
+     +'<div class="dock"><button class="sw'+(S.autoAccept?' on':'')+'" data-toggle="autoAccept" role="switch" aria-checked="'+S.autoAccept+'">自动接受 · 2 秒<i></i></button>'
+     +'<button class="sw'+(S.autoSkin?' on':'')+'" data-toggle="autoSkin" role="switch" aria-checked="'+S.autoSkin+'">自动换肤<i></i></button></div></section>'
+     +'<section class="mid"><div class="art" data-a="'+s.key+'"></div><div class="sh"></div>'
+     +'<div class="title"><small>薇恩</small><h1>'+esc(s.name)+'</h1></div>'
+     +'<button class="use" data-use '+(useDisabled()?'disabled':'')+'>'+useLabel()+'</button>'
+     +'<div class="film">'+SKINS.map(function(k,i){return '<button class="'+(i===S.skin?'on ':'')+(i===S.used?'used':'')+'" data-skin="'+i+'" data-a="'+k.key+'" aria-label="'+esc(k.name)+'">'+(k.owned?'':'<span class="lock">'+lock+'</span>')+'</button>';}).join('')+'</div></section>'
+     +'<section class="team enemy"><h2>对方</h2>'+ENEMIES.map(p).join('')+'<div class="dock">演示数据</div></section></main>';
+  } else {
+    h+='<div class="empty"><div><h1>'+{player:'玩家',guide:'攻略',settings:'设置'}[S.route]+'</h1><p>选定方向后按同一结构展开。</p></div></div>';
+  }
+  document.getElementById('app').innerHTML=h;
+};
+rerender();
+</script>
+</body></html>

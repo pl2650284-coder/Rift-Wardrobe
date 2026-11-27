@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>App 名称与 Logo · 四种完全不同风格</title>
+<style>
+  :root {
+    --bg: #f6f6f8;
+    --surface: #ffffff;
+    --line: rgba(15, 23, 42, 0.09);
+    --ink: #111318;
+    --muted: #5a6170;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 28px 36px 36px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 16px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .top h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .top span { font-size: 13px; color: var(--muted); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .banner {
+    height: 184px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 20px 28px;
+    position: relative;
+  }
+  .b-1 { background: #f3efe6; }
+  .b-2 { background: linear-gradient(135deg, #0d1226 0%, #172347 55%, #123447 100%); color: #f4f7ff; }
+  .b-3 { background: linear-gradient(135deg, #271327 0%, #3d1c3d 52%, #24193d 100%); color: #fff4f8; }
+  .b-4 { background: linear-gradient(135deg, #e7ebf0 0%, #dde3ea 100%); color: #1a202c; }
+
+  .hero-svg {
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.18));
+    flex: none;
+  }
+  .lockup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .lockup h2 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .lockup .en {
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.68;
+    font-weight: 600;
+  }
+  .b-1 .lockup h2 { font-family: "Songti SC", "STSong", Georgia, serif; color: #1b1917; }
+  .b-1 .lockup .en { color: #b93627; opacity: 1; }
+  .b-4 .lockup h2 { color: #18202c; }
+  .b-4 .lockup .en { color: #0f766e; opacity: 1; }
+
+  .info {
+    padding: 18px 22px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+  }
+  .info-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .style-tag {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .num-tag {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .desc { font-size: 13px; color: var(--muted); }
+  .foot-row {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .mini-sizes {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mini-sizes span { font-size: 11px; color: var(--muted); }
+  .alts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .alt {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #f2f3f6;
+    color: #363c48;
+  }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <h1>四种不同气质与配色的名称 &amp; Logo</h1>
+      <span>暖白朱砂 / 冰青玻璃 / 晚霞星芒 / 陶瓷银灰拟物</span>
+    </header>
+
+    <main class="grid">
+      <!-- 1. 弈印 / 暖白朱砂 -->
+      <article class="card">
+        <div class="banner b-1">
+          <div class="hero-svg">
+            <svg width="96" height="96" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="128" height="128" rx="30" fill="#FAF7F0" stroke="#DDD5C5" stroke-width="2"/>
+              <rect x="20" y="20" width="88" height="88" rx="18" fill="#C93B2B"/>
+              <path d="M40 90L88 38" stroke="#FAF7F0" stroke-width="14" stroke-linecap="round"/>
+              <circle cx="44" cy="44" r="9" fill="#FAF7F0"/>
+              <circle cx="84" cy="84" r="9" fill="#FAF7F0"/>
+            </svg>
+          </div>
+          <div class="lockup">
+            <h2>峡印</h2>
+            <span class="en">Kyo · Mark</span>
+          </div>
+        </div>
+        <div class="info">
+          <div class="info-head">
+            <span class="style-tag">现代东方印记 · 暖白瓷＋朱砂红</span>
+            <span class="num-tag">方案 1</span>
+          </div>
+          <p class="desc">跳出冷淡深黑科技风，用温润宣白底托起一枚朱砂红方印，一笔白色斜线分开红蓝两点，有独特东方高级感与极强辨识度。</p>
+          <div class="foot-row">
+            <div class="mini-sizes">
+              <svg width="28" height="28" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="30" fill="#FAF7F0" stroke="#DDD5C5" stroke-width="3"/><rect x="20" y="20" width="88" height="88" rx="18" fill="#C93B2B"/><path d="M40 90L88 38" stroke="#FAF7F0" stroke-width="14" stroke-linecap="round"/><circle cx="44" cy="44" r="9" fill="#FAF7F0"/><circle cx="84" cy="84" r="9" fill="#FAF7F0"/></svg>
+              <svg width="16" height="16" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="28" fill="#C93B2B"/><path d="M36 92L92 36" stroke="#FAF7F0" stroke-width="16" stroke-linecap="round"/><circle cx="42" cy="42" r="10" fill="#FAF7F0"/><circle cx="86" cy="86" r="10" fill="#FAF7F0"/></svg>
+              <span>小尺寸</span>
+            </div>
+            <div class="alts"><span class="alt">弈印</span><span class="alt">赤峡</span><span class="alt">印记</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2. 流光 Luma / 玻璃渐变 -->
+      <article class="card">
+        <div class="banner b-2">
+          <div class="hero-svg">
+            <svg width="96" height="96" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="g2bg" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#4F46E5"/>
+                  <stop offset="52%" stop-color="#2563EB"/>
+                  <stop offset="100%" stop-color="#06B6D4"/>
+                </linearGradient>
+                <linearGradient id="g2card" x1="34" y1="24" x2="96" y2="104" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.96"/>
+                  <stop offset="100%" stop-color="#BAE6FD" stop-opacity="0.72"/>
+                </linearGradient>
+              </defs>
+              <rect width="128" height="128" rx="30" fill="url(#g2bg)"/>
+              <rect x="26" y="34" width="54" height="68" rx="14" transform="rotate(-10 26 34)" fill="#FFFFFF" fill-opacity="0.28"/>
+              <rect x="44" y="26" width="56" height="72" rx="14" transform="rotate(6 44 26)" fill="url(#g2card)"/>
+              <circle cx="70" cy="60" r="10" fill="#2563EB"/>
+            </svg>
+          </div>
+          <div class="lockup">
+            <h2>流光</h2>
+            <span class="en">Luma</span>
+          </div>
+        </div>
+        <div class="info">
+          <div class="info-head">
+            <span class="style-tag">通透渐变卡片 · 蓝紫到冰青</span>
+            <span class="num-tag">方案 2</span>
+          </div>
+          <p class="desc">现代桌面精品 App 的通透渐变质感，两张交错叠放的半透明卡片寓意“一键翻换皮肤与构筑”，鲜活、精致、百搭浅深色桌面。</p>
+          <div class="foot-row">
+            <div class="mini-sizes">
+              <svg width="28" height="28" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="30" fill="url(#g2bg)"/><rect x="26" y="34" width="54" height="68" rx="14" transform="rotate(-10 26 34)" fill="#FFFFFF" fill-opacity="0.28"/><rect x="44" y="26" width="56" height="72" rx="14" transform="rotate(6 44 26)" fill="url(#g2card)"/><circle cx="70" cy="60" r="10" fill="#2563EB"/></svg>
+              <svg width="16" height="16" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="30" fill="url(#g2bg)"/><rect x="40" y="26" width="58" height="74" rx="14" fill="#FFFFFF" fill-opacity="0.92"/><circle cx="69" cy="63" r="12" fill="#2563EB"/></svg>
+              <span>小尺寸</span>
+            </div>
+            <div class="alts"><span class="alt">幻羽</span><span class="alt">星幕</span><span class="alt">Vela</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 3. 星澜 Lyra / 晚霞绯紫星芒 -->
+      <article class="card">
+        <div class="banner b-3">
+          <div class="hero-svg">
+            <svg width="96" height="96" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="g3bg" x1="10" y1="8" x2="118" y2="120" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#FB7185"/>
+                  <stop offset="52%" stop-color="#C026D3"/>
+                  <stop offset="100%" stop-color="#6D28D9"/>
+                </linearGradient>
+                <linearGradient id="g3star" x1="36" y1="24" x2="92" y2="104" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#FFFFFF"/>
+                  <stop offset="100%" stop-color="#FCE7F3"/>
+                </linearGradient>
+              </defs>
+              <rect width="128" height="128" rx="30" fill="url(#g3bg)"/>
+              <ellipse cx="64" cy="64" rx="44" ry="20" transform="rotate(-28 64 64)" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="4.5"/>
+              <path d="M64 24C66.5 46 82 61.5 104 64C82 66.5 66.5 82 64 104C61.5 82 46 66.5 24 64C46 61.5 61.5 46 64 24Z" fill="url(#g3star)"/>
+              <circle cx="93" cy="36" r="5.5" fill="#FDE68A"/>
+            </svg>
+          </div>
+          <div class="lockup">
+            <h2>星澜</h2>
+            <span class="en">Lyra</span>
+          </div>
+        </div>
+        <div class="info">
+          <div class="info-head">
+            <span class="style-tag">柔雾星芒 · 晚霞绯红到暮紫</span>
+            <span class="num-tag">方案 3</span>
+          </div>
+          <p class="desc">柔润的四芒星光穿过微倾轨道环，兼顾灵动皮肤星灵与优雅桌面图标审美；绯红暮紫色调既吸睛又不刺眼。</p>
+          <div class="foot-row">
+            <div class="mini-sizes">
+              <svg width="28" height="28" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="30" fill="url(#g3bg)"/><ellipse cx="64" cy="64" rx="44" ry="20" transform="rotate(-28 64 64)" stroke="#FFFFFF" stroke-opacity="0.48" stroke-width="5"/><path d="M64 24C66.5 46 82 61.5 104 64C82 66.5 66.5 82 64 104C61.5 82 46 66.5 24 64C46 61.5 61.5 46 64 24Z" fill="url(#g3star)"/></svg>
+              <svg width="16" height="16" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="28" fill="url(#g3bg)"/><path d="M64 20C67 45 83 61 108 64C83 67 67 83 64 108C61 83 45 67 20 64C45 61 61 45 64 20Z" fill="#FFFFFF"/></svg>
+              <span>小尺寸</span>
+            </div>
+            <div class="alts"><span class="alt">绯光</span><span class="alt">星瞳</span><span class="alt">Iris</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4. 微澜 Pebble / 陶瓷银灰拟物表盘 -->
+      <article class="card">
+        <div class="banner b-4">
+          <div class="hero-svg">
+            <svg width="96" height="96" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="g4body" x1="16" y1="8" x2="112" y2="124" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#FFFFFF"/>
+                  <stop offset="100%" stop-color="#CBD5E1"/>
+                </linearGradient>
+                <linearGradient id="g4well" x1="30" y1="30" x2="98" y2="98" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#DCE3EC"/>
+                  <stop offset="100%" stop-color="#F8FAFC"/>
+                </linearGradient>
+                <linearGradient id="g4jade" x1="42" y1="32" x2="94" y2="90" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#14B8A6"/>
+                  <stop offset="100%" stop-color="#0F766E"/>
+                </linearGradient>
+              </defs>
+              <rect width="128" height="128" rx="30" fill="url(#g4body)" stroke="#FFFFFF" stroke-width="2"/>
+              <circle cx="64" cy="64" r="40" fill="url(#g4well)" stroke="#CBD5E1" stroke-width="2"/>
+              <path d="M64 31A33 33 0 0 1 97 64" stroke="url(#g4jade)" stroke-width="10" stroke-linecap="round"/>
+              <circle cx="64" cy="64" r="14" fill="#1E293B"/>
+              <circle cx="64" cy="64" r="5" fill="#14B8A6"/>
+            </svg>
+          </div>
+          <div class="lockup">
+            <h2>青瓷</h2>
+            <span class="en">Vesper</span>
+          </div>
+        </div>
+        <div class="info">
+          <div class="info-head">
+            <span class="style-tag">陶瓷拟物微件 · 柔银灰＋松石青</span>
+            <span class="num-tag">方案 4</span>
+          </div>
+          <p class="desc">精密实体仪器与温润陶瓷浮雕质感，内凹圆盘配一抹松石青刻度弧，寓意“安静待命、精准响应”，在浅色与深色桌面都很有高级器物感。</p>
+          <div class="foot-row">
+            <div class="mini-sizes">
+              <svg width="28" height="28" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="30" fill="url(#g4body)" stroke="#CBD5E1" stroke-width="3"/><circle cx="64" cy="64" r="40" fill="url(#g4well)"/><path d="M64 31A33 33 0 0 1 97 64" stroke="url(#g4jade)" stroke-width="11" stroke-linecap="round"/><circle cx="64" cy="64" r="15" fill="#1E293B"/><circle cx="64" cy="64" r="5.5" fill="#14B8A6"/></svg>
+              <svg width="16" height="16" viewBox="0 0 128 128" fill="none"><rect width="128" height="128" rx="28" fill="#E2E8F0"/><path d="M64 28A36 36 0 0 1 100 64" stroke="#0F766E" stroke-width="14" stroke-linecap="round"/><circle cx="64" cy="64" r="18" fill="#1E293B"/></svg>
+              <span>小尺寸</span>
+            </div>
+            <div class="alts"><span class="alt">瓷光</span><span class="alt">松石</span><span class="alt">Pebble</span></div>
+          </div>
+        </div>
+      </article>
+    </main>
+  </div>
+</body>
+</html>

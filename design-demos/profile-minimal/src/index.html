@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>主页 · 个人信息（极简重设计示例）</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --rail: #0c0e12;
+    --surface: #15181f;
+    --surface-hover: #1b1f28;
+    --line: rgba(255, 255, 255, 0.075);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --ink: #f2f4f8;
+    --ink-2: #a5adbd;
+    --ink-3: #6c7486;
+    --win: #34d399;
+    --win-bg: rgba(52, 211, 153, 0.11);
+    --loss: #f87171;
+    --loss-bg: rgba(248, 113, 113, 0.11);
+    --accent: #e5e7eb;
+    --bar: #6b8afd;
+    --bar-muted: rgba(255, 255, 255, 0.08);
+  }
+  [data-theme="light"] {
+    --bg: #fafafa;
+    --rail: #f3f4f6;
+    --surface: #ffffff;
+    --surface-hover: #f5f6f8;
+    --line: rgba(15, 23, 42, 0.08);
+    --line-strong: rgba(15, 23, 42, 0.16);
+    --ink: #111318;
+    --ink-2: #525866;
+    --ink-3: #868e9e;
+    --win: #059669;
+    --win-bg: rgba(5, 150, 105, 0.1);
+    --loss: #dc2626;
+    --loss-bg: rgba(220, 38, 38, 0.09);
+    --accent: #111318;
+    --bar: #3b63f6;
+    --bar-muted: rgba(15, 23, 42, 0.07);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei UI", "Segoe UI", -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--bar); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  /* Minimal left rail */
+  .rail {
+    background: var(--rail);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0 18px;
+    gap: 8px;
+  }
+  .brand-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--line-strong);
+    display: grid;
+    place-items: center;
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .rail-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .nav-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    color: var(--ink-3);
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .nav-btn:hover { background: var(--surface-hover); color: var(--ink); }
+  .nav-btn.active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+  .rail-foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--win);
+  }
+
+  /* Main canvas */
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .titlebar {
+    height: 48px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .crumb {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .crumb strong { color: var(--ink); font-weight: 600; }
+  .bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .status-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .icon-btn {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  }
+  .icon-btn:hover { background: var(--surface-hover); color: var(--ink); border-color: var(--line-strong); }
+  .win-btns { display: inline-flex; gap: 4px; margin-left: 6px; }
+  .win-btns span {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: grid; place-items: center; font-size: 12px; color: var(--ink-3);
+  }
+
+  /* Content container — generous breathing room, no nested box soup */
+  .page {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 24px 36px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* 1. Summoner header strip */
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    object-fit: cover;
+    border: 1px solid var(--line-strong);
+    display: block;
+  }
+  .name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .name-row h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .tag { font-size: 14px; color: var(--ink-3); font-weight: 500; }
+  .meta-line {
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  .rank-block {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+  .rank-text { text-align: right; }
+  .rank-tier {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .rank-sub {
+    margin-top: 3px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .refresh-btn {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    font-size: 13px;
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .refresh-btn:hover { background: var(--surface-hover); }
+
+  /* 2. Quiet 3-metric summary bar (no boxed KPI cards) */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .metric + .metric {
+    padding-left: 24px;
+    border-left: 1px solid var(--line);
+  }
+  .metric-label { font-size: 13px; color: var(--ink-2); }
+  .metric-val {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    color: var(--ink);
+  }
+  .metric-val span { font-size: 15px; font-weight: 500; color: var(--ink-2); margin-left: 4px; }
+  .metric-sub { font-size: 12px; color: var(--ink-3); }
+
+  /* 3. Two-column body */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.58fr) minmax(300px, 1fr);
+    gap: 36px;
+    align-items: start;
+  }
+  .sec-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .sec-title { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .sec-note { font-size: 12px; color: var(--ink-3); }
+
+  .seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  .seg button {
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .seg button.active {
+    background: var(--surface-hover);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+
+  /* Recent matches list */
+  .match-list {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--line);
+  }
+  .match-row {
+    display: grid;
+    grid-template-columns: 4px 40px minmax(110px, 1.1fr) 118px 86px 74px;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 10px 13px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    transition: background 0.12s ease;
+  }
+  .match-row:hover { background: var(--surface-hover); }
+  .result-bar {
+    width: 3px;
+    height: 32px;
+    border-radius: 2px;
+    background: var(--win);
+  }
+  .match-row.loss .result-bar { background: var(--loss); }
+
+  .champ-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+    overflow: hidden;
+  }
+  .champ-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .m-champ { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .m-mode { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+  .m-kda { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .m-cs { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+  .m-res {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: var(--win);
+    background: var(--win-bg);
+    text-align: center;
+    width: fit-content;
+  }
+  .match-row.loss .m-res { color: var(--loss); background: var(--loss-bg); }
+
+  .m-time { text-align: right; font-size: 12px; color: var(--ink-3); }
+  .m-dur { font-size: 13px; color: var(--ink-2); }
+
+  .match-detail {
+    padding: 10px 14px 12px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--ink-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Right column */
+  .side-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* Top champions */
+  .champ-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .c-item {
+    display: grid;
+    grid-template-columns: 74px 1fr 48px;
+    align-items: center;
+    gap: 12px;
+  }
+  .c-name { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .c-games { font-size: 12px; color: var(--ink-3); }
+  .c-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bar-muted);
+    overflow: hidden;
+  }
+  .c-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--ink-2);
+  }
+  .c-item:first-child .c-fill { background: var(--win); }
+  .c-wr { text-align: right; font-size: 14px; font-weight: 600; color: var(--ink); }
+
+  /* 7-day trend minimal chart */
+  .trend-box {
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .chart-wrap {
+    margin-top: 10px;
+    height: 104px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    align-items: end;
+  }
+  .day-col {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+  }
+  .day-val { font-size: 11px; color: var(--ink-3); }
+  .day-bar-wrap {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .day-bar {
+    width: 18px;
+    border-radius: 4px 4px 2px 2px;
+    background: var(--bar-muted);
+    transition: height 0.2s ease, background 0.14s ease;
+  }
+  .day-col:last-child .day-bar,
+  .day-col:hover .day-bar { background: var(--bar); }
+  .day-col:hover .day-val { color: var(--ink); font-weight: 600; }
+  .day-lbl { font-size: 12px; color: var(--ink-3); }
+
+  /* Assets compact footer inside right col */
+  .assets-box {
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .asset-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .asset-summary strong { font-weight: 600; color: var(--ink); }
+  .link-btn {
+    font-size: 13px;
+    color: var(--ink);
+    padding: 7px 13px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  .link-btn:hover { background: var(--surface-hover); }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    color: var(--ink);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 920px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { display: none; }
+    .page { padding: 20px; }
+    .hero { flex-direction: column; align-items: flex-start; }
+    .rank-block { width: 100%; justify-content: space-between; }
+    .rank-text { text-align: left; }
+    .metrics { grid-template-columns: 1fr; gap: 16px; }
+    .metric + .metric { padding-left: 0; border-left: none; padding-top: 14px; border-top: 1px solid var(--line); }
+    .grid { grid-template-columns: 1fr; }
+    .match-row { grid-template-columns: 4px 36px 1fr auto; }
+    .m-res, .m-time { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="主导航">
+      <div class="brand-dot" title="峡谷衣橱">R</div>
+      <nav class="rail-nav">
+        <button class="nav-btn active" title="主页 / 个人信息" aria-label="主页">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+        </button>
+        <button class="nav-btn" data-nav="选人换肤" title="选人换肤" aria-label="选人换肤">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 12h4m-2-2v4m6-2h.01"/></svg>
+        </button>
+        <button class="nav-btn" data-nav="英雄榜" title="英雄榜" aria-label="英雄榜">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M7 15V9m5 6V5m5 10v-4"/></svg>
+        </button>
+        <button class="nav-btn" data-nav="偏好设置" title="偏好设置" aria-label="偏好设置">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+      </nav>
+      <div class="rail-foot">
+        <span class="online-dot" title="本地运行中"></span>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="titlebar">
+        <div class="crumb">
+          <strong>主页</strong>
+          <span>/</span>
+          <span>个人信息</span>
+        </div>
+        <div class="bar-right">
+          <span class="status-text"><i class="online-dot"></i>演示数据</span>
+          <button id="themeBtn" class="icon-btn" aria-label="切换浅色或深色主题">切换浅色</button>
+          <div class="win-btns" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div>
+        </div>
+      </header>
+
+      <main class="page">
+        <!-- 1. Summoner & Rank -->
+        <section class="hero" aria-label="召唤师概览">
+          <div class="identity">
+            <img id="summonerAvatar" class="avatar" alt="召唤师头像" />
+            <div>
+              <div class="name-row">
+                <h1>薇恩玩家</h1>
+                <span class="tag">#CN1</span>
+              </div>
+              <div class="meta-line">
+                <span>峡谷之巅</span>
+                <span class="num">Lv. 186</span>
+                <span>常用下路</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rank-block">
+            <div class="rank-text">
+              <div class="rank-tier">单双排 钻石 III</div>
+              <div class="rank-sub num">74 LP · 42 胜 30 负 · 胜率 58%</div>
+            </div>
+            <button id="refreshBtn" class="refresh-btn">刷新</button>
+          </div>
+        </section>
+
+        <!-- 2. Three non-duplicated core stats -->
+        <section class="metrics" aria-label="关键统计">
+          <div class="metric">
+            <span class="metric-label">近期胜率</span>
+            <div class="metric-val num">80%<span>4 胜 1 负</span></div>
+            <span class="metric-sub">最近 5 场有效对局，重开不计入</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">平均 KDA</span>
+            <div class="metric-val num">4.2</div>
+            <span class="metric-sub">近 7 个自然日有效对局均值</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">已拥有皮肤</span>
+            <div class="metric-val num">146<span>/ 812</span></div>
+            <span class="metric-sub">不含默认外观与炫彩，本机收藏 18 款</span>
+          </div>
+        </section>
+
+        <!-- 3. Matches + Side column -->
+        <section class="grid">
+          <div>
+            <div class="sec-head">
+              <h2 class="sec-title">最近对局</h2>
+              <div class="seg" role="tablist" aria-label="按模式筛选">
+                <button class="active" data-mode="all">全部</button>
+                <button data-mode="排位赛">排位</button>
+                <button data-mode="极地大乱斗">大乱斗</button>
+              </div>
+            </div>
+            <div id="matchList" class="match-list"></div>
+          </div>
+
+          <aside class="side-col">
+            <div>
+              <div class="sec-head">
+                <h2 class="sec-title">常用英雄</h2>
+                <span class="sec-note">近 20 场</span>
+              </div>
+              <div id="topChamps" class="champ-list"></div>
+            </div>
+
+            <div class="trend-box">
+              <div class="sec-head">
+                <h2 class="sec-title">近 7 天表现</h2>
+                <div class="seg" role="tablist" aria-label="切换趋势指标">
+                  <button class="active" data-metric="winRate">胜率</button>
+                  <button data-metric="kda">KDA</button>
+                </div>
+              </div>
+              <div id="trendChart" class="chart-wrap"></div>
+            </div>
+
+            <div class="assets-box">
+              <div class="asset-summary num">
+                <span>英雄 <strong>92</strong> / 171 · 收藏 <strong>18</strong> 款</span>
+                <span style="font-size:12px;color:var(--ink-3)">永久拥有资产，不含体验与炫彩</span>
+              </div>
+              <button id="openWardrobe" class="link-btn">进入换肤</button>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!--ASSETS-->
+  <script>
+    (function () {
+      const ASSETS = JSON.parse(document.getElementById("assets").textContent);
+      document.getElementById("summonerAvatar").src = ASSETS.Vayne;
+
+      const MATCHES = [
+        { id: "g-1", champ: "薇恩", short: "VN", img: ASSETS.Vayne, res: "win", mode: "排位赛", kda: "9 / 2 / 7", ratio: "8.0", cs: 213, dur: "28:14", ago: "12 分钟前", role: "下路" },
+        { id: "g-2", champ: "卡莎", short: "KA", img: null, res: "win", mode: "排位赛", kda: "11 / 4 / 5", ratio: "4.0", cs: 187, dur: "31:42", ago: "2 小时前", role: "下路" },
+        { id: "g-3", champ: "霞", short: "XR", img: null, res: "loss", mode: "排位赛", kda: "3 / 7 / 9", ratio: "1.7", cs: 164, dur: "26:08", ago: "昨天", role: "下路" },
+        { id: "g-4", champ: "厄运小姐", short: "MF", img: null, res: "win", mode: "极地大乱斗", kda: "18 / 6 / 22", ratio: "6.7", cs: 92, dur: "19:36", ago: "昨天", role: "嚎哭深渊" },
+        { id: "g-5", champ: "卢锡安", short: "LU", img: null, res: "win", mode: "排位赛", kda: "7 / 3 / 11", ratio: "6.0", cs: 198, dur: "29:51", ago: "2 天前", role: "下路" }
+      ];
+
+      const TOP_CHAMPS = [
+        { name: "薇恩", games: 18, wr: 67 },
+        { name: "卡莎", games: 14, wr: 64 },
+        { name: "霞", games: 9, wr: 56 }
+      ];
+
+      const TREND = {
+        labels: ["周一", "周二", "周三", "周四", "周五", "周六", "今天"],
+        winRate: [48, 55, 52, 61, 58, 67, 72],
+        kda: [2.4, 2.9, 2.6, 3.4, 3.1, 3.8, 4.2]
+      };
+
+      let modeFilter = "all";
+      let expandedId = null;
+      let chartMetric = "winRate";
+
+      const matchList = document.getElementById("matchList");
+      const topChamps = document.getElementById("topChamps");
+      const trendChart = document.getElementById("trendChart");
+      const themeBtn = document.getElementById("themeBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const toastEl = document.getElementById("toast");
+
+      let toastTimer = null;
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1800);
+      }
+
+      function renderMatches() {
+        const rows = MATCHES.filter(m => modeFilter === "all" || m.mode === modeFilter);
+        matchList.innerHTML = rows.map(m => {
+          const icon = m.img ? '<img src="' + m.img + '" alt="' + m.champ + '" />' : m.short;
+          const isOpen = expandedId === m.id;
+          return '<button class="match-row ' + m.res + '" data-id="' + m.id + '" aria-expanded="' + isOpen + '">' +
+            '<span class="result-bar"></span>' +
+            '<span class="champ-icon">' + icon + '</span>' +
+            '<div><div class="m-champ">' + m.champ + '</div><div class="m-mode">' + m.mode + '</div></div>' +
+            '<div class="num"><div class="m-kda">' + m.kda + '</div><div class="m-cs">补刀 ' + m.cs + '</div></div>' +
+            '<span class="m-res">' + (m.res === "win" ? "胜利" : "失败") + '</span>' +
+            '<div class="m-time num"><div class="m-dur">' + m.dur + '</div><div>' + m.ago + '</div></div>' +
+            '</button>' +
+            (isOpen ? '<div class="match-detail"><span>位置：' + m.role + ' · 战损比 ' + m.ratio + ' · 补刀 ' + m.cs + '</span><span>对局时长 ' + m.dur + '</span></div>' : '');
+        }).join("");
+      }
+
+      function renderTopChamps() {
+        topChamps.innerHTML = TOP_CHAMPS.map(c =>
+          '<div class="c-item">' +
+            '<div><div class="c-name">' + c.name + '</div><div class="c-games num">' + c.games + ' 场</div></div>' +
+            '<div class="c-track"><div class="c-fill" style="width:' + c.wr + '%"></div></div>' +
+            '<div class="c-wr num">' + c.wr + '%</div>' +
+          '</div>'
+        ).join("");
+      }
+
+      function renderTrend() {
+        const vals = TREND[chartMetric];
+        const max = chartMetric === "winRate" ? 100 : 5.0;
+        trendChart.innerHTML = TREND.labels.map((lbl, i) => {
+          const v = vals[i];
+          const pct = Math.max(12, Math.round((v / max) * 100));
+          const text = chartMetric === "winRate" ? (v + "%") : v.toFixed(1);
+          return '<div class="day-col">' +
+            '<span class="day-val num">' + text + '</span>' +
+            '<div class="day-bar-wrap"><div class="day-bar" style="height:' + pct + '%"></div></div>' +
+            '<span class="day-lbl">' + lbl + '</span>' +
+          '</div>';
+        }).join("");
+      }
+
+      matchList.addEventListener("click", e => {
+        const row = e.target.closest("[data-id]");
+        if (!row) return;
+        expandedId = expandedId === row.dataset.id ? null : row.dataset.id;
+        renderMatches();
+      });
+
+      document.querySelectorAll("[data-mode]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          modeFilter = btn.dataset.mode;
+          document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("active", b === btn));
+          renderMatches();
+        });
+      });
+
+      document.querySelectorAll("[data-metric]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          chartMetric = btn.dataset.metric;
+          document.querySelectorAll("[data-metric]").forEach(b => b.classList.toggle("active", b === btn));
+          renderTrend();
+        });
+      });
+
+      function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        themeBtn.textContent = theme === "dark" ? "切换浅色" : "切换深色";
+      }
+      if (new URLSearchParams(location.search).get("theme") === "light") setTheme("light");
+
+      themeBtn.addEventListener("click", () => {
+        const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        setTheme(next);
+      });
+
+      refreshBtn.addEventListener("click", () => {
+        toast("已刷新演示数据");
+      });
+
+      document.querySelectorAll("[data-nav]").forEach(btn => {
+        btn.addEventListener("click", () => toast("当前为主页（个人信息）设计示例"));
+      });
+      document.getElementById("openWardrobe").addEventListener("click", () => toast("跳转到选人换肤页"));
+
+      renderMatches();
+      renderTopChamps();
+      renderTrend();
+    })();
+  </script>
+</body>
+</html>

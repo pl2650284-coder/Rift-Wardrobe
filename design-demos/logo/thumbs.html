@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Logo 六个候选方向</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#12151b;color:#eaedf2;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif;padding:34px 40px}
+header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:26px}
+header h1{font-size:20px;font-weight:600;letter-spacing:1px}
+header span{font-size:13px;color:#8c96a6}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.card{background:#181d26;border:1px solid #272f3d;border-radius:8px;padding:26px 24px 20px;display:flex;flex-direction:column;align-items:center}
+.stage{width:100%;height:190px;display:flex;align-items:center;justify-content:center;gap:26px;background:radial-gradient(circle at 50% 45%,#222b3a,#141820 75%);border-radius:6px;border:1px solid #232b38}
+.big{width:128px;height:128px;filter:drop-shadow(0 12px 24px #0009)}
+.sizes{display:flex;flex-direction:column;align-items:center;gap:12px;padding-left:18px;border-left:1px solid #283140}
+.sizes .s32{width:32px;height:32px}
+.sizes .s16{width:16px;height:16px}
+.sizes small{font-size:11px;color:#7e8999;font-variant-numeric:tabular-nums}
+.meta{width:100%;margin-top:16px}
+.meta .tag{font-size:12px;color:#d4b26f;letter-spacing:1px}
+.meta h2{font-size:16px;margin-top:3px;font-weight:600}
+.meta p{font-size:13px;color:#9aa4b4;margin-top:4px}
+svg{display:block;width:100%;height:100%}
+</style></head><body>
+<header><h1>峡谷衣橱 · Logo 六个候选（纯图形 · 含 32px / 16px 实寸）</h1><span>1–3 为完整展示板方向 · 4–6 为备选</span></header>
+<div class="grid" id="g"></div>
+<script>
+const LOGOS = [
+  {
+    tag: '方向 1 · 衣橱与展柜（田中一光构成）',
+    name: '双扉金枢 · The Vault Doors',
+    desc: '左右两扇斜切门扉向两侧开启，中央亮出代表皮肤的发光菱形。',
+    svg: `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#0b111c"/>
+      <path d="M96 124 L224 88 L224 372 L96 416 Z" fill="#1d3549"/>
+      <path d="M96 124 L224 88 L224 148 L96 184 Z" fill="#c9a55c"/>
+      <path d="M416 96 L288 132 L288 424 L416 388 Z" fill="#c9a55c"/>
+      <path d="M416 328 L288 364 L288 424 L416 388 Z" fill="#1d3549"/>
+      <polygon points="256,164 316,256 256,348 196,256" fill="#f3dfb0"/>
+    </svg>`
+  },
+  {
+    tag: '方向 2 · 综合对局（召唤师峡谷地形）',
+    name: '双阵裂谷 · The Rift Diagonal',
+    desc: '左下至右上的一道金色裂谷，将方印切为我方深青与对方暗绯。',
+    svg: `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#0a0f18"/>
+      <path d="M168 96 H356 L96 356 V168 L168 96 Z" fill="#3d8fb8"/>
+      <path d="M416 156 V344 L344 416 H156 L416 156 Z" fill="#c25959"/>
+      <polygon points="392,92 420,120 120,420 92,392" fill="#e5c478"/>
+      <polygon points="256,196 316,256 256,316 196,256" fill="#0a0f18"/>
+      <polygon points="256,218 294,256 256,294 218,256" fill="#f3dfb0"/>
+    </svg>`
+  },
+  {
+    tag: '方向 3 · 纯几何符号（佐藤可士和极简）',
+    name: '双环咬合 · Hex Interlock',
+    desc: '两条等宽金与青折带咬合成正六边形，中心留出负空间菱形，16px 极度锐利。',
+    svg: `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#0c121d"/>
+      <path d="M256 76 L412 166 V268 L344 228 V206 L256 155 L168 206 V306 L100 346 V166 L256 76 Z" fill="#dfc07a"/>
+      <path d="M256 436 L100 346 L168 306 L256 357 L344 306 V206 L412 166 V346 L256 436 Z" fill="#4aa3b5"/>
+      <polygon points="256,214 298,256 256,298 214,256" fill="#f5e6c4"/>
+    </svg>`
+  },
+  {
+    tag: '方向 4 · 备选（海克斯光棱）',
+    name: '切面宝石 · Hextech Prism',
+    desc: '八角切面晶体，三块明暗折射面象征皮肤的焕新。',
+    svg: `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#0b101a"/>
+      <polygon points="256,72 396,156 396,356 256,440 116,356 116,156" fill="#172a3e"/>
+      <polygon points="256,72 396,156 256,256 116,156" fill="#49a6bd"/>
+      <polygon points="396,156 396,356 256,440 256,256" fill="#c9a55c"/>
+      <polygon points="256,162 332,256 256,350 180,256" fill="#f7e7be"/>
+    </svg>`
+  },
+  {
+    tag: '方向 5 · 备选（轮盘 · 杉浦康平曼荼罗）',
+    name: '峡谷罗盘 · Rift Compass',
+    desc: '同心圆环与四象限指针，中心为海克斯金核。',
+    svg: `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#0d131d"/>
+      <circle cx="256" cy="256" r="156" fill="none" stroke="#c9a55c" stroke-width="28"/>
+      <circle cx="256" cy="256" r="96" fill="none" stroke="#3f8fa6" stroke-width="18"/>
+      <polygon points="256,64 284,228 448,256 284,284 256,448 228,284 64,256 228,228" fill="#ebd094"/>
+      <circle cx="256" cy="256" r="36" fill="#0d131d"/>
+      <circle cx="256" cy="256" r="18" fill="#ebd094"/>
+    </svg>`
+  },
+  {
+    tag: '方向 6 · 备选（轮盘 · 等距双层切片）',
+    name: '叠影浮层 · Overlay Planes',
+    desc: '底层青色代表游戏客户端，上层金色代表悬浮其上的助手与皮肤。',
+    svg: `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#0b1018"/>
+      <polygon points="256,196 424,292 256,388 88,292" fill="#3a899e"/>
+      <polygon points="256,116 424,212 256,308 88,212" fill="#dfc07a"/>
+      <polygon points="256,196 354,252 256,308 158,252" fill="#0b1018"/>
+      <polygon points="256,214 322,252 256,290 190,252" fill="#f6e7c1"/>
+    </svg>`
+  }
+];
+document.getElementById('g').innerHTML = LOGOS.map(l => `
+  <div class="card">
+    <div class="stage">
+      <div class="big">${l.svg}</div>
+      <div class="sizes">
+        <div class="s32">${l.svg}</div><small>32px</small>
+        <div class="s16">${l.svg}</div><small>16px</small>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tag">${l.tag}</div>
+      <h2>${l.name}</h2>
+      <p>${l.desc}</p>
+    </div>
+  </div>
+`).join('');
+</script>
+</body></html>

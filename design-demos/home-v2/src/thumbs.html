@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>首页减法 · 六个候选</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1b1d21;color:#e9e9e9;font:14px "Microsoft YaHei UI","Segoe UI",sans-serif;padding:28px}
+.grid{display:grid;grid-template-columns:repeat(3,451px);gap:26px 22px}
+.cell p{margin-top:9px;font-size:13px;color:#b9bcc2}.cell p b{color:#fff;font-weight:600;margin-right:6px}
+.clip{width:451px;height:322px;overflow:hidden;border-radius:4px;outline:1px solid #34373d}
+.f{width:980px;height:700px;transform:scale(.46);transform-origin:0 0;position:relative;overflow:hidden}
+.bg{position:absolute;inset:0;background-size:cover;background-position:60% 30%}
+img{display:block}
+.av{width:44px;height:44px;border-radius:50%;object-fit:cover}
+
+/* 1 Ash Thorp — full bleed HUD */
+.v1{background:#05080d;color:#fff}
+.v1 .shade{position:absolute;inset:0;background:linear-gradient(90deg,#05080dcc,transparent 45%),linear-gradient(0deg,#05080df0 5%,transparent 45%)}
+.v1 .top{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:26px;padding:0 24px;font-size:14px;color:#cfd6df}
+.v1 .top img{width:26px}.v1 .top .on{color:#fff;border-bottom:2px solid #c8a96a;padding:15px 0}
+.v1 .top .r{margin-left:auto;display:flex;gap:18px;font-size:13px}.v1 .top .r i{font-style:normal;color:#c8a96a}
+.v1 .side{position:absolute;top:110px;display:flex;flex-direction:column;gap:12px}.v1 .side.l{left:24px}.v1 .side.r{right:24px}
+.v1 .side img{border:2px solid #6aa7c8}.v1 .side.r img{border-color:#c86a6a}
+.v1 .name{position:absolute;left:96px;bottom:150px}.v1 .name small{font-size:16px;color:#c8a96a;letter-spacing:4px}
+.v1 .name h1{font:400 76px/1.1 "Noto Serif SC",SimSun,serif;margin-top:6px}
+.v1 .btn{position:absolute;left:96px;bottom:92px;background:#c8a96a;color:#111;padding:13px 30px;font-size:15px}
+.v1 .film{position:absolute;right:96px;bottom:34px;display:flex;gap:8px}
+.v1 .film div{width:96px;height:56px;background-size:cover;background-position:center;opacity:.6}.v1 .film .on{opacity:1;outline:2px solid #c8a96a}
+
+/* 2 Vignelli — paper grid */
+.v2{background:#f3f1ec;color:#111}
+.v2 .top{height:56px;display:flex;align-items:center;gap:28px;padding:0 40px;border-bottom:2px solid #111;font-size:14px}
+.v2 .top b{font-size:16px}.v2 .top .on{color:#a8812f;font-weight:700}.v2 .top .r{margin-left:auto;font-size:13px}
+.v2 .body{display:grid;grid-template-columns:5fr 7fr;gap:32px;padding:30px 40px 0}
+.v2 h1{font:700 68px/1 "Microsoft YaHei UI",sans-serif;letter-spacing:-2px}.v2 h2{font-size:26px;font-weight:400;margin-top:10px}
+.v2 .btn{display:inline-block;margin-top:22px;background:#111;color:#fff;padding:12px 26px}
+.v2 table{width:100%;margin-top:34px;border-collapse:collapse;font-size:14px}.v2 td{border-top:1px solid #111;padding:7px 0}.v2 td:last-child{text-align:right}
+.v2 .art{height:470px;background-size:cover;background-position:60% 30%}
+.v2 .skins{display:flex;gap:28px;padding:22px 40px;font-size:15px}.v2 .skins .on{border-bottom:3px solid #a8812f}.v2 .skins .no{color:#888}
+
+/* 3 Champ select — three columns */
+.v3{background:#0a1220;color:#e7edf5}
+.v3 .top{height:52px;display:flex;align-items:center;gap:26px;padding:0 22px;background:#060c16;font-size:14px;color:#a9b6c7}
+.v3 .top img{width:26px}.v3 .top .on{color:#f0d79a}.v3 .top .r{margin-left:auto;color:#f0d79a}
+.v3 .cols{display:grid;grid-template-columns:200px 1fr 200px;height:648px}
+.v3 .team{padding:18px 14px;display:flex;flex-direction:column;gap:10px;background:#0c1626}
+.v3 .p{display:flex;align-items:center;gap:10px;height:62px;padding:0 10px;border-left:3px solid #4d8fb8;background:#111e31}
+.v3 .team.e .p{border-left:0;border-right:3px solid #b85d5d;flex-direction:row-reverse;text-align:right}
+.v3 .p b{display:block;font-size:14px;font-weight:600}.v3 .p small{font-size:12px;color:#93a3b8}
+.v3 .mid{position:relative}.v3 .mid .bg{background-position:58% 25%}
+.v3 .mid .sh{position:absolute;inset:0;background:linear-gradient(0deg,#0a1220 8%,transparent 50%)}
+.v3 .mid h1{position:absolute;left:0;right:0;bottom:170px;text-align:center;font:400 44px "Noto Serif SC",SimSun,serif}
+.v3 .mid .btn{position:absolute;left:50%;transform:translateX(-50%);bottom:118px;border:1px solid #c8a96a;color:#f0d79a;padding:10px 34px;background:#0a1220cc}
+.v3 .mid .film{position:absolute;bottom:24px;left:0;right:0;display:flex;justify-content:center;gap:8px}
+.v3 .mid .film div{width:84px;height:62px;background-size:cover;background-position:center;opacity:.55}.v3 .mid .film .on{opacity:1;outline:2px solid #c8a96a}
+
+/* 4 Steam — banner + bar */
+.v4{background:#1b2838;color:#dfe6ee}
+.v4 .top{height:48px;display:flex;align-items:center;gap:24px;padding:0 22px;background:#171d25;font-size:14px;color:#9aa8b8}.v4 .top .on{color:#fff}
+.v4 .ban{height:330px;position:relative}.v4 .ban .sh{position:absolute;inset:0;background:linear-gradient(0deg,#1b2838,transparent 60%)}
+.v4 .ban h1{position:absolute;left:30px;bottom:24px;font-size:46px;font-weight:700}
+.v4 .bar{display:flex;align-items:center;gap:30px;margin:0 30px;padding:16px 20px;background:#22344a}
+.v4 .bar .btn{background:#5fae3f;color:#fff;padding:14px 34px;font-size:17px;font-weight:700}
+.v4 .bar div small{display:block;font-size:12px;color:#8fa1b6}.v4 .bar div b{font-size:15px}
+.v4 .row{display:flex;gap:12px;padding:22px 30px 0}.v4 .row img{width:58px;height:58px;border-radius:3px}.v4 .row .gap{width:30px}
+
+/* 5 Cinematic spectrum */
+.v5{background:#000;color:#fff}
+.v5 .top{height:56px;display:flex;align-items:center;gap:26px;padding:0 32px;font-size:14px;color:#aaa}.v5 .top .on{color:#fff}
+.v5 h1{position:absolute;left:32px;top:96px;font:900 150px/1 "Microsoft YaHei UI",sans-serif;letter-spacing:-6px;z-index:2}
+.v5 h2{position:absolute;left:38px;top:262px;font-size:24px;font-weight:400;color:#ddd;z-index:2}
+.v5 .spec{position:absolute;left:0;right:0;top:120px;height:300px;display:flex;align-items:center;justify-content:flex-end;gap:16px;padding-right:40px}
+.v5 .spec div{width:26px;border-radius:13px;background:linear-gradient(#6c7cff,#3a3fd1)}.v5 .spec div.e{background:linear-gradient(#ff6c8a,#c13a5c)}
+.v5 .cards{position:absolute;left:32px;right:32px;bottom:30px;display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.v5 .cards div{height:120px;border-radius:10px;background-size:cover;background-position:center;outline:1px solid #333}.v5 .cards .on{outline:2px solid #fff}
+
+/* 6 Deco */
+.v6{background:#12302c;color:#ead8a8}
+.v6 .frame{position:absolute;inset:18px;border:4px solid #c9a24a;outline:1px solid #c9a24a;outline-offset:-12px}
+.v6 .fan{position:absolute;left:60px;top:70px;width:440px;height:440px;border-radius:50%;background:repeating-conic-gradient(from -90deg at 50% 50%,#c9a24a 0 9deg,transparent 9deg 20deg);clip-path:inset(0 0 45% 0)}
+.v6 .circle{position:absolute;left:150px;top:170px;width:260px;height:260px;border-radius:50%;background-size:cover;background-position:62% 22%;border:6px solid #9e2a1d}
+.v6 h1{position:absolute;left:540px;top:80px;font:900 84px/1.1 "Noto Serif SC",SimSun,serif;color:#c9a24a;text-shadow:4px 4px 0 #9e2a1d}
+.v6 .grid2{position:absolute;left:540px;top:310px;display:grid;grid-template-columns:repeat(5,64px);gap:10px}.v6 .grid2 img{width:64px;height:64px;border:2px solid #c9a24a}
+.v6 .band{position:absolute;left:60px;right:60px;bottom:52px;height:64px;background:#9e2a1d;display:flex;align-items:center;justify-content:space-between;padding:0 26px;color:#f3e3b8;font-size:18px;letter-spacing:3px}
+</style></head><body>
+<div class="grid">
+
+<div class="cell"><div class="clip"><div class="f v1"><div class="bg" data-a="spirit"></div><div class="shade"></div>
+<div class="top"><img data-a="logo" alt=""><span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span><span class="r"><span><i>●</i> 自动接受 2s</span><span>自动换肤 关</span></span></div>
+<div class="side l"><img class="av" data-a="Vayne"><img class="av" data-a="JarvanIV"><img class="av" data-a="Gwen"><img class="av" data-a="Jinx"><img class="av" data-a="Leona"></div>
+<div class="side r"><img class="av" data-a="Yasuo"><img class="av" data-a="Ahri"><img class="av" data-a="Thresh"><img class="av" data-a="LeeSin"><img class="av" data-a="Lux"></div>
+<div class="name"><small>薇恩 · 下路</small><h1>灵魂莲华</h1></div><div class="btn">使用这款</div>
+<div class="film"><div data-a="classic"></div><div data-a="heart"></div><div class="on" data-a="spirit"></div><div data-a="project"></div><div data-a="soul"></div></div>
+</div></div><p><b>1 · Ash Thorp</b>全屏原画 + 贴边 HUD</p></div>
+
+<div class="cell"><div class="clip"><div class="f v2">
+<div class="top"><b>峡谷衣橱</b><span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span><span class="r">选人中 · 演示</span></div>
+<div class="body"><div><h1>薇恩</h1><h2>灵魂莲华</h2><span class="btn">使用这款</span>
+<table><tr><td>薇恩</td><td>下路</td><td>58%</td><td>亚索</td><td>中路</td><td>53%</td></tr><tr><td>嘉文四世</td><td>打野</td><td>62%</td><td>阿狸</td><td>下路</td><td>57%</td></tr><tr><td>格温</td><td>上路</td><td>54%</td><td>锤石</td><td>辅助</td><td>49%</td></tr><tr><td>金克丝</td><td>中路</td><td>51%</td><td>李青</td><td>打野</td><td>61%</td></tr><tr><td>蕾欧娜</td><td>辅助</td><td>56%</td><td>拉克丝</td><td>上路</td><td>52%</td></tr></table></div>
+<div class="art" data-a="spirit"></div></div>
+<div class="skins"><span>经典</span><span>觅心猎手</span><span class="on">灵魂莲华</span><span>源计划：净化</span><span class="no">摄魂使者</span></div>
+</div></div><p><b>2 · Vignelli</b>纸底网格 + 对照表</p></div>
+
+<div class="cell"><div class="clip"><div class="f v3">
+<div class="top"><img data-a="logo" alt=""><span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span><span class="r">选人中 0:42</span></div>
+<div class="cols"><div class="team">
+<div class="p"><img class="av" data-a="Vayne"><div><b>薇恩</b><small>下路 · 58%</small></div></div><div class="p"><img class="av" data-a="JarvanIV"><div><b>嘉文四世</b><small>打野 · 62%</small></div></div><div class="p"><img class="av" data-a="Gwen"><div><b>格温</b><small>上路 · 54%</small></div></div><div class="p"><img class="av" data-a="Jinx"><div><b>金克丝</b><small>中路 · 51%</small></div></div><div class="p"><img class="av" data-a="Leona"><div><b>蕾欧娜</b><small>辅助 · 56%</small></div></div></div>
+<div class="mid"><div class="bg" data-a="spirit"></div><div class="sh"></div><h1>灵魂莲华</h1><div class="btn">使用这款</div>
+<div class="film"><div data-a="classic"></div><div data-a="heart"></div><div class="on" data-a="spirit"></div><div data-a="project"></div><div data-a="soul"></div></div></div>
+<div class="team e"><div class="p"><img class="av" data-a="Yasuo"><div><b>亚索</b><small>中路 · 53%</small></div></div><div class="p"><img class="av" data-a="Ahri"><div><b>阿狸</b><small>下路 · 57%</small></div></div><div class="p"><img class="av" data-a="Thresh"><div><b>锤石</b><small>辅助 · 49%</small></div></div><div class="p"><img class="av" data-a="LeeSin"><div><b>李青</b><small>打野 · 61%</small></div></div><div class="p"><img class="av" data-a="Lux"><div><b>拉克丝</b><small>上路 · 52%</small></div></div></div></div>
+</div></div><p><b>3 · LoL 选人界面</b>我方 | 原画 | 对方</p></div>
+
+<div class="cell"><div class="clip"><div class="f v4">
+<div class="top"><span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span></div>
+<div class="ban"><div class="bg" data-a="spirit"></div><div class="sh"></div><h1>薇恩 · 灵魂莲华</h1></div>
+<div class="bar"><span class="btn">使用这款</span><div><small>阶段</small><b>选人中</b></div><div><small>自动接受</small><b>2 秒</b></div><div><small>自动换肤</small><b>关</b></div></div>
+<div class="row"><img data-a="Vayne"><img data-a="JarvanIV"><img data-a="Gwen"><img data-a="Jinx"><img data-a="Leona"><span class="gap"></span><img data-a="Yasuo"><img data-a="Ahri"><img data-a="Thresh"><img data-a="LeeSin"><img data-a="Lux"></div>
+</div></div><p><b>4 · Steam 库页</b>横幅 + 操作条（备选）</p></div>
+
+<div class="cell"><div class="clip"><div class="f v5">
+<div class="top"><span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span></div>
+<div class="spec"><div style="height:174px"></div><div style="height:248px"></div><div style="height:162px"></div><div style="height:122px"></div><div style="height:192px"></div><div class="e" style="height:146px"></div><div class="e" style="height:228px"></div><div class="e" style="height:96px"></div><div class="e" style="height:244px"></div><div class="e" style="height:138px"></div></div>
+<h1>薇恩</h1><h2>灵魂莲华 · 选人中</h2>
+<div class="cards"><div data-a="classic"></div><div data-a="heart"></div><div class="on" data-a="spirit"></div><div data-a="project"></div><div data-a="soul"></div></div>
+</div></div><p><b>5 · 轮盘 · 声波</b>巨字 + 胜率柱（备选）</p></div>
+
+<div class="cell"><div class="clip"><div class="f v6"><div class="frame"></div><div class="fan"></div><div class="circle" data-a="spirit"></div>
+<h1>灵魂<br>莲华</h1>
+<div class="grid2"><img data-a="Vayne"><img data-a="JarvanIV"><img data-a="Gwen"><img data-a="Jinx"><img data-a="Leona"><img data-a="Yasuo"><img data-a="Ahri"><img data-a="Thresh"><img data-a="LeeSin"><img data-a="Lux"></div>
+<div class="band"><span>峡谷衣橱 · 薇恩</span><span>自动接受 2 秒</span></div>
+</div></div><p><b>6 · 轮盘 · 摩登装饰</b>扇形 + 金框（备选）</p></div>
+
+</div>
+<!--ASSETS-->
+</body></html>

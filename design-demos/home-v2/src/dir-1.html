@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 1 · 全屏原画 · 峡谷衣橱</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#05080d;color:#f4f6f8;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+img{display:block}
+:root{--gold:#d4b26f;--ally:#6fb0d6;--enemy:#d67a7a}
+#app{position:relative;height:100vh;min-height:560px;overflow:hidden}
+.art{position:absolute;inset:0;background-size:cover;background-position:62% 28%;transition:opacity .45s ease,transform 1.2s ease}
+.art.dim{opacity:.28;transform:scale(1.04)}
+.shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,#05080dd9 0,#05080d66 32%,transparent 55%),linear-gradient(0deg,#05080df2 0,#05080d99 22%,transparent 46%),linear-gradient(180deg,#05080dcc 0,transparent 14%)}
+
+.top{position:absolute;z-index:3;top:0;left:0;right:0;height:56px;display:flex;align-items:center;padding:0 10px 0 22px;gap:4px}
+.mark{width:26px;height:26px;margin-right:18px}
+.nav{display:flex;gap:4px}
+.nav button{height:56px;padding:0 14px;color:#c3ccd7;font-size:14px;position:relative}
+.nav button:hover{color:#fff}
+.nav button.on{color:#fff}.nav button.on::after{content:"";position:absolute;left:14px;right:14px;bottom:12px;height:2px;background:var(--gold)}
+.right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.pill{height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:16px;color:#c3ccd7;font-size:13px;background:#0a101a80;border:1px solid #ffffff1f}
+.pill i{width:7px;height:7px;border-radius:50%;background:#5c6672}.pill.on{color:#fff}.pill.on i{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.pill:hover{border-color:#ffffff4d}
+.phase{font-size:13px;color:var(--gold);margin-right:10px;font-variant-numeric:tabular-nums}
+.win{display:flex;margin-left:8px}.win span{width:40px;height:40px;display:grid;place-items:center;color:#9aa5b2;font-size:15px}
+
+.team{position:absolute;z-index:3;top:96px;display:flex;flex-direction:column;gap:14px}
+.team.ally{left:22px}.team.enemy{right:22px}
+.who{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:52px}
+.who img{width:46px;height:46px;border-radius:50%;object-fit:cover;border:2px solid var(--ally);transition:transform .15s}
+.enemy .who img{border-color:var(--enemy)}
+.who:hover img,.who.on img{transform:scale(1.08)}
+.who small{font-size:12px;color:#d6dde6;font-variant-numeric:tabular-nums;text-shadow:0 1px 6px #000}
+.who.me img{box-shadow:0 0 0 3px #05080d,0 0 0 5px var(--gold)}
+
+.card{position:absolute;z-index:4;width:208px;padding:14px 16px;background:#0b111bf0;border:1px solid #ffffff22;border-radius:6px;box-shadow:0 18px 40px #000a}
+.card h3{font-size:15px;font-weight:600}.card p{color:#aab5c2;font-size:12px;margin-top:2px}
+.card dl{display:grid;grid-template-columns:repeat(3,1fr);margin-top:12px;gap:6px}
+.card dt{font-size:12px;color:#8f9aa8}.card dd{font-size:16px;font-variant-numeric:tabular-nums}
+
+.hero{position:absolute;z-index:3;left:100px;bottom:116px;max-width:52%}
+.hero small{font-size:14px;color:var(--gold);letter-spacing:3px}
+.hero h1{font:400 clamp(44px,6.6vw,74px)/1.12 "Noto Serif SC","Source Han Serif SC",SimSun,serif;margin-top:4px;text-shadow:0 2px 24px #0008}
+.use{position:absolute;z-index:3;left:100px;bottom:52px;height:46px;padding:0 30px;background:var(--gold);color:#13100a;font-size:15px;font-weight:600;border-radius:2px;transition:filter .15s}
+.use:hover{filter:brightness(1.08)}
+.use:disabled{background:#ffffff1a;color:#e8ecf1;cursor:default;border:1px solid #ffffff33}
+
+.film{position:absolute;z-index:3;right:100px;bottom:52px;display:flex;gap:8px}
+.film button{position:relative;width:96px;height:58px;border-radius:3px;background-size:cover;background-position:center 25%;opacity:.55;transition:opacity .15s,transform .15s;outline:1px solid #ffffff26}
+.film button:hover{opacity:.85}
+.film button.on{opacity:1;outline:2px solid var(--gold);transform:translateY(-4px)}
+.film button.used::after{content:"";position:absolute;right:5px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px #05080d}
+.film .lock{position:absolute;inset:0;display:grid;place-items:center;background:#05080d80}
+.film .lock svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2}
+.demo{position:absolute;z-index:3;right:22px;bottom:16px;font-size:12px;color:#8f9aa8}
+
+.empty{position:absolute;z-index:3;left:100px;top:46%;transform:translateY(-50%)}
+.empty h1{font:400 56px/1.2 "Noto Serif SC",SimSun,serif}.empty p{color:#aab5c2;margin-top:10px}
+
+#toast{position:fixed;z-index:9;left:50%;top:70px;transform:translate(-50%,-10px);opacity:0;padding:9px 18px;border-radius:18px;background:#0b111bf0;border:1px solid #d4b26f66;font-size:13px;transition:.2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:760px){
+  .hero,.use,.empty{left:24px}.hero{max-width:80%;bottom:150px}.use{bottom:92px}
+  .film{left:24px;right:24px;bottom:22px;overflow-x:auto}.film button{flex:none;width:84px;height:52px}
+  .team.ally{left:14px}.team.enemy{right:14px}.who img{width:38px;height:38px}
+  .phase,.win{display:none}.demo{display:none}
+}
+@media(max-width:600px){
+  .top{padding:0 10px 0 12px}.mark{margin-right:4px}.nav button{padding:0 8px}.right .pill{display:none}
+  .team{top:64px;flex-direction:row;gap:8px;left:14px!important;right:auto!important}.team.enemy{top:128px}
+  .who{width:42px}.who img{width:36px;height:36px}
+  .card{left:14px!important;right:14px!important;top:198px!important;width:auto}
+  .art{background-position:68% 30%}
+  .film{right:0;padding-right:14px}
+}
+</style></head><body>
+<div id="app"></div><div id="toast" role="status"></div>
+<!--ASSETS--><!--COMMON-->
+<script>
+var lock='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function who(p, i, side){
+  return '<button class="who'+(p.id==='a1'?' me':'')+(S.player===p.id?' on':'')+'" data-player="'+p.id+'" aria-label="'+esc(p.champ)+'"><img data-a="'+p.a+'" alt=""><small>'+p.rate+'%</small></button>';
+}
+function card(){
+  if(!S.player) return '';
+  var p=findPlayer(S.player), ally=p.id[0]==='a', idx=(ally?ALLIES:ENEMIES).indexOf(p);
+  var top=96+idx*(46+3+18+14)-4, pos=ally?'left:86px':'right:86px';
+  return '<div class="card" style="top:'+top+'px;'+pos+'"><h3>'+esc(p.champ)+'</h3><p>'+esc(p.who)+' · '+esc(p.role)+'</p><dl><div><dt>胜率</dt><dd>'+p.rate+'%</dd></div><div><dt>KDA</dt><dd>'+p.kda+'</dd></div><div><dt>近 5 场</dt><dd>'+p.rec+'</dd></div></dl></div>';
+}
+window.render=function(){
+  var s=SKINS[S.skin], match=S.route==='match';
+  var h='<div class="art'+(match?'':' dim')+'" data-a="'+s.key+'"></div><div class="shade"></div>'
+   +'<header class="top"><img class="mark" data-a="logo" alt="峡谷衣橱"><nav class="nav">'+NAV.map(function(n){return '<button class="'+(S.route===n[0]?'on':'')+'" data-route="'+n[0]+'">'+n[1]+'</button>';}).join('')+'</nav>'
+   +'<div class="right"><span class="phase">选人中 0:42</span>'
+   +'<button class="pill'+(S.autoAccept?' on':'')+'" data-toggle="autoAccept" aria-pressed="'+S.autoAccept+'"><i></i>自动接受<span> 2s</span></button>'
+   +'<button class="pill'+(S.autoSkin?' on':'')+'" data-toggle="autoSkin" aria-pressed="'+S.autoSkin+'"><i></i>自动换肤</button>'
+   +'<div class="win" aria-hidden="true"><span>–</span><span>□</span><span>×</span></div></div></header>';
+  if(match){
+    h+='<div class="team ally">'+ALLIES.map(who).join('')+'</div><div class="team enemy">'+ENEMIES.map(who).join('')+'</div>'+card()
+     +'<div class="hero"><small>薇恩 · 下路</small><h1>'+esc(s.name)+'</h1></div>'
+     +'<button class="use" data-use '+(useDisabled()?'disabled':'')+'>'+useLabel()+'</button>'
+     +'<div class="film">'+SKINS.map(function(k,i){return '<button class="'+(i===S.skin?'on ':'')+(i===S.used?'used':'')+'" data-skin="'+i+'" data-a="'+k.key+'" aria-label="'+esc(k.name)+'">'+(k.owned?'':'<span class="lock">'+lock+'</span>')+'</button>';}).join('')+'</div>'
+     +'<span class="demo">演示数据</span>';
+  } else {
+    var label={player:'玩家',guide:'攻略',settings:'设置'}[S.route];
+    h+='<div class="empty"><h1>'+label+'</h1><p>选定方向后按同一风格展开。</p></div>';
+  }
+  document.getElementById('app').innerHTML=h;
+};
+rerender();
+</script>
+</body></html>

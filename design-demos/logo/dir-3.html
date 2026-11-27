@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Logo 方向 3 · 双环咬合</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1200px;height:760px;overflow:hidden;background:#0d121b;color:#eaedf3;font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif;padding:34px 40px;display:grid;grid-template-columns:460px 1fr;gap:28px}
+svg{display:block;width:100%;height:100%}
+.hero{background:radial-gradient(circle at 50% 42%,#19293a,#0b1018 72%);border:1px solid #232d3d;border-radius:10px;padding:32px;display:flex;flex-direction:column;justify-content:space-between}
+.hero-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#8e99ab;letter-spacing:1px}
+.hero-top b{color:#dfc07a;font-weight:600}
+.hero-mark{width:260px;height:260px;margin:20px auto;filter:drop-shadow(0 22px 44px #000b)}
+.hero-copy h1{font:600 26px/1.25 "Microsoft YaHei UI",sans-serif}
+.hero-copy p{font-size:13px;color:#9aa5b6;margin-top:8px}
+.swatches{display:flex;gap:10px;margin-top:16px}
+.sw{flex:1;height:40px;border-radius:4px;padding:0 10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-variant-numeric:tabular-nums;border:1px solid #ffffff1a;white-space:nowrap}
+
+.right{display:grid;grid-template-rows:auto auto 1fr;gap:20px}
+.panel{background:#131a26;border:1px solid #232d3d;border-radius:10px;padding:20px 24px}
+.panel h2{font-size:12px;color:#8e99ab;letter-spacing:1.5px;font-weight:500;margin-bottom:14px;display:flex;justify-content:space-between}
+.scale-row{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 8px 2px}
+.sc{display:flex;flex-direction:column;align-items:center;gap:8px}
+.sc span{font-size:12px;color:#8e99ab;font-variant-numeric:tabular-nums}
+.mono{display:flex;gap:14px;align-items:center;padding-left:20px;border-left:1px solid #232d3d}
+.mono-box{width:56px;height:56px;border-radius:8px;display:grid;place-items:center;padding:10px}
+.mono-box.light{background:#f3f0e8;color:#111}
+.mono-box.dark{background:#090d14;border:1px solid #2a3446}
+
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mock{background:#0b1018;border:1px solid #202938;border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;height:132px}
+.mock small{font-size:12px;color:#7e8a9c}
+.topbar{height:44px;background:#070c14;border:1px solid #1d2636;border-radius:4px;display:flex;align-items:center;padding:0 14px;gap:16px;font-size:13px;color:#9aa6b8}
+.topbar .ico{width:22px;height:22px}
+.topbar .on{color:#fff;border-bottom:2px solid #dfc07a;padding:11px 0}
+.taskbar{height:44px;background:#1a202c;border:1px solid #2c3546;border-radius:4px;display:flex;align-items:center;padding:0 14px;justify-content:space-between}
+.tb-apps{display:flex;align-items:center;gap:14px}
+.tb-dot{width:22px;height:22px;border-radius:4px;background:#2f394b}
+.tb-active{width:34px;height:34px;padding:4px;border-radius:5px;background:#ffffff14;border-bottom:2px solid #dfc07a}
+.tray{display:flex;align-items:center;gap:10px;background:#111620;padding:6px 10px;border-radius:4px;font-size:12px;color:#b8c2d1}
+.tray .t16{width:16px;height:16px}
+
+.bottom{display:grid;grid-template-columns:230px 1fr;gap:20px}
+.grid-box{background:#0b1018;border:1px solid #202938;border-radius:6px;height:100%;display:grid;place-items:center;position:relative;overflow:hidden}
+.rationale{display:flex;flex-direction:column;justify-content:center;gap:12px;padding:4px 6px}
+.rationale div h3{font-size:14px;color:#e5c57e;margin-bottom:3px}
+.rationale div p{font-size:13px;color:#a5b0c0}
+</style></head><body>
+
+<section class="hero">
+  <div class="hero-top"><b>方向 3 · 纯几何符号方向</b><span>512 × 512 MASTER</span></div>
+  <div class="hero-mark" id="master"></div>
+  <div class="hero-copy">
+    <h1>双环咬合 · Hex Interlock</h1>
+    <p>遵循佐藤可士和与 Chermayeff & Geismar 的现代主义徽标法则：两条完全全等的 60° 折带（一金一青）互锁成正六边形，中心留出负空间菱形。零具象隐喻，纯粹耐看。</p>
+    <div class="swatches">
+      <div class="sw" style="background:#0c121d;color:#9aa5b6">#0C121D</div>
+      <div class="sw" style="background:#dfc07a;color:#111">#DFC07A</div>
+      <div class="sw" style="background:#4aa3b5;color:#111">#4AA3B5</div>
+      <div class="sw" style="background:#f5e6c4;color:#111">#F5E6C4</div>
+    </div>
+  </div>
+</section>
+
+<div class="right">
+  <section class="panel">
+    <h2><span>多尺寸实寸核验（像素级渲染）</span><span>单色镂空适配</span></h2>
+    <div class="scale-row">
+      <div class="sc"><div style="width:128px;height:128px" class="use-logo"></div><span>128 px · 桌面大图</span></div>
+      <div class="sc"><div style="width:64px;height:64px" class="use-logo"></div><span>64 px · 应用列表</span></div>
+      <div class="sc"><div style="width:32px;height:32px" class="use-logo"></div><span>32 px · 窗口图标</span></div>
+      <div class="sc"><div style="width:24px;height:24px" class="use-logo"></div><span>24 px · 顶栏</span></div>
+      <div class="sc"><div style="width:16px;height:16px" class="use-logo"></div><span>16 px · 托盘</span></div>
+      <div class="mono">
+        <div class="sc"><div class="mono-box dark" id="mono-w"></div><span>反白</span></div>
+        <div class="sc"><div class="mono-box light" id="mono-b"></div><span>纯黑</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2><span>真实场景实装预览</span><span>DARK UI & WINDOWS TRAY</span></h2>
+    <div class="scenes">
+      <div class="mock">
+        <small>App 顶栏导航（22×22 px）</small>
+        <div class="topbar">
+          <div class="ico use-logo"></div>
+          <span class="on">对局</span><span>玩家</span><span>攻略</span><span>设置</span>
+        </div>
+      </div>
+      <div class="mock">
+        <small>Windows 任务栏（26px）与右下角托盘常驻（16×16 px）</small>
+        <div class="taskbar">
+          <div class="tb-apps"><div class="tb-dot"></div><div class="tb-active use-logo"></div><div class="tb-dot"></div></div>
+          <div class="tray"><div class="t16 use-logo"></div><span>22:00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel bottom">
+    <div class="grid-box" id="construct"></div>
+    <div class="rationale">
+      <div><h3>为什么用正六边形咬合？</h3><p>六边形是海克斯科技（Hextech）的母体几何；上下两条折带咬合代表「本地助手 ↔ 游戏客户端」的常驻联动与同步。</p></div>
+      <div><h3>小尺寸优势</h3><p>折带宽度达到 68 单位（占画布 13%），无论在深色顶栏、浅色纸底（方向 2 首页）还是 16px 系统托盘里，轮廓都像原生系统级工具一样干净。</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const MASTER = `<svg viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0c121d"/>
+  <path d="M256 76 L412 166 V268 L344 228 V206 L256 155 L168 206 V306 L100 346 V166 L256 76 Z" fill="#dfc07a"/>
+  <path d="M256 436 L100 346 L168 306 L256 357 L344 306 V206 L412 166 V346 L256 436 Z" fill="#4aa3b5"/>
+  <polygon points="256,214 298,256 256,298 214,256" fill="#f5e6c4"/>
+</svg>`;
+const MONO = (c) => `<svg viewBox="0 0 512 512">
+  <path d="M256 64 L424 161 V262 L348 218 V198 L256 145 L164 198 V314 L88 358 V161 Z" fill="${c}"/>
+  <path d="M256 448 L88 351 L164 307 L256 367 L348 314 V198 L424 154 V351 Z" fill="${c}" opacity=".58"/>
+  <polygon points="256,210 302,256 256,302 210,256" fill="${c}"/>
+</svg>`;
+const CONSTRUCT = `<svg viewBox="0 0 512 512">
+  <g stroke="#243249" stroke-width="2">
+    <line x1="256" y1="0" x2="256" y2="512"/><line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="36" y1="129" x2="476" y2="383"/><line x1="36" y1="383" x2="476" y2="129"/>
+    <polygon points="256,76 412,166 412,346 256,436 100,346 100,166" fill="none" stroke="#dfc07a55" stroke-dasharray="6 6"/>
+    <polygon points="256,155 344,206 344,306 256,357 168,306 168,206" fill="none" stroke="#4aa3b566" stroke-dasharray="6 6"/>
+  </g>
+  <path d="M256 76 L412 166 V268 L344 228 V206 L256 155 L168 206 V306 L100 346 V166 Z" fill="#dfc07a66" stroke="#dfc07a" stroke-width="3"/>
+  <path d="M256 436 L100 346 L168 306 L256 357 L344 306 V206 L412 166 V346 Z" fill="#4aa3b566" stroke="#4aa3b5" stroke-width="3"/>
+  <polygon points="256,214 298,256 256,298 214,256" fill="#f5e6c4" stroke="#fff" stroke-width="2"/>
+</svg>`;
+document.getElementById('master').innerHTML = MASTER;
+document.querySelectorAll('.use-logo').forEach(el => el.innerHTML = MASTER);
+document.getElementById('mono-w').innerHTML = MONO('#f5e6c4');
+document.getElementById('mono-b').innerHTML = MONO('#141414');
+document.getElementById('construct').innerHTML = CONSTRUCT;
+</script>
+</body></html>

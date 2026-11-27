@@ -6,7 +6,15 @@ use crate::{
     profile::PlayerProfile,
 };
 use rand::seq::SliceRandom;
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{Mutex, RwLock};
 
@@ -16,6 +24,7 @@ pub struct RuntimeState {
     write_guard: Mutex<()>,
     image_cache: RwLock<HashMap<String, String>>,
     automation: Mutex<AutoAccept>,
+    auto_popup_companion: AtomicBool,
 }
 
 impl RuntimeState {
@@ -26,7 +35,16 @@ impl RuntimeState {
             write_guard: Mutex::new(()),
             image_cache: RwLock::new(HashMap::new()),
             automation: Mutex::new(AutoAccept::default()),
+            auto_popup_companion: AtomicBool::new(true),
         }
+    }
+
+    pub fn auto_popup_companion(&self) -> bool {
+        self.auto_popup_companion.load(Ordering::Relaxed)
+    }
+
+    pub fn set_auto_popup_companion(&self, enabled: bool) {
+        self.auto_popup_companion.store(enabled, Ordering::Relaxed);
     }
 
     pub async fn snapshot(&self) -> AppSnapshot {
@@ -259,19 +277,149 @@ async fn publish_snapshot(app: &AppHandle, state: &RuntimeState, mut next: AppSn
     }
 
     let _ = app.emit("snapshot-changed", &next);
-    if let Some(window) = app.get_webview_window("main") {
-        if next.active && !was_active {
-            show_without_focus(&window);
-        } else if !next.active && was_active {
-            let _ = window.hide();
+    if next.active && !was_active {
+        if state.auto_popup_companion() {
+            show_companion_window(app, false, Some("skin"), None);
+        }
+    } else if !next.active && was_active {
+        hide_companion_window(app);
+    }
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompanionNavigatePayload {
+    tab: Option<String>,
+    hero_id: Option<u32>,
+}
+
+pub fn show_companion_window(
+    app: &AppHandle,
+    focus: bool,
+    tab: Option<&str>,
+    hero_id: Option<u32>,
+) {
+    if let Some(window) = app.get_webview_window("companion") {
+        position_companion_near_client(&window);
+        if tab.is_some() || hero_id.is_some() {
+            let _ = window.emit(
+                "companion-navigate",
+                CompanionNavigatePayload {
+                    tab: tab.map(str::to_string),
+                    hero_id,
+                },
+            );
+        }
+        let _ = window.show();
+        if focus {
+            let _ = window.set_focus();
         }
     }
 }
 
-fn show_without_focus(window: &tauri::WebviewWindow) {
-    // Tauri's window configuration keeps automatic showing from taking focus.
-    let _ = window.show();
+pub fn hide_companion_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("companion") {
+        let _ = window.hide();
+    }
 }
+
+#[cfg(windows)]
+fn position_companion_near_client(window: &tauri::WebviewWindow) {
+    use windows::{
+        core::PCWSTR,
+        Win32::{
+            Foundation::RECT,
+            UI::WindowsAndMessaging::{
+                FindWindowW, GetWindowRect, IsWindowVisible, SetWindowPos, SystemParametersInfoW,
+                SPI_GETWORKAREA, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+            },
+        },
+    };
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let mut comp_rect = RECT::default();
+    if unsafe { GetWindowRect(hwnd, &mut comp_rect) }.is_err() {
+        return;
+    }
+    let comp_w = (comp_rect.right - comp_rect.left).max(360);
+    let comp_h = (comp_rect.bottom - comp_rect.top).max(520);
+
+    let mut work = RECT {
+        left: 0,
+        top: 0,
+        right: 1920,
+        bottom: 1040,
+    };
+    unsafe {
+        let _ = SystemParametersInfoW(
+            SPI_GETWORKAREA,
+            0,
+            Some((&mut work as *mut RECT).cast()),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        );
+    }
+
+    let rclient_class: Vec<u16> = "RCLIENT\0".encode_utf16().collect();
+    let lol_title: Vec<u16> = "League of Legends\0".encode_utf16().collect();
+    let client_hwnd = unsafe {
+        FindWindowW(PCWSTR(rclient_class.as_ptr()), PCWSTR::null())
+            .ok()
+            .filter(|h| !h.is_invalid() && IsWindowVisible(*h).as_bool())
+            .or_else(|| {
+                FindWindowW(PCWSTR::null(), PCWSTR(lol_title.as_ptr()))
+                    .ok()
+                    .filter(|h| !h.is_invalid() && IsWindowVisible(*h).as_bool())
+            })
+    };
+
+    let gap = 12;
+    let (mut x, mut y) = (
+        work.right - comp_w - 18,
+        work.top + ((work.bottom - work.top - comp_h) / 2).max(16),
+    );
+
+    if let Some(client_hwnd) = client_hwnd {
+        let mut client_rect = RECT::default();
+        if unsafe { GetWindowRect(client_hwnd, &mut client_rect) }.is_ok() {
+            let client_w = client_rect.right - client_rect.left;
+            if client_w >= 400 {
+                let right_x = client_rect.right + gap;
+                let left_x = client_rect.left - comp_w - gap;
+                if right_x + comp_w <= work.right {
+                    x = right_x;
+                } else if left_x >= work.left {
+                    x = left_x;
+                } else {
+                    x = work.right - comp_w - 14;
+                }
+                y = client_rect.top;
+            }
+        }
+    }
+
+    let max_x = (work.right - comp_w).max(work.left);
+    let max_y = (work.bottom - comp_h).max(work.top);
+    x = x.clamp(work.left, max_x);
+    y = y.clamp(work.top, max_y);
+
+    unsafe {
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            x,
+            y,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+        );
+    }
+}
+
+#[cfg(not(windows))]
+fn position_companion_near_client(_window: &tauri::WebviewWindow) {}
 
 #[cfg(test)]
 mod tests {
