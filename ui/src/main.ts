@@ -51,14 +51,35 @@ import {
   Zap,
 } from "lucide";
 import { DEFAULT_PREFERENCES } from "./data/mock";
-import type { AppPreferences, AssistantLog, AutomationSnapshot, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary, RuntimeStatus } from "./data/types";
+import type {
+  AppPreferences,
+  AssistantLog,
+  AutomationSnapshot,
+  AugmentStat,
+  ChampionStat,
+  MatchDetail,
+  NewsDataMeta,
+  AugmentCombo,
+  OngoingGameSnapshot,
+  PlayerDetail,
+  ProfileSummary,
+  RuntimeStatus,
+  SavedPlayer,
+  SummonerOverview,
+} from "./data/types";
 import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
 import { getProfileSummary } from "./services/profile";
 import { createHextechView } from "./hextech-view";
 import { createRankingsView } from "./rankings-view";
 import { renderShell } from "./shell";
-import { fetchCompanionBuild, renderCompanionShell, type CompanionTab } from "./companion";
-import { renderProfileView } from "./views/profile-view";
+import {
+  fetchCompanionBuild,
+  fetchCompanionOngoing,
+  formatOngoingChatSummary,
+  renderCompanionShell,
+  type CompanionTab,
+} from "./companion";
+import { renderProfileView, type OpenPlayerTab } from "./views/profile-view";
 import { renderAutomationView } from "./views/automation-view";
 import { renderToolkitView } from "./views/toolkit-view";
 import { renderSettingsView } from "./views/settings-view";
@@ -185,7 +206,12 @@ const iconSet = {
 const isTauri = Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 const urlParams = new URLSearchParams(window.location.search);
 const isCompanionWindow = urlParams.get("window") === "companion";
-const initialCompanionTab = urlParams.get("tab") === "build" ? "build" : "skin";
+const urlCompanionTab = urlParams.get("tab");
+const initialCompanionTab: CompanionTab = urlCompanionTab === "build"
+  ? "build"
+  : urlCompanionTab === "ongoing"
+    ? "ongoing"
+    : "skin";
 const disconnectedSnapshot: Snapshot = {
   connection: "disconnected",
   phase: "Disconnected",
@@ -240,6 +266,26 @@ let companionBuildDetail: HexDetail | null = null;
 let companionBuildLoading = false;
 let companionBuildError = "";
 let companionBuildRequest = 0;
+let ongoingGame: OngoingGameSnapshot | null = null;
+let ongoingLoading = false;
+let ongoingError = "";
+let ongoingRequest = 0;
+let sendingChat = false;
+let quickTagPuuid: string | null = null;
+let activePlayerTab = "self";
+let openPlayerTabs: OpenPlayerTab[] = [];
+let playerSearchQuery = "";
+let playerSearching = false;
+let tagDraft = "";
+let noteDraft = "";
+let savingTag = false;
+let savedPlayers: SavedPlayer[] = [];
+let savedPlayersOpen = false;
+let matchDetailOpen = false;
+let matchDetailLoading = false;
+let matchDetailError: string | null = null;
+let matchDetail: MatchDetail | null = null;
+let matchDetailRequest = 0;
 let profileModeFilter: "all" | "排位赛" | "极地大乱斗" = "all";
 let profileExpandedMatchId: string | null = null;
 let profileTrendMetric: "winRate" | "kda" = "winRate";
@@ -501,6 +547,267 @@ async function loadCompanionBuild(heroId: number | null, force = false): Promise
   }
 }
 
+async function loadCompanionOngoing(force = false): Promise<void> {
+  if (!force && ongoingLoading) return;
+  const req = ++ongoingRequest;
+  ongoingLoading = true;
+  ongoingError = "";
+  render();
+  try {
+    const next = await fetchCompanionOngoing(isTauri);
+    if (req !== ongoingRequest) return;
+    ongoingGame = next;
+  } catch (error) {
+    if (req !== ongoingRequest) return;
+    ongoingError = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (req === ongoingRequest) {
+      ongoingLoading = false;
+      render();
+    }
+  }
+}
+
+async function sendOngoingToChampSelectChat(): Promise<void> {
+  if (sendingChat || !ongoingGame || !ongoingGame.canSendChat) return;
+  const message = formatOngoingChatSummary(ongoingGame);
+  if (!message) return;
+  if (!isTauri) {
+    showToast("演示：已发送本局战绩到选人频道");
+    return;
+  }
+  sendingChat = true;
+  render();
+  try {
+    await invokeCommand("send_champ_select_chat", { message });
+    showToast("已发送到选人频道");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    sendingChat = false;
+    render();
+  }
+}
+
+async function hydrateSavedPlayers(): Promise<void> {
+  const selfPuuid = profileData?.summoner.puuid || ongoingGame?.selfPuuid || "";
+  if (!isTauri || !selfPuuid) return;
+  try {
+    const list = await invokeCommand<SavedPlayer[]>("list_saved_players", { selfPuuid });
+    if (Array.isArray(list)) {
+      savedPlayers = list;
+      render();
+    }
+  } catch {
+    // Non-critical DB load.
+  }
+}
+
+async function searchAndOpenPlayer(rawQuery: string): Promise<void> {
+  const query = rawQuery.trim();
+  if (!query || playerSearching) return;
+  if (!isTauri) {
+    const demoPuuid = `demo-${encodeURIComponent(query)}`;
+    await openPlayerTab(demoPuuid, query.split("#")[0] || query, true);
+    return;
+  }
+  playerSearching = true;
+  render();
+  try {
+    const overview = await invokeCommand<SummonerOverview>("search_player", { query });
+    playerSearchQuery = "";
+    await openPlayerTab(overview.puuid, overview.gameName, true);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    playerSearching = false;
+    render();
+  }
+}
+
+async function openPlayerTab(puuid: string, label: string, force = false): Promise<void> {
+  let tab = openPlayerTabs.find((item) => item.puuid === puuid);
+  if (!tab) {
+    tab = { puuid, label, detail: null, loading: false, error: null };
+    openPlayerTabs = [...openPlayerTabs.slice(-4), tab];
+  } else if (label && tab.label !== label) {
+    tab.label = label;
+  }
+  activePlayerTab = puuid;
+  tagDraft = tab.detail?.saved?.tag ?? "";
+  noteDraft = tab.detail?.saved?.note ?? "";
+  if (!force && tab.detail) {
+    render();
+    return;
+  }
+  tab.loading = true;
+  tab.error = null;
+  render();
+  try {
+    if (!isTauri) {
+      tab.detail = {
+        selfPuuid: "demo-self",
+        summoner: {
+          puuid,
+          summonerId: 1001,
+          gameName: label,
+          tagLine: "CN1",
+          level: 142,
+          iconPath: null,
+          privacy: "PUBLIC",
+        },
+        ranks: [{ queueType: "RANKED_SOLO_5x5", queueLabel: "单双排", tier: "翡翠", division: "II", ranked: true, points: 64, wins: 48, losses: 39, winRate: 55 }],
+        matches: [
+          { id: "demo:9001", gameId: 9001, championId: 67, champion: "薇恩", result: "win", mode: "单双排位", queueId: 420, kills: 11, deaths: 2, assists: 6, cs: 224, gold: 15200, damage: 34800, durationSeconds: 1740, playedAtMs: Date.now() - 3600_000, items: [3153, 3124] },
+          { id: "demo:9002", gameId: 9002, championId: 103, champion: "阿狸", result: "loss", mode: "极地大乱斗", queueId: 450, kills: 6, deaths: 7, assists: 12, cs: 62, gold: 12400, damage: 26100, durationSeconds: 1120, playedAtMs: Date.now() - 7200_000, items: [3089] },
+        ],
+        mastery: [
+          { championId: 67, championName: "薇恩", level: 18, points: 245000 },
+          { championId: 103, championName: "阿狸", level: 12, points: 118000 },
+        ],
+        stats: { sampleSize: 2, wins: 1, losses: 1, winRate: 50, avgKda: 3.9, avgKills: 8.5, avgDeaths: 4.5, avgAssists: 9.0, streak: 1, score: 74 },
+        saved: savedPlayers.find((s) => s.puuid === puuid) ?? null,
+        encountered: [],
+        warnings: [],
+      };
+    } else {
+      const detail = await invokeCommand<PlayerDetail>("get_player_detail", { puuid, begIndex: 0, endIndex: 19 });
+      tab.detail = detail;
+      tab.label = detail.summoner.gameName;
+    }
+    if (activePlayerTab === puuid && tab.detail) {
+      tagDraft = tab.detail.saved?.tag ?? "";
+      noteDraft = tab.detail.saved?.note ?? "";
+    }
+  } catch (error) {
+    tab.error = error instanceof Error ? error.message : String(error);
+  } finally {
+    tab.loading = false;
+    render();
+  }
+}
+
+function closePlayerTab(puuid: string): void {
+  openPlayerTabs = openPlayerTabs.filter((tab) => tab.puuid !== puuid);
+  if (activePlayerTab === puuid) {
+    activePlayerTab = "self";
+    tagDraft = "";
+    noteDraft = "";
+  }
+  render();
+}
+
+async function openMatchDetail(gameId: number): Promise<void> {
+  if (!Number.isInteger(gameId) || gameId <= 0) return;
+  const req = ++matchDetailRequest;
+  matchDetailOpen = true;
+  matchDetailLoading = true;
+  matchDetailError = null;
+  matchDetail = null;
+  render();
+  try {
+    if (!isTauri) {
+      matchDetail = {
+        gameId,
+        mode: "单双排位",
+        queueId: 420,
+        durationSeconds: 1740,
+        playedAtMs: Date.now() - 3600_000,
+        teams: [
+          {
+            teamId: 100, win: true, kills: 28, deaths: 14, assists: 51, totalDamage: 124000, totalGold: 64200,
+            players: [
+              { puuid: "demo-self", gameName: "峡印演示", tagLine: "CN1", teamId: 100, championId: 67, championName: "薇恩", kills: 11, deaths: 2, assists: 6, cs: 224, gold: 15200, damage: 34800, damageTaken: 14200, visionScore: 22, win: true, items: [3153, 3124], spell1Id: 4, spell2Id: 7, role: "下路", isSelf: true },
+              { puuid: "demo-mate-1", gameName: "轻舟过万山", tagLine: "2048", teamId: 100, championId: 117, championName: "璐璐", kills: 2, deaths: 1, assists: 20, cs: 34, gold: 10400, damage: 11200, damageTaken: 10800, visionScore: 48, win: true, items: [], spell1Id: 4, spell2Id: 3, role: "辅助", isSelf: false },
+            ],
+          },
+          {
+            teamId: 200, win: false, kills: 14, deaths: 28, assists: 24, totalDamage: 92000, totalGold: 53100,
+            players: [
+              { puuid: "demo-enemy-1", gameName: "晚风知我意", tagLine: "8848", teamId: 200, championId: 103, championName: "阿狸", kills: 6, deaths: 6, assists: 4, cs: 196, gold: 11800, damage: 26100, damageTaken: 18500, visionScore: 19, win: false, items: [], spell1Id: 4, spell2Id: 14, role: "中路", isSelf: false },
+            ],
+          },
+        ],
+      };
+    } else {
+      const detail = await invokeCommand<MatchDetail>("get_match_detail", { gameId });
+      if (req !== matchDetailRequest) return;
+      matchDetail = detail;
+    }
+  } catch (error) {
+    if (req !== matchDetailRequest) return;
+    matchDetailError = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (req === matchDetailRequest) {
+      matchDetailLoading = false;
+      render();
+    }
+  }
+}
+
+async function savePlayerTag(puuid: string, tag: string, note: string): Promise<void> {
+  if (savingTag) return;
+  const selfPuuid = profileData?.summoner.puuid || ongoingGame?.selfPuuid || openPlayerTabs.find((t) => t.puuid === puuid)?.detail?.selfPuuid || "demo-self";
+  savingTag = true;
+  render();
+  try {
+    const saved: SavedPlayer = isTauri
+      ? await invokeCommand<SavedPlayer>("upsert_saved_player", { puuid, selfPuuid, tag, note })
+      : { puuid, selfPuuid, tag, note, updatedAtMs: Date.now() };
+    savedPlayers = [saved, ...savedPlayers.filter((s) => s.puuid !== puuid)];
+    const tab = openPlayerTabs.find((t) => t.puuid === puuid);
+    if (tab?.detail) tab.detail.saved = saved;
+    if (ongoingGame) {
+      for (const p of [...ongoingGame.myTeam, ...ongoingGame.enemyTeam]) {
+        if (p.puuid === puuid) {
+          p.saved = saved;
+          p.tags = [saved.tag, ...p.tags.filter((t) => !["大腿", "靠谱", "谨慎", "拉黑", saved.tag].includes(t))];
+        }
+      }
+    }
+    showToast("已保存玩家标记");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    savingTag = false;
+    render();
+  }
+}
+
+async function deletePlayerTag(puuid: string): Promise<void> {
+  if (savingTag) return;
+  const selfPuuid = profileData?.summoner.puuid || ongoingGame?.selfPuuid || openPlayerTabs.find((t) => t.puuid === puuid)?.detail?.selfPuuid || "demo-self";
+  savingTag = true;
+  render();
+  try {
+    if (isTauri) {
+      await invokeCommand("delete_saved_player", { puuid, selfPuuid });
+    }
+    savedPlayers = savedPlayers.filter((s) => s.puuid !== puuid);
+    const tab = openPlayerTabs.find((t) => t.puuid === puuid);
+    if (tab?.detail) tab.detail.saved = null;
+    if (activePlayerTab === puuid) {
+      tagDraft = "";
+      noteDraft = "";
+    }
+    if (ongoingGame) {
+      for (const p of [...ongoingGame.myTeam, ...ongoingGame.enemyTeam]) {
+        if (p.puuid === puuid) {
+          const oldTag = p.saved?.tag;
+          p.saved = null;
+          if (oldTag) p.tags = p.tags.filter((t) => t !== oldTag);
+        }
+      }
+    }
+    showToast("已清除玩家标记");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    savingTag = false;
+    render();
+  }
+}
+
 async function hydrateDashboardData(force = false): Promise<void> {
   if (force) gameIconFailures.clear();
   dashboardLoading = true;
@@ -564,6 +871,7 @@ async function hydrateProfileData(): Promise<void> {
     if (requestId !== profileRequestId) return;
     profile.assets.favorites = favoriteSkinIds.size;
     profileData = profile;
+    void hydrateSavedPlayers();
   } catch (error) {
     if (requestId !== profileRequestId) return;
     profileData = null;
@@ -858,6 +1166,19 @@ function renderProfilePage(): string {
     profileExpandedMatchId,
     profileTrendMetric,
     favoritesCount: favoriteSkinIds.size,
+    activePlayerTab,
+    openPlayerTabs,
+    playerSearchQuery,
+    playerSearching,
+    tagDraft,
+    noteDraft,
+    savingTag,
+    savedPlayers,
+    savedPlayersOpen,
+    matchDetailOpen,
+    matchDetailLoading,
+    matchDetailError,
+    matchDetail,
     escape: escapeHtml,
     icon,
     formatTime,
@@ -1089,6 +1410,11 @@ function renderCompanionWindow(): void {
     buildDetail: companionBuildDetail,
     buildLoading: companionBuildLoading,
     buildError: companionBuildError,
+    ongoingGame,
+    ongoingLoading,
+    ongoingError,
+    sendingChat,
+    quickTagPuuid,
     escape: escapeHtml,
     icon,
     skinImage,
@@ -1542,12 +1868,94 @@ function wireEvents(): void {
   }));
   app.querySelectorAll<HTMLElement>("[data-companion-tab]").forEach((element) => element.addEventListener("click", () => {
     const tab = element.dataset.companionTab;
-    if (tab !== "skin" && tab !== "build") return;
+    if (tab !== "skin" && tab !== "build" && tab !== "ongoing") return;
     companionTab = tab;
     if (tab === "build") {
       void loadCompanionBuild(companionBuildHeroId ?? snapshot.championId);
     }
+    if (tab === "ongoing") {
+      void loadCompanionOngoing();
+    }
     render();
+  }));
+  app.querySelector<HTMLFormElement>("[data-player-search-form]")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void searchAndOpenPlayer(playerSearchQuery);
+  });
+  app.querySelector<HTMLInputElement>("[data-player-search]")?.addEventListener("input", (event) => {
+    const input = event.currentTarget;
+    if (input instanceof HTMLInputElement) playerSearchQuery = input.value;
+  });
+  app.querySelectorAll<HTMLElement>("[data-player-tab]").forEach((element) => element.addEventListener("click", () => {
+    const tabId = element.dataset.playerTab;
+    if (!tabId) return;
+    activePlayerTab = tabId;
+    const found = openPlayerTabs.find((t) => t.puuid === tabId);
+    tagDraft = found?.detail?.saved?.tag ?? "";
+    noteDraft = found?.detail?.saved?.note ?? "";
+    render();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-close-player-tab]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.closePlayerTab;
+    if (puuid) closePlayerTab(puuid);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-player-refresh]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.playerRefresh;
+    if (!puuid) return;
+    const tab = openPlayerTabs.find((t) => t.puuid === puuid);
+    void openPlayerTab(puuid, tab?.label ?? puuid.slice(0, 8), true);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-match-detail]").forEach((element) => element.addEventListener("click", () => {
+    const gid = Number(element.dataset.matchDetail);
+    if (Number.isInteger(gid) && gid > 0) void openMatchDetail(gid);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-open-player-puuid]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.openPlayerPuuid;
+    const name = element.dataset.openPlayerName ?? "";
+    if (!puuid) return;
+    matchDetailOpen = false;
+    savedPlayersOpen = false;
+    void openPlayerTab(puuid, name || puuid.slice(0, 8));
+  }));
+  app.querySelectorAll<HTMLElement>("[data-select-tag-preset]").forEach((element) => element.addEventListener("click", () => {
+    const preset = element.dataset.selectTagPreset;
+    if (!preset) return;
+    tagDraft = tagDraft === preset ? "" : preset;
+    render();
+  }));
+  app.querySelector<HTMLInputElement>("[data-player-note-input]")?.addEventListener("input", (event) => {
+    const input = event.currentTarget;
+    if (input instanceof HTMLInputElement) noteDraft = input.value;
+  });
+  app.querySelectorAll<HTMLElement>("[data-save-player-tag]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.savePlayerTag;
+    if (!puuid) return;
+    const tab = openPlayerTabs.find((t) => t.puuid === puuid);
+    const chosenTag = tagDraft || tab?.detail?.saved?.tag || "已标记";
+    void savePlayerTag(puuid, chosenTag, noteDraft);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-delete-player-tag]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.deletePlayerTag;
+    if (puuid) void deletePlayerTag(puuid);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-quick-tag-toggle]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.quickTagToggle;
+    if (!puuid) return;
+    quickTagPuuid = quickTagPuuid === puuid ? null : puuid;
+    render();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-quick-tag-set]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.quickTagSet;
+    const tagValue = element.dataset.tagValue ?? "";
+    if (!puuid || !tagValue) return;
+    quickTagPuuid = null;
+    void savePlayerTag(puuid, tagValue, "");
+  }));
+  app.querySelectorAll<HTMLElement>("[data-quick-tag-clear]").forEach((element) => element.addEventListener("click", () => {
+    const puuid = element.dataset.quickTagClear;
+    if (!puuid) return;
+    quickTagPuuid = null;
+    void deletePlayerTag(puuid);
   }));
   app.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => element.addEventListener("click", (event) => {
     const action = element.dataset.action;
@@ -1588,6 +1996,23 @@ function wireEvents(): void {
     if (action === "show-main-window") void showMainWindow();
     if (action === "toggle-companion-pin") void updateCompanionPin(!companionAlwaysOnTop);
     if (action === "companion-build-refresh") void loadCompanionBuild(companionBuildHeroId ?? snapshot.championId, true);
+    if (action === "companion-ongoing-refresh") void loadCompanionOngoing(true);
+    if (action === "companion-send-chat") void sendOngoingToChampSelectChat();
+    if (action === "open-saved-players") {
+      savedPlayersOpen = true;
+      void hydrateSavedPlayers();
+      render();
+    }
+    if (action === "close-saved-players") {
+      if (element.classList.contains("detail-backdrop") && event.target !== element) return;
+      savedPlayersOpen = false;
+      render();
+    }
+    if (action === "close-match-detail") {
+      if (element.classList.contains("detail-backdrop") && event.target !== element) return;
+      matchDetailOpen = false;
+      render();
+    }
     if (action === "cycle-theme") {
       themeMode = themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system";
       persistAppPreferences();
@@ -1795,6 +2220,9 @@ function receiveSnapshot(next: Snapshot): void {
       companionBuildHeroId = snapshot.championId;
       if (companionTab === "build") void loadCompanionBuild(snapshot.championId);
     }
+    if (companionTab === "ongoing" && (snapshot.phase !== previous.phase || snapshot.contextId !== previous.contextId)) {
+      void loadCompanionOngoing(true);
+    }
   } else if (snapshot.connection !== "ready") {
     clearProfileData();
   } else if (previous.connection !== "ready" || (previous.phase !== snapshot.phase
@@ -1816,6 +2244,9 @@ async function bootstrap(): Promise<void> {
   render();
   if (isCompanionWindow && companionTab === "build") {
     void loadCompanionBuild(companionBuildHeroId ?? snapshot.championId);
+  }
+  if (isCompanionWindow && companionTab === "ongoing") {
+    void loadCompanionOngoing();
   }
   if (!isCompanionWindow) {
     void hydrateDashboardData();
@@ -1849,11 +2280,13 @@ async function bootstrap(): Promise<void> {
     if (isCompanionWindow) {
       cleanupCompanionNavListener = await listen<{ tab?: string | null; heroId?: number | null }>("companion-navigate", (event) => {
         const payload = event.payload;
-        if (payload?.tab === "skin" || payload?.tab === "build") companionTab = payload.tab;
+        if (payload?.tab === "skin" || payload?.tab === "build" || payload?.tab === "ongoing") companionTab = payload.tab;
         if (typeof payload?.heroId === "number" && payload.heroId > 0) {
           void loadCompanionBuild(payload.heroId);
         } else if (companionTab === "build") {
           void loadCompanionBuild(snapshot.championId);
+        } else if (companionTab === "ongoing") {
+          void loadCompanionOngoing(true);
         }
         render();
       });
@@ -1936,6 +2369,16 @@ window.addEventListener("keydown", (event) => {
     }
     if (hextech.isOpen()) {
       if (hextech.closeDetail()) return;
+    }
+    if (matchDetailOpen) {
+      matchDetailOpen = false;
+      render();
+      return;
+    }
+    if (savedPlayersOpen) {
+      savedPlayersOpen = false;
+      render();
+      return;
     }
     if (settingsOpen) {
       settingsOpen = false;

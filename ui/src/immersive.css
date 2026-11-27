@@ -902,6 +902,299 @@ button:focus-visible, select:focus-visible, input:focus-visible, .skin-grid:focu
 }
 .toolkit-status-dot.is-live { background: var(--positive); }
 
+/* ========== Phase 2.2: Player Search Tabs, 10-Player Detail & Companion Ongoing ========== */
+.mp-player-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.mp-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mp-tab-wrap {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.mp-tab-wrap.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mp-tab {
+  height: 30px;
+  padding: 0 11px;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border-radius: 7px;
+}
+.mp-tab.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.mp-tab-wrap .mp-tab { border-radius: 0; box-shadow: none; background: transparent; }
+.mp-tab-wrap.is-active .mp-tab { color: var(--accent); font-weight: 600; }
+.mp-tab-close {
+  width: 24px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-2);
+  background: transparent;
+}
+.mp-tab-close:hover { color: var(--text); background: var(--surface-raised); }
+.mp-player-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mp-search-form { display: flex; align-items: center; gap: 6px; }
+.mp-search-box {
+  width: 196px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.mp-search-box input { width: 100%; font-size: 13px; }
+.mp-search-btn, .mp-saved-btn { min-height: 32px; padding: 0 11px; font-size: 12px; }
+
+.player-tag-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+}
+.player-tag-pill--good { background: var(--win-bg); color: var(--positive); border-color: transparent; }
+.player-tag-pill--danger { background: var(--loss-bg); color: var(--negative); border-color: transparent; }
+
+.player-tag-box {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.player-tag-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.player-preset-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+.player-preset-btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.player-note-row { display: flex; gap: 8px; }
+.player-note-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+.player-note-row .secondary-button { min-height: 32px; padding: 0 12px; font-size: 12px; }
+
+.encountered-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.encountered-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+}
+.encountered-row:hover { background: var(--surface-raised); }
+
+.match-detail-drawer { width: min(680px, 92vw); }
+.md-body { padding: 14px 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.md-meta { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.md-team { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.md-team-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+.md-team.is-win .md-team-head strong { color: var(--positive); }
+.md-team.is-loss .md-team-head strong { color: var(--negative); }
+.md-players { display: flex; flex-direction: column; }
+.md-player {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1.3fr) 86px 94px 54px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.md-player:last-child { border-bottom: 0; }
+.md-player.is-self { background: var(--accent-soft); }
+.md-player .champion-token { width: 32px; height: 32px; flex-basis: 32px; border-radius: 7px; }
+.md-p-name { min-width: 0; display: flex; flex-direction: column; }
+.md-p-name small { font-size: 11px; color: var(--muted-2); }
+.md-player-link {
+  text-align: left;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-player-link:hover { color: var(--accent); text-decoration: underline; }
+.md-p-kda { display: flex; flex-direction: column; }
+.md-p-kda span { font-size: 11px; color: var(--muted-2); }
+.md-p-dmg { display: flex; flex-direction: column; gap: 4px; }
+.md-dmg-val { font-size: 12px; color: var(--muted); }
+.md-dmg-track { height: 5px; border-radius: 999px; background: var(--bar-muted); overflow: hidden; }
+.md-dmg-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.md-p-gold { text-align: right; font-size: 12px; color: var(--muted); }
+
+.saved-players-list { padding: 10px 20px 20px; display: flex; flex-direction: column; }
+.saved-player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.saved-player-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+}
+.saved-player-main strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Companion Ongoing Game Tab */
+.comp-ongoing { display: flex; flex-direction: column; gap: 12px; }
+.comp-og-head-title { display: flex; align-items: baseline; gap: 8px; }
+.comp-og-head-title strong { font-size: 14px; color: var(--text); }
+.comp-og-head-title span { font-size: 12px; color: var(--muted); }
+.comp-og-head-actions { display: flex; align-items: center; gap: 6px; }
+.comp-chat-btn { min-height: 28px; padding: 0 10px; font-size: 12px; }
+.comp-og-list { display: flex; flex-direction: column; gap: 7px; }
+.comp-og-card {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.comp-og-card.is-self { border-color: var(--accent); }
+.comp-og-row { display: flex; align-items: center; gap: 9px; }
+.comp-og-row .champion-token, .comp-og-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 7px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.comp-og-main { flex: 1; min-width: 0; }
+.comp-og-name { display: flex; align-items: center; gap: 5px; }
+.comp-og-name strong { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comp-og-premade {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex: none;
+}
+.comp-og-pos { font-size: 11px; color: var(--muted-2); flex: none; }
+.comp-og-meta { display: flex; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.comp-og-right { display: flex; align-items: center; gap: 4px; flex: none; }
+.comp-og-score {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.comp-og-score.is-high { background: var(--win-bg); color: var(--positive); }
+.comp-og-score.is-low { background: var(--loss-bg); color: var(--negative); }
+.comp-og-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.comp-og-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.comp-og-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+.comp-og-tag.is-good { background: var(--win-bg); color: var(--positive); }
+.comp-og-tag.is-bad { background: var(--loss-bg); color: var(--negative); }
+.comp-og-dots { display: inline-flex; gap: 4px; align-items: center; }
+.comp-wl-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-2); }
+.comp-wl-dot.is-win { background: var(--positive); }
+.comp-wl-dot.is-loss { background: var(--negative); }
+.comp-og-tagbar {
+  display: flex;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.comp-og-preset {
+  flex: 1;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11px;
+}
+.comp-og-preset.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ========== Minimal News / Rankings Polish ========== */
 .news-mode-header { padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .news-mode-header h1 { font-size: 22px; font-weight: 600; color: var(--text); }
@@ -996,7 +1289,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, .skin-grid:focu
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--line);
   background: var(--surface-muted);
 }

@@ -5,16 +5,20 @@ mod game_assets;
 mod hextech;
 mod lcu;
 mod lcu_ws;
+mod match_history;
 mod models;
 mod official_data;
+mod ongoing_game;
 mod profile;
 mod rankings;
 mod runtime;
 
 use automation::AutomationSnapshot;
 use db::{EncounteredGame, SavedPlayer};
+use match_history::{MatchDetail, PlayerDetail, SummonerOverview};
 use models::{AppSnapshot, ApplyResult};
 use official_data::NewsDataSnapshot;
+use ongoing_game::OngoingGameSnapshot;
 use profile::PlayerProfile;
 use runtime::{RuntimeState, RuntimeStatus};
 use tauri::{
@@ -329,6 +333,49 @@ async fn toolkit_leave_lobby(state: State<'_, RuntimeState>) -> Result<(), Strin
 }
 
 #[tauri::command]
+async fn search_player(
+    state: State<'_, RuntimeState>,
+    query: String,
+) -> Result<SummonerOverview, String> {
+    state.search_player(query).await
+}
+
+#[tauri::command]
+async fn get_player_detail(
+    state: State<'_, RuntimeState>,
+    puuid: String,
+    beg_index: Option<usize>,
+    end_index: Option<usize>,
+) -> Result<PlayerDetail, String> {
+    state
+        .get_player_detail(puuid, beg_index.unwrap_or(0), end_index.unwrap_or(19))
+        .await
+}
+
+#[tauri::command]
+async fn get_match_detail(
+    state: State<'_, RuntimeState>,
+    game_id: u64,
+) -> Result<MatchDetail, String> {
+    state.get_match_detail(game_id).await
+}
+
+#[tauri::command]
+async fn get_ongoing_game(
+    state: State<'_, RuntimeState>,
+) -> Result<OngoingGameSnapshot, String> {
+    state.get_ongoing_game().await
+}
+
+#[tauri::command]
+async fn send_champ_select_chat(
+    state: State<'_, RuntimeState>,
+    message: String,
+) -> Result<(), String> {
+    state.send_champ_select_chat(message).await
+}
+
+#[tauri::command]
 fn get_launch_at_startup() -> Result<bool, String> {
     startup_enabled()
 }
@@ -461,6 +508,11 @@ pub fn run() {
             toolkit_restart_ux,
             toolkit_play_again,
             toolkit_leave_lobby,
+            search_player,
+            get_player_detail,
+            get_match_detail,
+            get_ongoing_game,
+            send_champ_select_chat,
             get_launch_at_startup,
             set_launch_at_startup,
         ])

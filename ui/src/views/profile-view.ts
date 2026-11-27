@@ -1,4 +1,13 @@
-import type { ProfileSummary } from "../data/types";
+import type { MatchDetail, PlayerDetail, ProfileSummary, SavedPlayer } from "../data/types";
+import { renderMatchDetailDrawer, renderPlayerDetailView, renderSavedPlayersDrawer } from "./player-detail-view";
+
+export type OpenPlayerTab = {
+  puuid: string;
+  label: string;
+  detail: PlayerDetail | null;
+  loading: boolean;
+  error: string | null;
+};
 
 export type ProfileViewProps = {
   isTauri: boolean;
@@ -10,6 +19,19 @@ export type ProfileViewProps = {
   profileExpandedMatchId: string | null;
   profileTrendMetric: "winRate" | "kda";
   favoritesCount: number;
+  activePlayerTab: string;
+  openPlayerTabs: OpenPlayerTab[];
+  playerSearchQuery: string;
+  playerSearching: boolean;
+  tagDraft: string;
+  noteDraft: string;
+  savingTag: boolean;
+  savedPlayers: SavedPlayer[];
+  savedPlayersOpen: boolean;
+  matchDetailOpen: boolean;
+  matchDetailLoading: boolean;
+  matchDetailError: string | null;
+  matchDetail: MatchDetail | null;
   escape: (value: string) => string;
   icon: (name: string, size?: number) => string;
   formatTime: (timestamp: number) => string;
@@ -26,11 +48,79 @@ export function renderProfileView({
   profileExpandedMatchId,
   profileTrendMetric,
   favoritesCount,
+  activePlayerTab,
+  openPlayerTabs,
+  playerSearchQuery,
+  playerSearching,
+  tagDraft,
+  noteDraft,
+  savingTag,
+  savedPlayers,
+  savedPlayersOpen,
+  matchDetailOpen,
+  matchDetailLoading,
+  matchDetailError,
+  matchDetail,
   escape,
   icon,
   formatTime,
   renderChampionIcon,
 }: ProfileViewProps): string {
+  const drawers = renderMatchDetailDrawer({
+    open: matchDetailOpen,
+    loading: matchDetailLoading,
+    error: matchDetailError,
+    detail: matchDetail,
+    escape,
+    icon,
+    renderChampionIcon,
+  }) + renderSavedPlayersDrawer({
+    open: savedPlayersOpen,
+    players: savedPlayers,
+    escape,
+    icon,
+  });
+
+  const playerBar = connected || !isTauri
+    ? `<div class="mp-player-bar">
+        <div class="mp-tabs" role="tablist" aria-label="战绩标签页">
+          <button class="mp-tab ${activePlayerTab === "self" ? "is-active" : ""}" data-player-tab="self">我的战绩</button>
+          ${openPlayerTabs.map((tab) => `<span class="mp-tab-wrap ${activePlayerTab === tab.puuid ? "is-active" : ""}">
+            <button class="mp-tab" data-player-tab="${escape(tab.puuid)}">${escape(tab.label)}</button>
+            <button class="mp-tab-close" data-close-player-tab="${escape(tab.puuid)}" aria-label="关闭 ${escape(tab.label)}">${icon("x", 12)}</button>
+          </span>`).join("")}
+        </div>
+        <div class="mp-player-tools">
+          <form class="mp-search-form" data-player-search-form>
+            <label class="search-box mp-search-box">
+              ${icon("search", 14)}
+              <input type="search" maxlength="48" value="${escape(playerSearchQuery)}" placeholder="查玩家 名字#编号" aria-label="查询玩家战绩" data-player-search />
+            </label>
+            <button class="secondary-button mp-search-btn" type="submit" ${playerSearching ? "disabled" : ""}>${playerSearching ? "查询中" : "查询"}</button>
+          </form>
+          <button class="secondary-button mp-saved-btn" data-action="open-saved-players">已标记${savedPlayers.length ? ` (${savedPlayers.length})` : ""}</button>
+        </div>
+      </div>`
+    : "";
+
+  if (activePlayerTab !== "self") {
+    const activeTab = openPlayerTabs.find((t) => t.puuid === activePlayerTab);
+    if (activeTab) {
+      return `<div class="minimal-profile">${playerBar}${renderPlayerDetailView({
+        detail: activeTab.detail,
+        loading: activeTab.loading,
+        error: activeTab.error,
+        puuid: activeTab.puuid,
+        tagDraft,
+        noteDraft,
+        savingTag,
+        escape,
+        icon,
+        renderChampionIcon,
+      })}</div>${drawers}`;
+    }
+  }
+
   if (profileLoading && !profileData) {
     return `<div class="loading-panel"><span class="loading-spinner">${icon("loader-circle", 22)}</span><strong>正在加载召唤师数据</strong><span>正在整理最近对局与资产信息</span></div>`;
   }
@@ -57,6 +147,7 @@ export function renderProfileView({
 
   return `
     <div class="minimal-profile">
+      ${playerBar}
       ${data.warnings.length ? `<div class="profile-notice" role="status">${icon("info", 16)}<span>${data.warnings.map(escape).join("；")}。可稍后刷新重试。</span></div>` : ""}
 
       <section class="mp-hero" aria-label="召唤师概览">
@@ -111,14 +202,15 @@ export function renderProfileView({
             ${filteredGames.length ? filteredGames.map((game) => {
               const isOpen = profileExpandedMatchId === game.id;
               const resultLabel = game.result === "win" ? "胜利" : game.result === "remake" ? "重开" : "失败";
-              return `<button class="mp-match-row ${game.result}" data-profile-match="${escape(game.id)}" aria-expanded="${isOpen}">
+              const matchAttr = game.gameId ? `data-match-detail="${game.gameId}"` : `data-profile-match="${escape(game.id)}" aria-expanded="${isOpen}"`;
+              return `<button class="mp-match-row ${game.result}" ${matchAttr}>
                 <span class="mp-res-bar"></span>
                 ${renderChampionIcon(game.championId, game.champion, "var(--surface)")}
                 <div><div class="mp-m-name">${escape(game.champion)}</div><div class="mp-m-sub">${escape(game.mode)}</div></div>
                 <div class="num"><div class="mp-m-kda">${escape(game.kda)}</div><div class="mp-m-sub">补刀 ${game.cs}</div></div>
                 <span class="mp-res-pill">${resultLabel}</span>
                 <div class="mp-m-time num"><div class="mp-m-dur">${escape(game.duration)}</div><div>${escape(game.playedAt)}</div></div>
-              </button>${isOpen ? `<div class="mp-match-detail"><span>${escape(game.champion)} · ${escape(game.mode)} · KDA ${escape(game.kda)} · 补刀 ${game.cs}</span><span class="num">时长 ${escape(game.duration)} · ${escape(game.playedAt)}</span></div>` : ""}`;
+              </button>${!game.gameId && isOpen ? `<div class="mp-match-detail"><span>${escape(game.champion)} · ${escape(game.mode)} · KDA ${escape(game.kda)} · 补刀 ${game.cs}</span><span class="num">时长 ${escape(game.duration)} · ${escape(game.playedAt)}</span></div>` : ""}`;
             }).join("") : `<div class="empty-state">${icon("swords", 20)}<span>${data.recentGames.length ? "当前筛选下暂无对局" : gamesEmpty}</span></div>`}
           </div>
         </div>
@@ -169,5 +261,5 @@ export function renderProfileView({
           </div>
         </aside>
       </section>
-    </div>`;
+    </div>${drawers}`;
 }

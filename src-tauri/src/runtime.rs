@@ -4,7 +4,9 @@ use crate::{
     discovery,
     lcu::LcuClient,
     lcu_ws::{self, LcuEvent},
+    match_history::{MatchDetail, PlayerDetail, SummonerOverview},
     models::{AppSnapshot, ApplyResult},
+    ongoing_game::{self, OngoingGameSnapshot},
     profile::PlayerProfile,
 };
 use rand::seq::SliceRandom;
@@ -185,6 +187,101 @@ impl RuntimeState {
             .await
             .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
         client.leave_lobby().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn search_player(&self, query: String) -> Result<SummonerOverview, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let _permit = self.acquire_low_priority_read().await?;
+        client.search_player(&query).await
+    }
+
+    pub async fn get_player_detail(
+        &self,
+        puuid: String,
+        beg_index: usize,
+        end_index: usize,
+    ) -> Result<PlayerDetail, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let _permit = self.acquire_low_priority_read().await?;
+        let mut detail = client.get_player_detail_raw(&puuid, beg_index, end_index).await?;
+        if !detail.self_puuid.is_empty() {
+            if let Ok(db) = self.database().await {
+                let target_puuid = detail.summoner.puuid.clone();
+                let self_puuid = detail.self_puuid.clone();
+                if let Ok((saved, encountered)) = tauri::async_runtime::spawn_blocking(move || {
+                    let saved = db.get_saved_player(&target_puuid, &self_puuid).ok().flatten();
+                    let encountered = db
+                        .list_encountered_games(&self_puuid, &target_puuid, 20)
+                        .unwrap_or_default();
+                    (saved, encountered)
+                })
+                .await
+                {
+                    detail.saved = saved;
+                    detail.encountered = encountered;
+                }
+            }
+        }
+        Ok(detail)
+    }
+
+    pub async fn get_match_detail(&self, game_id: u64) -> Result<MatchDetail, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let _permit = self.acquire_low_priority_read().await?;
+        client.get_match_detail(game_id).await
+    }
+
+    pub async fn get_ongoing_game(&self) -> Result<OngoingGameSnapshot, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let db = self.db.read().await.clone();
+        ongoing_game::build_ongoing_game(client, self.low_priority_reads.clone(), db).await
+    }
+
+    pub async fn send_champ_select_chat(&self, message: String) -> Result<(), String> {
+        let trimmed = message.trim();
+        if trimmed.is_empty() {
+            return Err("发送内容不能为空".to_string());
+        }
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let phase = client
+            .get_phase()
+            .await
+            .map_err(|_| "无法确认客户端阶段".to_string())?;
+        if phase != "ChampSelect" {
+            return Err("仅允许在英雄选择阶段发送到选人频道".to_string());
+        }
+        let chat_id = client
+            .get_champ_select_chat_id()
+            .await
+            .map_err(|_| "无法读取选人聊天室".to_string())?
+            .ok_or_else(|| "当前选人频道尚未就绪".to_string())?;
+        for chunk in trimmed
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
+            client
+                .send_chat_message(&chat_id, chunk)
+                .await
+                .map_err(|_| "发送到选人频道失败".to_string())?;
+            tokio::time::sleep(Duration::from_millis(120)).await;
+        }
+        Ok(())
     }
 
     pub fn auto_popup_companion(&self) -> bool {

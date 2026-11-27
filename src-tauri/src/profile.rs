@@ -19,6 +19,7 @@ pub struct PlayerProfile {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileSummoner {
+    pub puuid: String,
     pub name: String,
     pub tag: String,
     pub region: String,
@@ -43,6 +44,7 @@ pub struct ProfileRank {
 #[serde(rename_all = "camelCase")]
 pub struct ProfileMatch {
     pub id: String,
+    pub game_id: u64,
     pub champion_id: u64,
     pub champion: String,
     pub result: String,
@@ -188,8 +190,10 @@ fn normalize_profile(
                 .and_then(|value| text(value, "region"))
         });
 
+    let (puuid, _) = identity(summoner)?;
     Ok(PlayerProfile {
         summoner: ProfileSummoner {
+            puuid,
             name: text(summoner, "gameName")
                 .or_else(|| text(summoner, "displayName"))
                 .unwrap_or("召唤师")
@@ -306,9 +310,9 @@ fn normalize_matches(
     let mut matches: Vec<ProfileMatch> = games
         .iter()
         .filter_map(|game| {
-            let id = number(game, "gameId")?;
+            let game_id = number(game, "gameId")?;
             let platform = text(game, "platformId").unwrap_or_default();
-            let id = format!("{platform}:{id}");
+            let id = format!("{platform}:{game_id}");
             let duration = number(game, "gameDuration").filter(|seconds| *seconds > 0)?;
             let identity =
                 game.get("participantIdentities")?
@@ -352,6 +356,7 @@ fn normalize_matches(
                 .unwrap_or("未知模式");
             Some(ProfileMatch {
                 id,
+                game_id,
                 champion_id,
                 champion: champion_names
                     .get(&champion_id)

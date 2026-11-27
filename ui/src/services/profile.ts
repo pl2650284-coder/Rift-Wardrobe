@@ -4,6 +4,7 @@ import type { ProfileSummary, RecentGame } from "../data/types.ts";
 
 export type ProfileMatch = {
   id: string;
+  gameId?: number;
   championId: number;
   champion: string;
   result: RecentGame["result"];
@@ -114,6 +115,7 @@ export function summarizeProfile(raw: NativeProfile, favorites: number, now = Da
     rank: raw.rank,
     recentGames: recent.map((game) => ({
       id: game.id,
+      gameId: game.gameId,
       championId: game.championId,
       champion: game.champion,
       championShort: Array.from(game.champion).slice(0, 2).join(""),

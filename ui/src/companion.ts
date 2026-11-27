@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { HexDetail } from "./data/hextech";
+import type { OngoingGameSnapshot, OngoingPlayer } from "./data/types";
 import { HEX_QUALITIES } from "./hextech-view";
 
-export type CompanionTab = "skin" | "build";
+export type CompanionTab = "skin" | "build" | "ongoing";
 
 export type CompanionSkin = {
   id: number;
@@ -49,6 +50,11 @@ export type CompanionRenderContext = {
   buildDetail: HexDetail | null;
   buildLoading: boolean;
   buildError: string;
+  ongoingGame: OngoingGameSnapshot | null;
+  ongoingLoading: boolean;
+  ongoingError: string;
+  sendingChat: boolean;
+  quickTagPuuid: string | null;
   escape: (s: string) => string;
   icon: (name: string, size?: number) => string;
   skinImage: (skin: CompanionSkin, large?: boolean) => string;
@@ -148,11 +154,106 @@ export async function fetchCompanionBuild(isTauri: boolean, heroId: number, forc
   return invoke<HexDetail>("get_hextech_detail", { heroId, force });
 }
 
+const demoOngoingGame: OngoingGameSnapshot = {
+  active: true,
+  phase: "ChampSelect",
+  stageLabel: "选人阶段",
+  gameId: 90001,
+  queueId: 420,
+  selfPuuid: "demo-self",
+  canSendChat: true,
+  myTeam: [
+    {
+      puuid: "demo-self",
+      gameName: "峡印演示",
+      tagLine: "CN1",
+      iconPath: null,
+      championId: 67,
+      championName: "薇恩",
+      position: "下路",
+      isSelf: true,
+      rankLabel: "翡翠 II",
+      winRate: 60,
+      wins: 6,
+      losses: 4,
+      avgKda: 4.1,
+      streak: 3,
+      score: 79,
+      premadeGroup: "A",
+      tags: ["3连胜"],
+      saved: null,
+      encounteredCount: 0,
+      recentGames: [
+        { gameId: 1, championId: 67, result: "win", kills: 9, deaths: 2, assists: 5 },
+        { gameId: 2, championId: 67, result: "win", kills: 7, deaths: 3, assists: 6 },
+        { gameId: 3, championId: 22, result: "win", kills: 5, deaths: 1, assists: 11 },
+        { gameId: 4, championId: 67, result: "loss", kills: 3, deaths: 6, assists: 4 },
+        { gameId: 5, championId: 81, result: "win", kills: 8, deaths: 2, assists: 7 },
+      ],
+      privacy: "PUBLIC",
+    },
+    {
+      puuid: "demo-mate-1",
+      gameName: "轻舟过万山",
+      tagLine: "2048",
+      iconPath: null,
+      championId: 117,
+      championName: "璐璐",
+      position: "辅助",
+      isSelf: false,
+      rankLabel: "钻石 IV",
+      winRate: 70,
+      wins: 7,
+      losses: 3,
+      avgKda: 5.2,
+      streak: 4,
+      score: 88,
+      premadeGroup: "A",
+      tags: ["大腿", "4连胜", "高胜率"],
+      saved: { puuid: "demo-mate-1", selfPuuid: "demo-self", tag: "大腿", note: "保护极稳", updatedAtMs: Date.now() },
+      encounteredCount: 2,
+      recentGames: [
+        { gameId: 1, championId: 117, result: "win", kills: 1, deaths: 1, assists: 18 },
+        { gameId: 2, championId: 117, result: "win", kills: 2, deaths: 2, assists: 15 },
+        { gameId: 3, championId: 412, result: "win", kills: 1, deaths: 3, assists: 14 },
+        { gameId: 4, championId: 117, result: "win", kills: 0, deaths: 2, assists: 19 },
+        { gameId: 5, championId: 89, result: "loss", kills: 1, deaths: 6, assists: 9 },
+      ],
+      privacy: "PUBLIC",
+    },
+  ],
+  enemyTeam: [],
+  updatedAtMs: Date.now(),
+};
+
+export async function fetchCompanionOngoing(isTauri: boolean): Promise<OngoingGameSnapshot> {
+  if (!isTauri) {
+    return structuredClone(demoOngoingGame);
+  }
+  return invoke<OngoingGameSnapshot>("get_ongoing_game");
+}
+
+export function formatOngoingChatSummary(ongoing: OngoingGameSnapshot): string {
+  return ongoing.myTeam
+    .slice(0, 5)
+    .map((p) => {
+      const wr = p.winRate !== null ? `${p.winRate}%` : "--";
+      const kda = p.avgKda !== null ? p.avgKda.toFixed(1) : "--";
+      const streak = p.streak >= 3 ? ` ${p.streak}连胜` : p.streak <= -3 ? ` ${-p.streak}连败` : "";
+      return `${p.gameName} 胜率${wr} KDA${kda}${streak}`;
+    })
+    .join(" | ");
+}
+
 export function renderCompanionShell(ctx: CompanionRenderContext): string {
   const { escape: e, icon, snapshot, tab, pinned } = ctx;
   const ready = snapshot.connection === "ready" && snapshot.active;
   const champLabel = snapshot.championName ?? (snapshot.connection === "ready" ? "等待选人" : "未连接");
-  const body = tab === "skin" ? renderCompanionSkins(ctx) : renderCompanionBuild(ctx);
+  const body = tab === "skin"
+    ? renderCompanionSkins(ctx)
+    : tab === "build"
+      ? renderCompanionBuild(ctx)
+      : renderCompanionOngoing(ctx);
 
   return `<div class="companion-shell">
     <header class="titlebar companion-titlebar">
@@ -180,6 +281,9 @@ export function renderCompanionShell(ctx: CompanionRenderContext): string {
       </button>
       <button class="companion-tab ${tab === "build" ? "is-active" : ""}" role="tab" aria-selected="${tab === "build"}" data-companion-tab="build">
         ${icon("swords", 14)}<span>海克斯速查</span>
+      </button>
+      <button class="companion-tab ${tab === "ongoing" ? "is-active" : ""}" role="tab" aria-selected="${tab === "ongoing"}" data-companion-tab="ongoing">
+        ${icon("users", 14)}<span>本局分析</span>
       </button>
     </nav>
 
@@ -347,6 +451,103 @@ function renderCompanionBuild(ctx: CompanionRenderContext): string {
       <h3>最佳拍档</h3>
       <div class="comp-partners">
         ${topPartners.map((p) => `<span class="comp-partner-chip">${e(p.hero.name)} <b class="num">${p.winRate.toFixed(1)}%</b></span>`).join("")}
+      </div>
+    </section>` : ""}
+  </div>`;
+}
+
+function renderOngoingPlayerCard(ctx: CompanionRenderContext, p: OngoingPlayer): string {
+  const { escape: e, icon, quickTagPuuid } = ctx;
+  const champIcon = p.championId
+    ? ctx.gameIcon(p.championName ?? p.gameName, "#6b8afd", `/lol-game-data/assets/v1/champion-icons/${p.championId}.png`, undefined, "champion")
+    : `<span class="comp-og-avatar">${e(Array.from(p.gameName).slice(0, 2).join(""))}</span>`;
+  const tagOpen = quickTagPuuid === p.puuid;
+  const scoreClass = (p.score ?? 0) >= 75 ? "is-high" : (p.score ?? 100) < 50 ? "is-low" : "";
+
+  return `<article class="comp-og-card ${p.isSelf ? "is-self" : ""}">
+    <div class="comp-og-row">
+      ${champIcon}
+      <div class="comp-og-main">
+        <div class="comp-og-name">
+          <strong>${e(p.gameName)}</strong>
+          ${p.premadeGroup ? `<span class="comp-og-premade">开黑${e(p.premadeGroup)}</span>` : ""}
+          ${p.position ? `<span class="comp-og-pos">${e(p.position)}</span>` : ""}
+        </div>
+        <div class="comp-og-meta num">
+          <span>${e(p.rankLabel)}</span>
+          <span>胜率 ${p.winRate !== null ? `${p.winRate}%` : "—"}</span>
+          <span>KDA ${p.avgKda !== null ? p.avgKda.toFixed(1) : "—"}</span>
+        </div>
+      </div>
+      <div class="comp-og-right">
+        ${p.score !== null ? `<span class="comp-og-score num ${scoreClass}">${p.score}</span>` : ""}
+        ${!p.isSelf ? `<button class="companion-icon-btn ${p.saved ? "is-active" : ""}" data-quick-tag-toggle="${e(p.puuid)}" title="标记玩家">${icon("star", 13)}</button>` : ""}
+      </div>
+    </div>
+    ${(p.tags.length || p.recentGames.length) ? `<div class="comp-og-sub">
+      <div class="comp-og-tags">
+        ${p.tags.slice(0, 3).map((tag) => `<span class="comp-og-tag ${tag === "拉黑" || tag.includes("连败") ? "is-bad" : tag === "大腿" || tag.includes("连胜") || tag === "高胜率" ? "is-good" : ""}">${e(tag)}</span>`).join("")}
+      </div>
+      <div class="comp-og-dots" aria-label="近期胜负">
+        ${p.recentGames.slice(0, 5).map((g) => `<span class="comp-wl-dot is-${g.result}" title="${g.kills}/${g.deaths}/${g.assists}"></span>`).join("")}
+      </div>
+    </div>` : ""}
+    ${tagOpen ? `<div class="comp-og-tagbar">
+      ${(["大腿", "靠谱", "谨慎", "拉黑"] as const).map((preset) => `<button class="comp-og-preset ${p.saved?.tag === preset ? "is-active" : ""}" data-quick-tag-set="${e(p.puuid)}" data-tag-value="${preset}">${preset}</button>`).join("")}
+      ${p.saved ? `<button class="comp-og-preset" data-quick-tag-clear="${e(p.puuid)}">清除</button>` : ""}
+    </div>` : ""}
+  </article>`;
+}
+
+function renderCompanionOngoing(ctx: CompanionRenderContext): string {
+  const { escape: e, icon, ongoingGame, ongoingLoading, ongoingError, sendingChat } = ctx;
+  if (ongoingLoading && !ongoingGame) {
+    return `<div class="comp-empty-hero">
+      <span class="loading-spinner">${icon("loader-circle", 22)}</span>
+      <strong>正在分析本局玩家</strong>
+    </div>`;
+  }
+  if (ongoingError && !ongoingGame) {
+    return `<div class="comp-empty-hero">
+      ${icon("info", 22)}
+      <strong>暂时无法分析对局</strong>
+      <span>${e(ongoingError)}</span>
+      <button class="secondary-button" data-action="companion-ongoing-refresh">重试</button>
+    </div>`;
+  }
+  if (!ongoingGame || !ongoingGame.active) {
+    return `<div class="comp-empty-hero">
+      ${icon("users", 24)}
+      <strong>等待进入房间或选人</strong>
+      <button class="secondary-button" data-action="companion-ongoing-refresh" ${ongoingLoading ? "disabled" : ""}>刷新</button>
+    </div>`;
+  }
+
+  return `<div class="comp-ongoing">
+    <div class="comp-build-head">
+      <div class="comp-og-head-title">
+        <strong>${e(ongoingGame.stageLabel)}</strong>
+        <span class="num">${ongoingGame.myTeam.length + ongoingGame.enemyTeam.length} 人</span>
+      </div>
+      <div class="comp-og-head-actions">
+        ${ongoingGame.canSendChat ? `<button class="secondary-button comp-chat-btn" data-action="companion-send-chat" ${sendingChat ? "disabled" : ""}>${sendingChat ? "发送中" : "发战绩"}</button>` : ""}
+        <button class="companion-icon-btn" data-action="companion-ongoing-refresh" title="刷新本局分析" ${ongoingLoading ? "disabled" : ""}>
+          ${icon("refresh-ccw", 14)}
+        </button>
+      </div>
+    </div>
+
+    ${ongoingGame.myTeam.length ? `<section class="comp-sec">
+      <h3>我方</h3>
+      <div class="comp-og-list">
+        ${ongoingGame.myTeam.map((p) => renderOngoingPlayerCard(ctx, p)).join("")}
+      </div>
+    </section>` : ""}
+
+    ${ongoingGame.enemyTeam.length ? `<section class="comp-sec">
+      <h3>敌方</h3>
+      <div class="comp-og-list">
+        ${ongoingGame.enemyTeam.map((p) => renderOngoingPlayerCard(ctx, p)).join("")}
       </div>
     </section>` : ""}
   </div>`;

@@ -161,9 +161,12 @@ test("native profile failure is surfaced without falling back to a demo account"
 const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   receiveSnapshot, hydrateProfileData, reconnectClient, refreshProfileIfNeeded, renderSettingsPage,
   renderNewsPage, renderAutomationPage, renderToolkitPage, selectNewsMode, runToolkitAction,
+  searchAndOpenPlayer, openMatchDetail, savePlayerTag, deletePlayerTag,
+  loadCompanionOngoing, sendOngoingToChampSelectChat,
   updateAutoAccept, updateAutoAcceptDelay, receiveAutomation,
   state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab,
-    autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs, runtimeStatus }),
+    autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs, runtimeStatus,
+    activePlayerTab, openPlayerTabs, matchDetailOpen, matchDetail, savedPlayers, ongoingGame }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -178,7 +181,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); }, readRanking = async () => { throw new Error("Unexpected ranking call"); }, automation = { autoAccept: false, autoAcceptDelaySeconds: 0, configured: true, revision: 0, logs: [] }, saveAutomation, hash = "#profile" } = {}) {
+function page({ initial = disconnected, read = async () => summarizeProfile(profile([]), 0, now), storedPreferences = {}, readHextech = async () => { throw new Error("Unexpected hextech call"); }, readRanking = async () => { throw new Error("Unexpected ranking call"); }, automation = { autoAccept: false, autoAcceptDelaySeconds: 0, configured: true, revision: 0, logs: [] }, saveAutomation, hash = "#profile", search = "", onInvoke } = {}) {
   const app = { innerHTML: "", dataset: {}, style: { setProperty() {}, removeProperty() {} }, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
   const document = { querySelector: (selector) => selector === "#app" ? app : null, querySelectorAll: () => [], activeElement: null, hidden: false, addEventListener() {} };
   let snapshotListener;
@@ -187,29 +190,35 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
   let reads = 0;
   const nativeCalls = [];
   const window = {
-    __TAURI_INTERNALS__: {}, location: { hash, search: "", pathname: "/" }, history: { replaceState() {} },
+    __TAURI_INTERNALS__: {}, location: { hash, search, pathname: "/" }, history: { replaceState() {} },
     localStorage: { getItem: (key) => storedPreferences[key] ?? null, setItem() {} }, addEventListener() {},
     matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
     setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
   };
+  const invokeHandler = async (command, args) => {
+    nativeCalls.push({ command, args });
+    if (onInvoke) {
+      const handled = await onInvoke(command, args);
+      if (handled !== undefined) return handled;
+    }
+    if (command === "get_automation_state") return structuredClone(automationState);
+    if (command === "set_auto_accept") {
+      automationState = saveAutomation ? await saveAutomation(args.enabled, args.delaySeconds) : {
+        ...automationState, configured: true, autoAccept: args.enabled, autoAcceptDelaySeconds: args.delaySeconds ?? automationState.autoAcceptDelaySeconds, revision: automationState.revision + 1,
+      };
+      return structuredClone(automationState);
+    }
+    return command === "get_snapshot" ? await initial : false;
+  };
   const hextechModule = evaluate(compile("../ui/src/hextech-view.ts"), { "@tauri-apps/api/core": { invoke: readHextech } });
   const themeModule = evaluate(compile("../ui/src/theme.ts"), {}, { window });
+  const playerDetailModule = evaluate(compile("../ui/src/views/player-detail-view.ts"), {});
   const companionModule = evaluate(compile("../ui/src/companion.ts"), {
-    "@tauri-apps/api/core": { invoke: readHextech },
+    "@tauri-apps/api/core": { invoke: async (command, args) => command === "get_hextech_detail" ? readHextech(command, args) : invokeHandler(command, args) },
     "./hextech-view": hextechModule,
   });
   const result = evaluate(pageCode, {
-    "@tauri-apps/api/core": { invoke: async (command, args) => {
-      nativeCalls.push({ command, args });
-      if (command === "get_automation_state") return structuredClone(automationState);
-      if (command === "set_auto_accept") {
-        automationState = saveAutomation ? await saveAutomation(args.enabled, args.delaySeconds) : {
-          ...automationState, configured: true, autoAccept: args.enabled, autoAcceptDelaySeconds: args.delaySeconds ?? automationState.autoAcceptDelaySeconds, revision: automationState.revision + 1,
-        };
-        return structuredClone(automationState);
-      }
-      return command === "get_snapshot" ? await initial : false;
-    } },
+    "@tauri-apps/api/core": { invoke: invokeHandler },
     "@tauri-apps/api/event": { listen: async (name, callback) => {
       if (name === "snapshot-changed") snapshotListener = callback;
       if (name === "automation-changed") automationListener = callback;
@@ -226,7 +235,7 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./rankings-view": evaluate(compile("../ui/src/rankings-view.ts"), { "@tauri-apps/api/core": { invoke: readRanking } }),
     "./shell": evaluate(compile("../ui/src/shell.ts"), {}),
     "./companion": companionModule,
-    "./views/profile-view": evaluate(compile("../ui/src/views/profile-view.ts"), {}),
+    "./views/profile-view": evaluate(compile("../ui/src/views/profile-view.ts"), { "./player-detail-view": playerDetailModule }),
     "./views/automation-view": evaluate(compile("../ui/src/views/automation-view.ts"), {}),
     "./views/toolkit-view": evaluate(compile("../ui/src/views/toolkit-view.ts"), {}),
     "./views/settings-view": evaluate(compile("../ui/src/views/settings-view.ts"), { "../theme": themeModule }),
@@ -509,4 +518,93 @@ test("main sidebar exposes five top-level routes and renders automation & toolki
     toolkitUi.nativeCalls.filter(({ command }) => command.startsWith("toolkit_")).map(({ command }) => command),
     ["toolkit_restart_ux", "toolkit_play_again", "toolkit_leave_lobby"],
   );
+});
+
+test("player search opens multi-tab detail, 10-player match drawer, and persists player tags", async () => {
+  const ui = page({
+    initial: connected,
+    read: async () => summarizeProfile(profile([], { summoner: { ...profile([]).summoner, puuid: "self-puuid" } }), 0, now),
+    onInvoke: async (command, args) => {
+      if (command === "list_saved_players") return [];
+      if (command === "search_player") {
+        return { puuid: "target-p1", summonerId: 2, gameName: "目标玩家", tagLine: "8888", level: 210, iconPath: null, privacy: "PUBLIC" };
+      }
+      if (command === "get_player_detail") {
+        return {
+          selfPuuid: "self-puuid",
+          summoner: { puuid: "target-p1", summonerId: 2, gameName: "目标玩家", tagLine: "8888", level: 210, iconPath: null, privacy: "PUBLIC" },
+          ranks: [{ queueType: "RANKED_SOLO_5x5", queueLabel: "单双排", tier: "钻石", division: "III", ranked: true, points: 52, wins: 30, losses: 20, winRate: 60 }],
+          matches: [{ id: "HN1:777", gameId: 777, championId: 67, champion: "薇恩", result: "win", mode: "单双排位", queueId: 420, kills: 12, deaths: 1, assists: 5, cs: 240, gold: 16000, damage: 38000, durationSeconds: 1800, playedAtMs: now - hours, items: [3153] }],
+          mastery: [{ championId: 67, championName: "薇恩", level: 15, points: 185000 }],
+          stats: { sampleSize: 1, wins: 1, losses: 0, winRate: 100, avgKda: 17, avgKills: 12, avgDeaths: 1, avgAssists: 5, streak: 1, score: 94 },
+          saved: null,
+          encountered: [],
+          warnings: [],
+        };
+      }
+      if (command === "get_match_detail") {
+        return {
+          gameId: args.gameId, mode: "单双排位", queueId: 420, durationSeconds: 1800, playedAtMs: now - hours,
+          teams: [{
+            teamId: 100, win: true, kills: 12, deaths: 1, assists: 5, totalDamage: 38000, totalGold: 16000,
+            players: [{ puuid: "target-p1", gameName: "目标玩家", tagLine: "8888", teamId: 100, championId: 67, championName: "薇恩", kills: 12, deaths: 1, assists: 5, cs: 240, gold: 16000, damage: 38000, damageTaken: 10000, visionScore: 20, win: true, items: [3153], spell1Id: 4, spell2Id: 7, role: "下路", isSelf: false }],
+          }],
+        };
+      }
+      if (command === "upsert_saved_player") {
+        return { puuid: args.puuid, selfPuuid: args.selfPuuid, tag: args.tag, note: args.note, updatedAtMs: now };
+      }
+      if (command === "delete_saved_player") return null;
+      return undefined;
+    },
+  });
+  await settle();
+  await ui.testing.searchAndOpenPlayer("目标玩家#8888");
+  assert.equal(ui.testing.state().activePlayerTab, "target-p1");
+  assert.match(ui.app.innerHTML, /目标玩家/);
+  assert.match(ui.app.innerHTML, /钻石 III/);
+  assert.match(ui.app.innerHTML, /英雄熟练度/);
+
+  await ui.testing.savePlayerTag("target-p1", "大腿", "走位很稳");
+  assert.equal(ui.testing.state().savedPlayers.length, 1);
+  assert.match(ui.app.innerHTML, /大腿/);
+
+  await ui.testing.openMatchDetail(777);
+  assert.equal(ui.testing.state().matchDetailOpen, true);
+  assert.match(ui.app.innerHTML, /蓝色方 · 胜利/);
+
+  await ui.testing.deletePlayerTag("target-p1");
+  assert.equal(ui.testing.state().savedPlayers.length, 0);
+});
+
+test("companion ongoing tab renders team analysis, premade group, and sends champ-select chat", async () => {
+  const ui = page({
+    initial: { ...connected, phase: "ChampSelect", active: true },
+    search: "?window=companion&tab=ongoing",
+    onInvoke: async (command) => {
+      if (command === "get_ongoing_game") {
+        return {
+          active: true, phase: "ChampSelect", stageLabel: "选人阶段", gameId: 500, queueId: 420,
+          selfPuuid: "me", canSendChat: true, updatedAtMs: now, enemyTeam: [],
+          myTeam: [
+            { puuid: "me", gameName: "我自己", tagLine: "1", iconPath: null, championId: 67, championName: "薇恩", position: "下路", isSelf: true, rankLabel: "翡翠 I", winRate: 60, wins: 6, losses: 4, avgKda: 4.0, streak: 3, score: 82, premadeGroup: "A", tags: ["3连胜"], saved: null, encounteredCount: 0, recentGames: [], privacy: "PUBLIC" },
+            { puuid: "mate", gameName: "开黑辅助", tagLine: "2", iconPath: null, championId: 117, championName: "璐璐", position: "辅助", isSelf: false, rankLabel: "钻石 IV", winRate: 70, wins: 7, losses: 3, avgKda: 5.1, streak: 0, score: 86, premadeGroup: "A", tags: ["高胜率"], saved: null, encounteredCount: 2, recentGames: [], privacy: "PUBLIC" },
+          ],
+        };
+      }
+      if (command === "send_champ_select_chat") return null;
+      return undefined;
+    },
+  });
+  await settle();
+  assert.match(ui.app.innerHTML, /本局分析/);
+  assert.match(ui.app.innerHTML, /开黑A/);
+  assert.match(ui.app.innerHTML, /开黑辅助/);
+  assert.match(ui.app.innerHTML, /data-action="companion-send-chat"/);
+
+  await ui.testing.sendOngoingToChampSelectChat();
+  const chatCall = ui.nativeCalls.find(({ command }) => command === "send_champ_select_chat");
+  assert.ok(chatCall);
+  assert.match(chatCall.args.message, /我自己 胜率60% KDA4\.0 3连胜/);
+  assert.match(chatCall.args.message, /开黑辅助 胜率70% KDA5\.1/);
 });

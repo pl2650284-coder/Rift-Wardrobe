@@ -137,6 +137,78 @@ impl LcuClient {
             .await
     }
 
+    pub(crate) async fn post_json_slow(
+        &self,
+        endpoint: &str,
+        body: &Value,
+    ) -> Result<Value, LcuError> {
+        self.request_json_with_timeout(Method::POST, endpoint, Some(body), Duration::from_secs(5))
+            .await
+    }
+
+    pub(crate) async fn optional_slow_json(&self, endpoint: &str) -> Result<Option<Value>, LcuError> {
+        match self.profile_json(endpoint).await {
+            Ok(value) => Ok(Some(value)),
+            Err(error) if error.is_not_found() => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub async fn get_champ_select_session(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_slow_json(CHAMP_SELECT_SESSION_ENDPOINT).await
+    }
+
+    pub async fn get_gameflow_session(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_slow_json("/lol-gameflow/v1/session").await
+    }
+
+    pub async fn get_lobby(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_slow_json("/lol-lobby/v2/lobby").await
+    }
+
+    pub async fn get_champ_select_chat_id(&self) -> Result<Option<String>, LcuError> {
+        if let Some(session) = self.get_champ_select_session().await? {
+            if let Some(id) = session
+                .pointer("/chatDetails/multiUserChatId")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                return Ok(Some(id.to_string()));
+            }
+        }
+        if let Some(Value::Array(convs)) = self.optional_slow_json("/lol-chat/v1/conversations").await? {
+            for conv in convs {
+                if conv.get("type").and_then(Value::as_str) == Some("championSelect") {
+                    if let Some(id) = conv.get("id").and_then(Value::as_str).filter(|s| !s.is_empty()) {
+                        return Ok(Some(id.to_string()));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn send_chat_message(&self, conversation_id: &str, message: &str) -> Result<(), LcuError> {
+        if conversation_id.is_empty()
+            || conversation_id.contains('/')
+            || conversation_id.contains("..")
+            || conversation_id.contains('?')
+        {
+            return Err(LcuError::Protocol("invalid conversation id".to_string()));
+        }
+        let endpoint = format!("/lol-chat/v1/conversations/{conversation_id}/messages");
+        self.post_json_slow(
+            &endpoint,
+            &json!({
+                "body": message,
+                "type": "chat"
+            }),
+        )
+        .await
+        .map(|_| ())
+    }
+
     async fn optional_json(&self, endpoint: &str) -> Result<Option<Value>, LcuError> {
         match self.request_json(Method::GET, endpoint, None).await {
             Ok(value) => Ok(Some(value)),
