@@ -140,3 +140,9 @@ export type AppPreferences = {
   companionAlwaysOnTop: boolean;
   notify: boolean;
 };
+
+export type RuntimeStatus = {
+  wsConnected: boolean;
+  connectionEpoch: number;
+  sessionEpoch: number;
+};

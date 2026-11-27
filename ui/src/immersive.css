@@ -865,6 +865,43 @@ button:focus-visible, select:focus-visible, input:focus-visible, .skin-grid:focu
 .custom-color-picker input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .custom-color-picker input[type="color"]::-webkit-color-swatch { border: 1px solid var(--line-strong); border-radius: 50%; }
 
+/* ========== Automation Logs & Toolkit Status ========== */
+.auto-log-wrap { padding: 0 20px 14px; }
+.auto-log-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.auto-log-row {
+  display: grid;
+  grid-template-columns: 62px 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.auto-log-time { color: var(--muted-2); font-size: 12px; }
+.auto-log-action { font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auto-log-detail { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auto-log-empty {
+  padding: 28px 0;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted-2);
+}
+.toolkit-status-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.toolkit-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+.toolkit-status-dot.is-live { background: var(--positive); }
+
 /* ========== Minimal News / Rankings Polish ========== */
 .news-mode-header { padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .news-mode-header h1 { font-size: 22px; font-weight: 600; color: var(--text); }

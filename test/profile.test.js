@@ -160,10 +160,10 @@ test("native profile failure is surfaced without falling back to a demo account"
 
 const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   receiveSnapshot, hydrateProfileData, reconnectClient, refreshProfileIfNeeded, renderSettingsPage,
-  renderNewsPage, selectNewsMode,
+  renderNewsPage, renderAutomationPage, renderToolkitPage, selectNewsMode, runToolkitAction,
   updateAutoAccept, updateAutoAcceptDelay, receiveAutomation,
   state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab,
-    autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs }),
+    autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs, runtimeStatus }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -226,6 +226,10 @@ function page({ initial = disconnected, read = async () => summarizeProfile(prof
     "./rankings-view": evaluate(compile("../ui/src/rankings-view.ts"), { "@tauri-apps/api/core": { invoke: readRanking } }),
     "./shell": evaluate(compile("../ui/src/shell.ts"), {}),
     "./companion": companionModule,
+    "./views/profile-view": evaluate(compile("../ui/src/views/profile-view.ts"), {}),
+    "./views/automation-view": evaluate(compile("../ui/src/views/automation-view.ts"), {}),
+    "./views/toolkit-view": evaluate(compile("../ui/src/views/toolkit-view.ts"), {}),
+    "./views/settings-view": evaluate(compile("../ui/src/views/settings-view.ts"), { "../theme": themeModule }),
     "./theme": themeModule,
     "./styles.css": {},
     "./immersive.css": {},
@@ -481,4 +485,28 @@ test("partial profile renders warnings, empty history, and unavailable assets wi
   assert.match(ui.app.innerHTML, /对局记录暂时无法读取/);
   assert.match(ui.app.innerHTML, /对局记录暂不可用，请稍后刷新/);
   assert.doesNotMatch(ui.app.innerHTML, /NaN|undefined|尚未选择|表现稳定|高于上周/);
+});
+
+test("main sidebar exposes five top-level routes and renders automation & toolkit views", async () => {
+  const ui = page({ initial: connected, hash: "#automation" });
+  await settle();
+  const routes = [...ui.app.innerHTML.matchAll(/<button class="nav-item[^"]*" data-route="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(routes, ["profile", "news", "automation", "toolkit", "settings"]);
+  assert.match(ui.app.innerHTML, /对局流程/);
+  assert.match(ui.app.innerHTML, /执行日志/);
+  assert.match(ui.app.innerHTML, /data-pref="autoAccept"/);
+  assert.match(ui.app.innerHTML, /data-auto-accept-delay/);
+
+  const toolkitUi = page({ initial: connected, hash: "#toolkit" });
+  await settle();
+  assert.match(toolkitUi.app.innerHTML, /data-action="toolkit-restart-ux"/);
+  assert.match(toolkitUi.app.innerHTML, /data-action="toolkit-play-again"/);
+  assert.match(toolkitUi.app.innerHTML, /data-action="toolkit-leave-lobby"/);
+  await toolkitUi.testing.runToolkitAction("toolkit_restart_ux", "已请求重启客户端界面");
+  await toolkitUi.testing.runToolkitAction("toolkit_play_again", "已请求返回房间");
+  await toolkitUi.testing.runToolkitAction("toolkit_leave_lobby", "已退出当前房间");
+  assert.deepEqual(
+    toolkitUi.nativeCalls.filter(({ command }) => command.startsWith("toolkit_")).map(({ command }) => command),
+    ["toolkit_restart_ux", "toolkit_play_again", "toolkit_leave_lobby"],
+  );
 });

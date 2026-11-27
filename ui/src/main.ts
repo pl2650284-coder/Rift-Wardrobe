@@ -47,18 +47,23 @@ import {
   UserRound,
   Users,
   Wifi,
+  Wrench,
   Zap,
 } from "lucide";
 import { DEFAULT_PREFERENCES } from "./data/mock";
-import type { AppPreferences, AssistantLog, AutomationSnapshot, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary } from "./data/types";
+import type { AppPreferences, AssistantLog, AutomationSnapshot, AugmentStat, ChampionStat, NewsDataMeta, AugmentCombo, ProfileSummary, RuntimeStatus } from "./data/types";
 import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
 import { getProfileSummary } from "./services/profile";
 import { createHextechView } from "./hextech-view";
 import { createRankingsView } from "./rankings-view";
 import { renderShell } from "./shell";
 import { fetchCompanionBuild, renderCompanionShell, type CompanionTab } from "./companion";
+import { renderProfileView } from "./views/profile-view";
+import { renderAutomationView } from "./views/automation-view";
+import { renderToolkitView } from "./views/toolkit-view";
+import { renderSettingsView } from "./views/settings-view";
 import type { HexDetail } from "./data/hextech";
-import { applyThemeAndAccent, currentAccentHex, isHexColor, isPresetAccent, PRESET_ACCENTS, watchSystemTheme, type ThemeMode } from "./theme";
+import { applyThemeAndAccent, isHexColor, isPresetAccent, watchSystemTheme, type ThemeMode } from "./theme";
 import "./styles.css";
 import "./immersive.css";
 
@@ -172,6 +177,7 @@ const iconSet = {
   UserRound,
   Users,
   Wifi,
+  Wrench,
   Zap,
   X,
 };
@@ -197,14 +203,19 @@ const disconnectedSnapshot: Snapshot = {
 
 let snapshot: Snapshot = isTauri ? disconnectedSnapshot : demoSnapshot;
 type CatalogFilter = "可用" | "全部" | "收藏";
-type AppRoute = "profile" | "assistant" | "news" | "settings";
+type AppRoute = "profile" | "assistant" | "news" | "automation" | "toolkit" | "settings";
 const NEWS_MODES = { rift: "峡谷", hextech: "海克斯大乱斗", aram: "极地大乱斗", classic: "经典模式" } as const;
 type NewsMode = keyof typeof NEWS_MODES;
 type NewsTab = "ranking" | "champions" | "augments";
 type ChampionRole = "全部" | "上路" | "打野" | "中路" | "下路" | "辅助";
 
 function isAppRoute(value: string): value is AppRoute {
-  return value === "profile" || value === "assistant" || value === "news" || value === "settings";
+  return value === "profile"
+    || value === "assistant"
+    || value === "news"
+    || value === "automation"
+    || value === "toolkit"
+    || value === "settings";
 }
 
 const FAVORITES_STORAGE_KEY = "lol-skin-assistant:favorites";
@@ -254,6 +265,8 @@ let newsMeta: NewsDataMeta = {
   source: "unavailable",
 };
 let assistantLogs: AssistantLog[] = [];
+let runtimeStatus: RuntimeStatus = { wsConnected: false, connectionEpoch: 0, sessionEpoch: 0 };
+let toolkitBusy = false;
 let dashboardLoading = true;
 let logsOpen = false;
 let newsDetailId: string | null = null;
@@ -835,146 +848,21 @@ function renderSkinWorkspace(): void {
 }
 
 function renderProfilePage(): string {
-  if (profileLoading && !profileData) {
-    return `<div class="loading-panel"><span class="loading-spinner">${icon("loader-circle", 22)}</span><strong>正在加载召唤师数据</strong><span>正在整理最近对局与资产信息</span></div>`;
-  }
-  if (!profileData) {
-    const connected = snapshot.connection === "ready";
-    return `<div class="minimal-profile"><div class="loading-panel" role="status">${icon(connected ? "circle-user" : "wifi", 28)}<strong>${connected ? "暂时无法读取个人信息" : "等待英雄联盟客户端"}</strong><span>${escapeHtml(profileError ?? "请启动并登录客户端，连接成功后会自动加载。")}</span><button class="secondary-button" data-action="${connected ? "profile-refresh" : "refresh"}">${icon("refresh-ccw", 15)}${connected ? "重试读取" : "重新连接"}</button></div></div>`;
-  }
-  const data = profileData;
-  const percent = (value: number | null): string => value === null ? "—" : `${value}%`;
-  const count = (value: number | null): string => value === null ? "—" : String(value);
-  const rank = data.rank;
-  const gamesEmpty = data.matchHistoryAvailable ? "暂无近期对局，完成游戏后刷新查看" : "对局记录暂不可用，请稍后刷新";
-  const refreshDisabled = profileLoading ? "disabled" : "";
-  const filteredGames = data.recentGames.filter((g) => profileModeFilter === "all" || g.mode === profileModeFilter);
-  const winsRecent = data.recentGames.filter((g) => g.result === "win").length;
-  const lossesRecent = data.recentGames.filter((g) => g.result === "loss").length;
-  const trendValues = profileTrendMetric === "winRate" ? data.trends.winRate : data.trends.kda;
-  const trendMax = profileTrendMetric === "winRate" ? 100 : Math.max(5, ...data.trends.kda.filter((v): v is number => v !== null));
-
-  const avatarContent = data.summoner.avatarUrl
-    ? `<img src="${escapeHtml(data.summoner.avatarUrl)}" alt="召唤师头像" />`
-    : !isTauri
-      ? `<img src="/preview/vayne-classic.jpg" alt="召唤师头像" />`
-      : escapeHtml(data.summoner.avatarLabel);
-
-  return `
-    <div class="minimal-profile">
-      ${data.warnings.length ? `<div class="profile-notice" role="status">${icon("info", 16)}<span>${data.warnings.map(escapeHtml).join("；")}。可稍后刷新重试。</span></div>` : ""}
-
-      <section class="mp-hero" aria-label="召唤师概览">
-        <div class="mp-identity">
-          <div class="mp-avatar">${avatarContent}</div>
-          <div>
-            <div class="mp-name-row">
-              <h1>${escapeHtml(data.summoner.name)}</h1>
-              ${data.summoner.tag ? `<span class="mp-tag">#${escapeHtml(data.summoner.tag)}</span>` : ""}
-            </div>
-            <div class="mp-meta num">
-              <span>${escapeHtml(data.summoner.region)}</span>
-              <span>Lv. ${data.summoner.level}</span>
-              ${data.preferredRole ? `<span>常用${escapeHtml(data.preferredRole.name)}</span>` : ""}
-              <span>${data.source === "demo" ? "演示数据" : `更新于 ${formatTime(data.updatedAtMs)}`}</span>
-            </div>
-          </div>
-        </div>
-        <div class="mp-rank-wrap">
-          <div class="mp-rank">
-            <strong>${rank ? `${escapeHtml(rank.queue)} ${escapeHtml(rank.tier)} ${escapeHtml(rank.division)}`.trim() : "排位暂不可用"}</strong>
-            <span class="num">${rank ? (rank.ranked ? `${rank.points} LP · ${rank.wins} 胜 ${rank.losses} 负 · 胜率 ${percent(rank.winRate)}` : `尚未定级 · ${rank.wins} 胜 ${rank.losses} 负`) : "请稍后刷新"}</span>
-          </div>
-          <button class="secondary-button" data-action="profile-refresh" ${refreshDisabled} aria-busy="${profileLoading}">${profileLoading ? "刷新中" : "刷新"}</button>
-        </div>
-      </section>
-
-      <section class="mp-metrics" aria-label="关键统计">
-        <div class="mp-metric">
-          <span class="mp-metric-k">近期胜率</span>
-          <div class="mp-metric-v num">${percent(data.recentWinRate)}${data.recentWinRateSampleSize ? `<span>${winsRecent} 胜 ${lossesRecent} 负</span>` : ""}</div>
-        </div>
-        <div class="mp-metric">
-          <span class="mp-metric-k">平均 KDA</span>
-          <div class="mp-metric-v num">${data.trends.averageKda !== null ? data.trends.averageKda.toFixed(1) : "—"}</div>
-        </div>
-        <div class="mp-metric">
-          <span class="mp-metric-k">已拥有皮肤</span>
-          <div class="mp-metric-v num">${count(data.assets.skinsOwned)}<span>/ ${count(data.assets.skinsTotal)}</span></div>
-        </div>
-      </section>
-
-      <section class="mp-body">
-        <div>
-          <div class="mp-sec-head">
-            <h2>最近对局</h2>
-            <div class="mp-seg" role="tablist" aria-label="按模式筛选">
-              ${(["all", "排位赛", "极地大乱斗"] as const).map((mode) => `<button class="${profileModeFilter === mode ? "is-active" : ""}" data-profile-mode="${mode}">${mode === "all" ? "全部" : mode === "排位赛" ? "排位" : "大乱斗"}</button>`).join("")}
-            </div>
-          </div>
-          <div class="mp-match-list">
-            ${filteredGames.length ? filteredGames.map((game) => {
-              const isOpen = profileExpandedMatchId === game.id;
-              const resultLabel = game.result === "win" ? "胜利" : game.result === "remake" ? "重开" : "失败";
-              return `<button class="mp-match-row ${game.result}" data-profile-match="${escapeHtml(game.id)}" aria-expanded="${isOpen}">
-                <span class="mp-res-bar"></span>
-                ${renderChampionIcon(game.championId, game.champion, "var(--surface)")}
-                <div><div class="mp-m-name">${escapeHtml(game.champion)}</div><div class="mp-m-sub">${escapeHtml(game.mode)}</div></div>
-                <div class="num"><div class="mp-m-kda">${escapeHtml(game.kda)}</div><div class="mp-m-sub">补刀 ${game.cs}</div></div>
-                <span class="mp-res-pill">${resultLabel}</span>
-                <div class="mp-m-time num"><div class="mp-m-dur">${escapeHtml(game.duration)}</div><div>${escapeHtml(game.playedAt)}</div></div>
-              </button>${isOpen ? `<div class="mp-match-detail"><span>${escapeHtml(game.champion)} · ${escapeHtml(game.mode)} · KDA ${escapeHtml(game.kda)} · 补刀 ${game.cs}</span><span class="num">时长 ${escapeHtml(game.duration)} · ${escapeHtml(game.playedAt)}</span></div>` : ""}`;
-            }).join("") : `<div class="empty-state">${icon("swords", 20)}<span>${data.recentGames.length ? "当前筛选下暂无对局" : gamesEmpty}</span></div>`}
-          </div>
-        </div>
-
-        <aside class="mp-side">
-          <div>
-            <div class="mp-sec-head">
-              <h2>常用英雄</h2>
-              <span class="mp-sec-note">近 ${data.matchCount || 20} 场</span>
-            </div>
-            <div class="mp-champ-list">
-              ${data.topChampions.length ? data.topChampions.map((champ) => `<div class="mp-champ-row">
-                ${renderChampionIcon(champ.championId, champ.name, "var(--surface)")}
-                <div><div class="mp-c-name">${escapeHtml(champ.name)}</div><div class="mp-c-games num">${champ.games} 场</div></div>
-                <div class="mp-track"><div class="mp-fill" style="width:${Math.min(100, Math.max(0, champ.winRate))}%"></div></div>
-                <div class="mp-c-wr num">${champ.winRate}%</div>
-              </div>`).join("") : `<div class="empty-state">${icon("users", 18)}<span>${gamesEmpty}</span></div>`}
-            </div>
-          </div>
-
-          <div class="mp-trend">
-            <div class="mp-sec-head">
-              <h2>近 7 天表现</h2>
-              <div class="mp-seg" role="tablist" aria-label="切换趋势指标">
-                <button class="${profileTrendMetric === "winRate" ? "is-active" : ""}" data-profile-trend="winRate">胜率</button>
-                <button class="${profileTrendMetric === "kda" ? "is-active" : ""}" data-profile-trend="kda">KDA</button>
-              </div>
-            </div>
-            <div class="mp-chart">
-              ${data.trends.labels.map((label, idx) => {
-                const raw = trendValues[idx];
-                const pct = raw === null ? 0 : Math.max(10, Math.round((raw / trendMax) * 100));
-                const text = raw === null ? "" : profileTrendMetric === "winRate" ? `${raw}%` : raw.toFixed(1);
-                return `<div class="mp-day">
-                  <span class="mp-day-val num">${text}</span>
-                  <div class="mp-day-bar-wrap"><div class="mp-day-bar" style="height:${pct}%"></div></div>
-                  <span class="mp-day-lbl">${escapeHtml(label)}</span>
-                </div>`;
-              }).join("")}
-            </div>
-          </div>
-
-          <div class="mp-assets-foot">
-            <div class="mp-assets-summary num">
-              <span>英雄 <strong>${count(data.assets.championsOwned)}</strong> / ${count(data.assets.championsTotal)} · 收藏 <strong>${favoriteSkinIds.size}</strong></span>
-            </div>
-            <button class="secondary-button" data-action="open-companion">选人小窗</button>
-          </div>
-        </aside>
-      </section>
-    </div>`;
+  return renderProfileView({
+    isTauri,
+    connected: snapshot.connection === "ready",
+    profileData,
+    profileLoading,
+    profileError,
+    profileModeFilter,
+    profileExpandedMatchId,
+    profileTrendMetric,
+    favoritesCount: favoriteSkinIds.size,
+    escape: escapeHtml,
+    icon,
+    formatTime,
+    renderChampionIcon,
+  });
 }
 
 function newsPercent(value: number | null): string {
@@ -1128,68 +1016,47 @@ function preferenceRow(key: string, title: string, checked: boolean): string {
   return `<label class="preference-row"><span><strong>${title}</strong></span><input class="switch-input" type="checkbox" data-pref="${key}" ${checked ? "checked" : ""} ${key === "autoAccept" && (!autoAcceptReady || autoAcceptSaving) ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label>`;
 }
 
+function renderAutomationPage(): string {
+  return renderAutomationView({
+    autoAccept,
+    autoSkin,
+    autoPopupCompanion,
+    companionAlwaysOnTop,
+    logs: assistantLogs,
+    preferenceRow,
+    autoAcceptDelaySelect,
+    escape: escapeHtml,
+  });
+}
+
+function renderToolkitPage(): string {
+  return renderToolkitView({
+    isTauri,
+    connected: snapshot.connection === "ready",
+    phaseLabel: phaseLabel(),
+    runtimeStatus,
+    toolkitBusy,
+    escape: escapeHtml,
+  });
+}
+
 function renderSettingsPage(): string {
-  const customActive = isHexColor(accentColor);
-  const pickerHex = currentAccentHex(accentColor);
-  return `
-    <section class="settings-layout">
-      <div class="settings-column">
-        <article class="settings-panel">
-          <header class="panel-heading"><div><h2>外观</h2></div></header>
-          <div class="preference-content">
-            <div class="preference-row preference-row--static">
-              <span><strong>主题模式</strong></span>
-              <div class="theme-choice">
-                <button class="theme-option ${themeMode === "system" ? "theme-option--active" : ""}" data-theme="system">${icon("monitor", 13)}跟随系统</button>
-                <button class="theme-option ${themeMode === "dark" ? "theme-option--active" : ""}" data-theme="dark">${icon("moon", 13)}深色</button>
-                <button class="theme-option ${themeMode === "light" ? "theme-option--active" : ""}" data-theme="light">${icon("sun", 13)}浅色</button>
-              </div>
-            </div>
-            <div class="preference-row preference-row--static">
-              <span><strong>主题颜色</strong></span>
-              <div class="accent-controls">
-                <div class="accent-choice">
-                  ${PRESET_ACCENTS.map((c) => `<button class="accent-swatch accent-swatch--${c.id} ${accentColor === c.id ? "accent-swatch--active" : ""}" data-accent="${c.id}" aria-label="${c.label}" title="${c.label}"></button>`).join("")}
-                </div>
-                <label class="custom-color-picker ${customActive ? "is-active" : ""}" title="自定义主题颜色">
-                  <input type="color" value="${escapeHtml(pickerHex)}" data-custom-accent aria-label="自定义主题颜色" />
-                  <span class="num">${customActive ? escapeHtml(pickerHex.toUpperCase()) : "自定义"}</span>
-                </label>
-              </div>
-            </div>
-            ${preferenceRow("compact", "紧凑布局", compactMode)}
-            ${preferenceRow("animations", "界面动效", animationsEnabled)}
-          </div>
-        </article>
-        <article class="settings-panel">
-          <header class="panel-heading"><div><h2>数据</h2></div></header>
-          <div class="preference-content">
-            <div class="preference-row preference-row--button">
-              <span><strong>图片缓存</strong></span>
-              <button class="secondary-button" data-action="clear-image-cache">清理缓存</button>
-            </div>
-            <div class="preference-row preference-row--button">
-              <span><strong>恢复默认设置</strong></span>
-              <button class="secondary-button" data-action="reset-preferences">恢复默认</button>
-            </div>
-          </div>
-        </article>
-      </div>
-      <div class="settings-column">
-        <article class="settings-panel">
-          <header class="panel-heading"><div><h2>辅助与小窗</h2></div></header>
-          <div class="preference-content">
-            ${preferenceRow("autoPopupCompanion", "选人时自动弹出小窗", autoPopupCompanion)}
-            ${preferenceRow("companionPin", "伴随小窗悬浮显示", companionAlwaysOnTop)}
-            ${preferenceRow("autoAccept", "自动接受对局", autoAccept)}
-            <div class="preference-row"><span><strong>自动接受延迟</strong></span>${autoAcceptDelaySelect()}</div>
-            ${preferenceRow("autoSkin", "自动应用上次皮肤", autoSkin)}
-            ${preferenceRow("notify", "桌面通知", notifyEnabled)}
-            ${preferenceRow("launchAtStartup", "开机启动", launchAtStartup)}
-          </div>
-        </article>
-      </div>
-    </section>`;
+  return renderSettingsView({
+    themeMode,
+    accentColor,
+    compactMode,
+    animationsEnabled,
+    autoPopupCompanion,
+    companionAlwaysOnTop,
+    autoAccept,
+    autoSkin,
+    notifyEnabled,
+    launchAtStartup,
+    preferenceRow,
+    autoAcceptDelaySelect,
+    escape: escapeHtml,
+    icon,
+  });
 }
 
 function renderAppShell(content: string): string {
@@ -1246,7 +1113,15 @@ function renderCompanionWindow(): void {
 }
 
 function renderDashboardShell(): void {
-  const content = currentRoute === "profile" ? renderProfilePage() : currentRoute === "news" ? renderNewsPage() : renderSettingsPage();
+  const content = currentRoute === "profile"
+    ? renderProfilePage()
+    : currentRoute === "news"
+      ? renderNewsPage()
+      : currentRoute === "automation"
+        ? renderAutomationPage()
+        : currentRoute === "toolkit"
+          ? renderToolkitPage()
+          : renderSettingsPage();
   app.innerHTML = renderAppShell(content);
   wireEvents();
   applyAppearance();
@@ -1553,9 +1428,10 @@ function wireEvents(): void {
   }));
   app.querySelectorAll<HTMLElement>("[data-route]").forEach((element) => element.addEventListener("click", () => {
     const route = element.dataset.route;
-    if (route !== "profile" && route !== "assistant" && route !== "news" && route !== "settings") return;
+    if (!route || !isAppRoute(route)) return;
     currentRoute = route;
     if (route === "news") loadNewsRanking();
+    if (route === "toolkit") void hydrateRuntimeStatus();
     window.history.replaceState(null, "", `#${route}`);
     settingsOpen = false;
     render();
@@ -1683,6 +1559,9 @@ function wireEvents(): void {
     if (action === "random") void applyRandom();
     if (action === "minimize" || action === "maximize" || action === "close") void runWindowAction(action);
     if (action === "refresh") void reconnectClient();
+    if (action === "toolkit-restart-ux") void runToolkitAction("toolkit_restart_ux", "已请求重启客户端界面");
+    if (action === "toolkit-play-again") void runToolkitAction("toolkit_play_again", "已请求返回房间");
+    if (action === "toolkit-leave-lobby") void runToolkitAction("toolkit_leave_lobby", "已退出当前房间");
     if (action === "news-refresh") void hydrateDashboardData(true);
     if (action === "settings") {
       currentRoute = "settings";
@@ -1776,6 +1655,41 @@ async function reconnectClient(): Promise<void> {
   }
 }
 
+async function hydrateRuntimeStatus(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    const next = await invokeCommand<RuntimeStatus>("get_runtime_status", {});
+    if (next && typeof next === "object" && typeof next.wsConnected === "boolean") {
+      runtimeStatus = next;
+      if (currentRoute === "toolkit") render();
+    }
+  } catch {
+    // Non-critical diagnostic status.
+  }
+}
+
+async function runToolkitAction(
+  command: "toolkit_restart_ux" | "toolkit_play_again" | "toolkit_leave_lobby",
+  successMessage: string,
+): Promise<void> {
+  if (toolkitBusy) return;
+  if (!isTauri) {
+    showToast(`演示：${successMessage}`);
+    return;
+  }
+  toolkitBusy = true;
+  render();
+  try {
+    await invokeCommand(command, {});
+    showToast(successMessage);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    toolkitBusy = false;
+    render();
+  }
+}
+
 async function hydrateNativePreferences(): Promise<void> {
   if (!isTauri) return;
   try {
@@ -1859,7 +1773,10 @@ async function updateAutoAccept(enabled: boolean, delaySeconds?: number): Promis
 function receiveSnapshot(next: Snapshot): void {
   if (next.revision < snapshot.revision) return;
   const previous = snapshot;
-  if (next.connection !== snapshot.connection) gameIconFailures.clear();
+  if (next.connection !== snapshot.connection) {
+    gameIconFailures.clear();
+    if (!isCompanionWindow && currentRoute === "toolkit") void hydrateRuntimeStatus();
+  }
   snapshot = next;
   if (snapshot.contextId !== previous.contextId) {
     imageCache.clear();
@@ -1946,6 +1863,7 @@ async function bootstrap(): Promise<void> {
     void hydrateAutomation();
     cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => receiveSnapshot(event.payload));
     receiveSnapshot(await invokeCommand<Snapshot>("get_snapshot", {}));
+    if (!isCompanionWindow && currentRoute === "toolkit") void hydrateRuntimeStatus();
     if (!isCompanionWindow) {
       profileRefreshTimer = window.setInterval(refreshProfileIfNeeded, 5_000);
     }

@@ -145,6 +145,28 @@ impl LcuClient {
         }
     }
 
+    pub fn credentials(&self) -> Credentials {
+        self.credentials.clone()
+    }
+
+    pub async fn restart_ux(&self) -> Result<(), LcuError> {
+        self.request_json(Method::POST, "/riotclient/kill-and-restart-ux", None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn play_again(&self) -> Result<(), LcuError> {
+        self.request_json(Method::POST, "/lol-lobby/v2/play-again", None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn leave_lobby(&self) -> Result<(), LcuError> {
+        self.request_json(Method::DELETE, "/lol-lobby/v2/lobby", None)
+            .await
+            .map(|_| ())
+    }
+
     pub async fn get_phase(&self) -> Result<String, LcuError> {
         let phase = self
             .request_json(Method::GET, GAMEFLOW_PHASE_ENDPOINT, None)

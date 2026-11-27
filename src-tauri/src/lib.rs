@@ -1,19 +1,22 @@
-mod discovery;
 mod automation;
+mod db;
+mod discovery;
 mod game_assets;
 mod hextech;
 mod lcu;
+mod lcu_ws;
 mod models;
 mod official_data;
 mod profile;
 mod rankings;
 mod runtime;
 
-use models::{AppSnapshot, ApplyResult};
 use automation::AutomationSnapshot;
+use db::{EncounteredGame, SavedPlayer};
+use models::{AppSnapshot, ApplyResult};
 use official_data::NewsDataSnapshot;
 use profile::PlayerProfile;
-use runtime::RuntimeState;
+use runtime::{RuntimeState, RuntimeStatus};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -249,6 +252,83 @@ fn sync_appearance(app: tauri::AppHandle, appearance: serde_json::Value) -> Resu
 }
 
 #[tauri::command]
+fn get_runtime_status(state: State<'_, RuntimeState>) -> RuntimeStatus {
+    state.status()
+}
+
+#[tauri::command]
+async fn upsert_saved_player(
+    state: State<'_, RuntimeState>,
+    puuid: String,
+    self_puuid: String,
+    tag: String,
+    note: String,
+) -> Result<SavedPlayer, String> {
+    state.upsert_saved_player(puuid, self_puuid, tag, note).await
+}
+
+#[tauri::command]
+async fn delete_saved_player(
+    state: State<'_, RuntimeState>,
+    puuid: String,
+    self_puuid: String,
+) -> Result<(), String> {
+    state.delete_saved_player(puuid, self_puuid).await
+}
+
+#[tauri::command]
+async fn get_saved_player(
+    state: State<'_, RuntimeState>,
+    puuid: String,
+    self_puuid: String,
+) -> Result<Option<SavedPlayer>, String> {
+    state.get_saved_player(puuid, self_puuid).await
+}
+
+#[tauri::command]
+async fn list_saved_players(
+    state: State<'_, RuntimeState>,
+    self_puuid: String,
+) -> Result<Vec<SavedPlayer>, String> {
+    state.list_saved_players(self_puuid).await
+}
+
+#[tauri::command]
+async fn record_encountered_game(
+    state: State<'_, RuntimeState>,
+    item: EncounteredGame,
+) -> Result<(), String> {
+    state.record_encountered_game(item).await
+}
+
+#[tauri::command]
+async fn list_encountered_games(
+    state: State<'_, RuntimeState>,
+    self_puuid: String,
+    puuid: String,
+    limit: Option<usize>,
+) -> Result<Vec<EncounteredGame>, String> {
+    state
+        .list_encountered_games(self_puuid, puuid, limit.unwrap_or(20))
+        .await
+}
+
+#[tauri::command]
+async fn toolkit_restart_ux(state: State<'_, RuntimeState>) -> Result<(), String> {
+    state.toolkit_restart_ux().await
+}
+
+#[tauri::command]
+async fn toolkit_play_again(state: State<'_, RuntimeState>) -> Result<(), String> {
+    state.toolkit_play_again().await
+}
+
+#[tauri::command]
+async fn toolkit_leave_lobby(state: State<'_, RuntimeState>) -> Result<(), String> {
+    state.toolkit_leave_lobby().await
+}
+
+#[tauri::command]
 fn get_launch_at_startup() -> Result<bool, String> {
     startup_enabled()
 }
@@ -371,11 +451,26 @@ pub fn run() {
             set_companion_pin,
             set_auto_popup_companion,
             sync_appearance,
+            get_runtime_status,
+            upsert_saved_player,
+            delete_saved_player,
+            get_saved_player,
+            list_saved_players,
+            record_encountered_game,
+            list_encountered_games,
+            toolkit_restart_ux,
+            toolkit_play_again,
+            toolkit_leave_lobby,
             get_launch_at_startup,
             set_launch_at_startup,
         ])
         .setup(|app| {
-            app.state::<RuntimeState>().configure_automation(app.path().app_config_dir()?.join("automation.json"))
+            let config_dir = app.path().app_config_dir()?;
+            app.state::<RuntimeState>()
+                .configure_automation(config_dir.join("automation.json"))
+                .map_err(std::io::Error::other)?;
+            app.state::<RuntimeState>()
+                .configure_database(config_dir.join("xiayin.db"))
                 .map_err(std::io::Error::other)?;
             let app_icon = app
                 .default_window_icon()

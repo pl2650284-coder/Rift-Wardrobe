@@ -1,22 +1,36 @@
 use crate::{
     automation::{AutoAccept, AutomationSnapshot},
+    db::{Database, EncounteredGame, SavedPlayer},
     discovery,
     lcu::LcuClient,
+    lcu_ws::{self, LcuEvent},
     models::{AppSnapshot, ApplyResult},
     profile::PlayerProfile,
 };
 use rand::seq::SliceRandom;
+use serde::Serialize;
 use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    sync::{broadcast, Mutex, Notify, OwnedSemaphorePermit, RwLock, Semaphore},
+    task::JoinHandle,
+};
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeStatus {
+    pub ws_connected: bool,
+    pub connection_epoch: u64,
+    pub session_epoch: u64,
+}
 
 pub struct RuntimeState {
     snapshot: RwLock<AppSnapshot>,
@@ -25,10 +39,19 @@ pub struct RuntimeState {
     image_cache: RwLock<HashMap<String, String>>,
     automation: Mutex<AutoAccept>,
     auto_popup_companion: AtomicBool,
+    connection_epoch: AtomicU64,
+    session_epoch: AtomicU64,
+    low_priority_reads: Arc<Semaphore>,
+    lcu_events: broadcast::Sender<LcuEvent>,
+    ws_connected: Arc<AtomicBool>,
+    ws_wake: Arc<Notify>,
+    ws_task: Mutex<Option<JoinHandle<()>>>,
+    db: RwLock<Option<Arc<Database>>>,
 }
 
 impl RuntimeState {
     pub fn new() -> Self {
+        let (lcu_events, _) = broadcast::channel(256);
         Self {
             snapshot: RwLock::new(AppSnapshot::disconnected(None)),
             client: RwLock::new(None),
@@ -36,7 +59,132 @@ impl RuntimeState {
             image_cache: RwLock::new(HashMap::new()),
             automation: Mutex::new(AutoAccept::default()),
             auto_popup_companion: AtomicBool::new(true),
+            connection_epoch: AtomicU64::new(0),
+            session_epoch: AtomicU64::new(0),
+            low_priority_reads: Arc::new(Semaphore::new(2)),
+            lcu_events,
+            ws_connected: Arc::new(AtomicBool::new(false)),
+            ws_wake: Arc::new(Notify::new()),
+            ws_task: Mutex::new(None),
+            db: RwLock::new(None),
         }
+    }
+
+    pub fn configure_database(&self, path: PathBuf) -> Result<(), String> {
+        let db = Arc::new(Database::open(&path)?);
+        let mut guard = self.db.try_write().map_err(|_| "数据库正在初始化")?;
+        *guard = Some(db);
+        Ok(())
+    }
+
+    pub async fn database(&self) -> Result<Arc<Database>, String> {
+        self.db
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| "本地数据库尚未初始化".to_string())
+    }
+
+    pub fn status(&self) -> RuntimeStatus {
+        RuntimeStatus {
+            ws_connected: self.ws_connected.load(Ordering::Relaxed),
+            connection_epoch: self.connection_epoch.load(Ordering::Relaxed),
+            session_epoch: self.session_epoch.load(Ordering::Relaxed),
+        }
+    }
+
+    pub async fn acquire_low_priority_read(&self) -> Result<OwnedSemaphorePermit, String> {
+        self.low_priority_reads
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| "后台读取通道已关闭".to_string())
+    }
+
+    #[allow(dead_code)]
+    pub fn subscribe_lcu_events(&self) -> broadcast::Receiver<LcuEvent> {
+        self.lcu_events.subscribe()
+    }
+
+    pub async fn upsert_saved_player(
+        &self,
+        puuid: String,
+        self_puuid: String,
+        tag: String,
+        note: String,
+    ) -> Result<SavedPlayer, String> {
+        let db = self.database().await?;
+        tauri::async_runtime::spawn_blocking(move || db.upsert_saved_player(&puuid, &self_puuid, &tag, &note))
+            .await
+            .map_err(|_| "数据库任务异常".to_string())?
+    }
+
+    pub async fn delete_saved_player(&self, puuid: String, self_puuid: String) -> Result<(), String> {
+        let db = self.database().await?;
+        tauri::async_runtime::spawn_blocking(move || db.delete_saved_player(&puuid, &self_puuid))
+            .await
+            .map_err(|_| "数据库任务异常".to_string())?
+    }
+
+    pub async fn get_saved_player(
+        &self,
+        puuid: String,
+        self_puuid: String,
+    ) -> Result<Option<SavedPlayer>, String> {
+        let db = self.database().await?;
+        tauri::async_runtime::spawn_blocking(move || db.get_saved_player(&puuid, &self_puuid))
+            .await
+            .map_err(|_| "数据库任务异常".to_string())?
+    }
+
+    pub async fn list_saved_players(&self, self_puuid: String) -> Result<Vec<SavedPlayer>, String> {
+        let db = self.database().await?;
+        tauri::async_runtime::spawn_blocking(move || db.list_saved_players(&self_puuid))
+            .await
+            .map_err(|_| "数据库任务异常".to_string())?
+    }
+
+    pub async fn record_encountered_game(&self, item: EncounteredGame) -> Result<(), String> {
+        let db = self.database().await?;
+        tauri::async_runtime::spawn_blocking(move || db.record_encountered_game(&item))
+            .await
+            .map_err(|_| "数据库任务异常".to_string())?
+    }
+
+    pub async fn list_encountered_games(
+        &self,
+        self_puuid: String,
+        puuid: String,
+        limit: usize,
+    ) -> Result<Vec<EncounteredGame>, String> {
+        let db = self.database().await?;
+        tauri::async_runtime::spawn_blocking(move || db.list_encountered_games(&self_puuid, &puuid, limit))
+            .await
+            .map_err(|_| "数据库任务异常".to_string())?
+    }
+
+    pub async fn toolkit_restart_ux(&self) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.restart_ux().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn toolkit_play_again(&self) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.play_again().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn toolkit_leave_lobby(&self) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.leave_lobby().await.map_err(|e| e.to_string())
     }
 
     pub fn auto_popup_companion(&self) -> bool {
@@ -82,12 +230,16 @@ impl RuntimeState {
     }
 
     pub async fn profile(&self) -> Result<PlayerProfile, String> {
+        let _permit = self.acquire_low_priority_read().await?;
+        let epoch = self.connection_epoch.load(Ordering::Relaxed);
         let client = self
             .client()
             .await
             .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
         let profile = client.get_profile().await?;
-        if !self.client().await.is_some_and(|current| Arc::ptr_eq(&client, &current)) {
+        if self.connection_epoch.load(Ordering::Relaxed) != epoch
+            || !self.client().await.is_some_and(|current| Arc::ptr_eq(&client, &current))
+        {
             return Err("CLIENT_DISCONNECTED: 客户端连接已变化，请重新读取个人信息".to_string());
         }
         Ok(profile)
@@ -98,10 +250,26 @@ impl RuntimeState {
     }
 
     async fn set_client(&self, client: Option<Arc<LcuClient>>) {
-        *self.client.write().await = client;
-        if self.client.read().await.is_none() {
-            self.image_cache.write().await.clear();
-            self.automation.lock().await.reset_offer();
+        self.connection_epoch.fetch_add(1, Ordering::Relaxed);
+        if let Some(old_ws) = self.ws_task.lock().await.take() {
+            old_ws.abort();
+        }
+        self.ws_connected.store(false, Ordering::Relaxed);
+        *self.client.write().await = client.clone();
+        match client {
+            Some(active) => {
+                let handle = lcu_ws::spawn_ws_listener(
+                    active.credentials(),
+                    self.lcu_events.clone(),
+                    self.ws_wake.clone(),
+                    self.ws_connected.clone(),
+                );
+                *self.ws_task.lock().await = Some(handle);
+            }
+            None => {
+                self.image_cache.write().await.clear();
+                self.automation.lock().await.reset_offer();
+            }
         }
     }
 
@@ -240,12 +408,22 @@ pub fn start_monitor(app: AppHandle) {
                     let phase = snapshot.phase.clone();
                     publish_snapshot(&app, &state, snapshot).await;
                     state.process_automation(&app, &client, &phase).await;
-                    tokio::time::sleep(if active || phase == "ReadyCheck" {
+                    let poll_interval = if state.ws_connected.load(Ordering::Relaxed) {
+                        // WebSocket drives instant updates; keep a calm reconcile timer as fallback.
+                        if phase == "ReadyCheck" {
+                            Duration::from_millis(250)
+                        } else {
+                            Duration::from_millis(1200)
+                        }
+                    } else if active || phase == "ReadyCheck" {
                         Duration::from_millis(180)
                     } else {
                         Duration::from_millis(650)
-                    })
-                    .await;
+                    };
+                    tokio::select! {
+                        _ = state.ws_wake.notified() => {}
+                        _ = tokio::time::sleep(poll_interval) => {}
+                    }
                 }
                 Err(error) => {
                     state.set_client(None).await;
@@ -268,10 +446,14 @@ async fn publish_snapshot(app: &AppHandle, state: &RuntimeState, mut next: AppSn
         return;
     }
     let was_active = current.active;
+    let phase_changed = current.phase != next.phase;
     let context_changed = current.context_id != next.context_id;
     next.revision = current.revision.saturating_add(1);
     *current = next.clone();
     drop(current);
+    if phase_changed || context_changed {
+        state.session_epoch.fetch_add(1, Ordering::Relaxed);
+    }
     if context_changed {
         state.image_cache.write().await.clear();
     }

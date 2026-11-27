@@ -1,7 +1,7 @@
 import type { ThemeMode } from "./theme";
 
 type ShellOptions = {
-  route: "profile" | "assistant" | "news" | "settings";
+  route: "profile" | "assistant" | "news" | "automation" | "toolkit" | "settings";
   content: string;
   windowActions: string;
   connection: string;
@@ -10,7 +10,7 @@ type ShellOptions = {
   icon: (name: string, size?: number) => string;
 };
 
-/** Minimal desktop shell: 60px icon rail (Home / Rankings / Settings) + calm 48px titlebar. */
+/** Minimal desktop shell: 60px icon rail (Home / Rankings / Automation / Toolkit / Settings) + calm 48px titlebar. */
 export function renderShell({
   route,
   content,
@@ -23,9 +23,19 @@ export function renderShell({
   const routes = [
     { id: "profile", label: "主页", glyph: "circle-user" },
     { id: "news", label: "榜单", glyph: "bar-chart-3" },
+    { id: "automation", label: "自动化", glyph: "zap" },
+    { id: "toolkit", label: "工具箱", glyph: "wrench" },
     { id: "settings", label: "设置", glyph: "settings-2" },
   ] as const;
-  const pageTitle = route === "news" ? "榜单" : route === "settings" ? "设置" : "主页";
+  const pageTitles: Record<ShellOptions["route"], string> = {
+    profile: "主页",
+    assistant: "衣橱",
+    news: "榜单",
+    automation: "自动化",
+    toolkit: "工具箱",
+    settings: "设置",
+  };
+  const pageTitle = pageTitles[route];
   const themeLabel = themeMode === "system" ? "自动" : themeMode === "dark" ? "深色" : "浅色";
   const themeGlyph = themeMode === "system" ? "monitor" : themeMode === "dark" ? "moon" : "sun";
 
