@@ -578,6 +578,16 @@ impl LcuClient {
         Ok(pages.into_iter().next())
     }
 
+    pub(crate) async fn put_json_slow(&self, endpoint: &str, body: &Value) -> Result<Value, LcuError> {
+        self.request_json_with_timeout(Method::PUT, endpoint, Some(body), Duration::from_secs(5))
+            .await
+    }
+
+    pub(crate) async fn delete_slow(&self, endpoint: &str) -> Result<Value, LcuError> {
+        self.request_json_with_timeout(Method::DELETE, endpoint, None, Duration::from_secs(5))
+            .await
+    }
+
     pub async fn get_phase(&self) -> Result<String, LcuError> {
         let phase = self
             .request_json(Method::GET, GAMEFLOW_PHASE_ENDPOINT, None)

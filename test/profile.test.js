@@ -166,11 +166,13 @@ const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   saveAutoSelectConfig, toggleAutoSelectPause, saveAutoGameflowConfig,
   benchSwapChampion, benchReroll,
   toggleAutoChampConfigEnabled, saveChampSpellsPreset, toggleSpellTimer, refreshLiveTimers,
+  runToolkitInvoke, claimAllRewards, toggleSettingsFileReadonly, loadToolkitFriends, confirmDeleteSelectedFriends,
   updateAutoAccept, updateAutoAcceptDelay, receiveAutomation,
   state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab,
     autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs, runtimeStatus,
     activePlayerTab, openPlayerTabs, matchDetailOpen, matchDetail, savedPlayers, ongoingGame,
-    autoSelectConfig, autoSelectPaused, autoGameflowConfig, autoChampConfig, liveTimers, spellCooldowns }),
+    autoSelectConfig, autoSelectPaused, autoGameflowConfig, autoChampConfig, liveTimers, spellCooldowns,
+    tkFriends, tkSelectedFriendIds, tkSettingsFileStatus }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -515,11 +517,12 @@ test("main sidebar exposes five top-level routes and renders automation & toolki
   assert.match(toolkitUi.app.innerHTML, /data-action="toolkit-restart-ux"/);
   assert.match(toolkitUi.app.innerHTML, /data-action="toolkit-play-again"/);
   assert.match(toolkitUi.app.innerHTML, /data-action="toolkit-leave-lobby"/);
+  const before = toolkitUi.nativeCalls.length;
   await toolkitUi.testing.runToolkitAction("toolkit_restart_ux", "已请求重启客户端界面");
   await toolkitUi.testing.runToolkitAction("toolkit_play_again", "已请求返回房间");
   await toolkitUi.testing.runToolkitAction("toolkit_leave_lobby", "已退出当前房间");
   assert.deepEqual(
-    toolkitUi.nativeCalls.filter(({ command }) => command.startsWith("toolkit_")).map(({ command }) => command),
+    toolkitUi.nativeCalls.slice(before).filter(({ command }) => command.startsWith("toolkit_")).map(({ command }) => command),
     ["toolkit_restart_ux", "toolkit_play_again", "toolkit_leave_lobby"],
   );
 });
@@ -764,4 +767,38 @@ test("auto champ config saves presets and companion timer tab tracks enemy spell
   compUi.testing.toggleSpellTimer("live-0-1", 273);
   assert.ok(compUi.testing.state().spellCooldowns["live-0-1"] > Date.now());
   assert.match(compUi.app.innerHTML, /is-cooling/);
+});
+
+test("expanded toolkit executes lobby, persona, rewards, readonly lock, and confirmed friend cleanup", async () => {
+  const ui = page({
+    initial: connected,
+    hash: "#toolkit",
+    onInvoke: async (command, args) => {
+      if (command === "toolkit_create_queue_lobby") return null;
+      if (command === "toolkit_set_fake_rank") return null;
+      if (command === "toolkit_claim_rewards") return { claimedGrants: 2, viewedMissions: 3 };
+      if (command === "toolkit_set_settings_readonly") return { found: true, readonly: args.readonly, path: "C:/Game/Config/PersistedSettings.json" };
+      if (command === "toolkit_list_friends") {
+        return [{ id: "f-1", puuid: "p-1", gameName: "旧好友", tagLine: "001", availability: "offline", groupName: "默认", note: "" }];
+      }
+      if (command === "toolkit_delete_friends") return args.ids.length;
+      return undefined;
+    },
+  });
+  await settle();
+  assert.match(ui.app.innerHTML, /创建模式房间/);
+  assert.match(ui.app.innerHTML, /锁定游戏设置只读/);
+
+  await ui.testing.runToolkitInvoke("toolkit_create_queue_lobby", { queueId: 450 }, "已创建房间");
+  await ui.testing.runToolkitInvoke("toolkit_set_fake_rank", { queue: "RANKED_SOLO_5x5", tier: "CHALLENGER", division: "I" }, "已更新伪装段位");
+  await ui.testing.claimAllRewards();
+  await ui.testing.toggleSettingsFileReadonly(true);
+  assert.equal(ui.testing.state().tkSettingsFileStatus.readonly, true);
+
+  await ui.testing.loadToolkitFriends();
+  assert.equal(ui.testing.state().tkFriends.length, 1);
+  ui.testing.state().tkSelectedFriendIds.add("f-1");
+  await ui.testing.confirmDeleteSelectedFriends();
+  assert.equal(ui.testing.state().tkFriends.length, 0);
+  assert.ok(ui.nativeCalls.some(({ command }) => command === "toolkit_delete_friends"));
 });

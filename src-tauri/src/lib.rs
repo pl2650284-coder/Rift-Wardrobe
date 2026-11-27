@@ -16,6 +16,7 @@ mod ongoing_game;
 mod profile;
 mod rankings;
 mod runtime;
+mod toolkit;
 
 use auto_champ_config::{AutoChampConfigSnapshot, ChampionPresetEntry};
 use auto_gameflow::{AutoGameflowConfig, AutoGameflowSnapshot};
@@ -29,6 +30,7 @@ use official_data::NewsDataSnapshot;
 use ongoing_game::OngoingGameSnapshot;
 use profile::PlayerProfile;
 use runtime::{RuntimeState, RuntimeStatus};
+use toolkit::{ClaimRewardsResult, FriendItem, SettingsFileStatus};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -532,6 +534,109 @@ async fn get_live_game_timers(
 }
 
 #[tauri::command]
+async fn toolkit_create_queue_lobby(
+    state: State<'_, RuntimeState>,
+    queue_id: u64,
+) -> Result<(), String> {
+    state.toolkit_create_queue_lobby(queue_id).await
+}
+
+#[tauri::command]
+async fn toolkit_create_practice_5v5(
+    state: State<'_, RuntimeState>,
+    lobby_name: String,
+) -> Result<(), String> {
+    state.toolkit_create_practice_5v5(lobby_name).await
+}
+
+#[tauri::command]
+async fn toolkit_add_bot(
+    state: State<'_, RuntimeState>,
+    champion_id: i64,
+    difficulty: String,
+    team_id: String,
+) -> Result<(), String> {
+    state.toolkit_add_bot(champion_id, difficulty, team_id).await
+}
+
+#[tauri::command]
+async fn toolkit_spectate_player(
+    state: State<'_, RuntimeState>,
+    query: String,
+) -> Result<String, String> {
+    state.toolkit_spectate_player(query).await
+}
+
+#[tauri::command]
+async fn toolkit_set_background_skin(
+    state: State<'_, RuntimeState>,
+    skin_id: i64,
+) -> Result<(), String> {
+    state.toolkit_set_background_skin(skin_id).await
+}
+
+#[tauri::command]
+async fn toolkit_set_fake_rank(
+    state: State<'_, RuntimeState>,
+    queue: String,
+    tier: String,
+    division: String,
+) -> Result<(), String> {
+    state.toolkit_set_fake_rank(queue, tier, division).await
+}
+
+#[tauri::command]
+async fn toolkit_set_availability(
+    state: State<'_, RuntimeState>,
+    availability: String,
+) -> Result<(), String> {
+    state.toolkit_set_availability(availability).await
+}
+
+#[tauri::command]
+async fn toolkit_set_status_message(
+    state: State<'_, RuntimeState>,
+    message: String,
+) -> Result<(), String> {
+    state.toolkit_set_status_message(message).await
+}
+
+#[tauri::command]
+async fn toolkit_claim_rewards(
+    state: State<'_, RuntimeState>,
+) -> Result<ClaimRewardsResult, String> {
+    state.toolkit_claim_rewards().await
+}
+
+#[tauri::command]
+async fn toolkit_list_friends(state: State<'_, RuntimeState>) -> Result<Vec<FriendItem>, String> {
+    state.toolkit_list_friends().await
+}
+
+#[tauri::command]
+async fn toolkit_delete_friends(
+    state: State<'_, RuntimeState>,
+    ids: Vec<String>,
+) -> Result<usize, String> {
+    state.toolkit_delete_friends(ids).await
+}
+
+#[tauri::command]
+async fn toolkit_get_settings_readonly(
+    state: State<'_, RuntimeState>,
+) -> Result<SettingsFileStatus, String> {
+    state.toolkit_get_settings_readonly().await
+}
+
+#[tauri::command]
+async fn toolkit_set_settings_readonly(
+    state: State<'_, RuntimeState>,
+    readonly: bool,
+) -> Result<SettingsFileStatus, String> {
+    state.toolkit_set_settings_readonly(readonly).await
+}
+
+#[tauri::command]
 fn get_launch_at_startup() -> Result<bool, String> {
     startup_enabled()
 }
@@ -685,6 +790,19 @@ pub fn run() {
             import_recommended_runes,
             apply_champ_preset_now,
             get_live_game_timers,
+            toolkit_create_queue_lobby,
+            toolkit_create_practice_5v5,
+            toolkit_add_bot,
+            toolkit_spectate_player,
+            toolkit_set_background_skin,
+            toolkit_set_fake_rank,
+            toolkit_set_availability,
+            toolkit_set_status_message,
+            toolkit_claim_rewards,
+            toolkit_list_friends,
+            toolkit_delete_friends,
+            toolkit_get_settings_readonly,
+            toolkit_set_settings_readonly,
             get_launch_at_startup,
             set_launch_at_startup,
         ])

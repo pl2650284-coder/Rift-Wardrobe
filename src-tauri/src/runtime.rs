@@ -14,6 +14,7 @@ use crate::{
     models::{AppSnapshot, ApplyResult},
     ongoing_game::{self, OngoingGameSnapshot},
     profile::PlayerProfile,
+    toolkit::{ClaimRewardsResult, FriendItem, SettingsFileStatus},
 };
 use rand::seq::SliceRandom;
 use serde::Serialize;
@@ -465,6 +466,124 @@ impl RuntimeState {
 
     pub async fn get_live_game_timers(&self) -> LiveGameTimerSnapshot {
         live_client::fetch_live_game_timers().await
+    }
+
+    pub async fn toolkit_create_queue_lobby(&self, queue_id: u64) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.create_queue_lobby(queue_id).await
+    }
+
+    pub async fn toolkit_create_practice_5v5(&self, lobby_name: String) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.create_practice_5v5(&lobby_name).await
+    }
+
+    pub async fn toolkit_add_bot(
+        &self,
+        champion_id: i64,
+        difficulty: String,
+        team_id: String,
+    ) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.add_custom_bot(champion_id, &difficulty, &team_id).await
+    }
+
+    pub async fn toolkit_spectate_player(&self, query: String) -> Result<String, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.spectate_player_by_query(&query).await
+    }
+
+    pub async fn toolkit_set_background_skin(&self, skin_id: i64) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.set_profile_background_skin(skin_id).await
+    }
+
+    pub async fn toolkit_set_fake_rank(
+        &self,
+        queue: String,
+        tier: String,
+        division: String,
+    ) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.set_fake_rank(&queue, &tier, &division).await
+    }
+
+    pub async fn toolkit_set_availability(&self, availability: String) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.set_chat_availability(&availability).await
+    }
+
+    pub async fn toolkit_set_status_message(&self, message: String) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.set_chat_status_message(&message).await
+    }
+
+    pub async fn toolkit_claim_rewards(&self) -> Result<ClaimRewardsResult, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.claim_all_rewards().await
+    }
+
+    pub async fn toolkit_list_friends(&self) -> Result<Vec<FriendItem>, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let _permit = self.acquire_low_priority_read().await?;
+        client.list_friends().await
+    }
+
+    pub async fn toolkit_delete_friends(&self, ids: Vec<String>) -> Result<usize, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.delete_friends(&ids).await
+    }
+
+    pub async fn toolkit_get_settings_readonly(&self) -> Result<SettingsFileStatus, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.get_persisted_settings_status().await
+    }
+
+    pub async fn toolkit_set_settings_readonly(
+        &self,
+        readonly: bool,
+    ) -> Result<SettingsFileStatus, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.set_persisted_settings_readonly(readonly).await
     }
 
     pub async fn auto_select_snapshot(&self) -> AutoSelectSnapshot {

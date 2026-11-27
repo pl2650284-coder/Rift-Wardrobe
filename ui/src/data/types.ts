@@ -444,3 +444,24 @@ export type LiveGameTimerSnapshot = {
   selfRespawn: LiveRespawnInfo | null;
   enemies: LiveEnemyPlayer[];
 };
+
+export type FriendItem = {
+  id: string;
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  availability: string;
+  groupName: string;
+  note: string;
+};
+
+export type ClaimRewardsResult = {
+  claimedGrants: number;
+  viewedMissions: number;
+};
+
+export type SettingsFileStatus = {
+  found: boolean;
+  readonly: boolean;
+  path: string | null;
+};

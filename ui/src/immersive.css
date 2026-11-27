@@ -1489,6 +1489,33 @@ button:focus-visible, select:focus-visible, input:focus-visible, .skin-grid:focu
 }
 .comp-cd-btn.is-cooling b { color: var(--accent); }
 
+/* ========== Phase 2.5: Expanded Toolkit ========== */
+.tk-inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tk-inline .secondary-button,
+.tk-inline .primary-button { min-height: 30px; padding: 0 10px; font-size: 12px; }
+.tk-short-input { width: 104px; flex: none; }
+.tk-med-input { width: 164px; flex: none; }
+.tk-friends-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tk-danger-btn { background: var(--negative); color: #ffffff; }
+.tk-danger-outline { border-color: var(--negative); color: var(--negative); }
+.tk-friend-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); max-height: 440px; overflow-y: auto; }
+.tk-friend-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1.4fr) 120px 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  cursor: pointer;
+}
+.tk-friend-row:hover { background: var(--surface-raised); }
+.tk-friend-name { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.tk-friend-name strong { font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-friend-name small { font-size: 11px; color: var(--muted-2); }
+.tk-friend-group { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-friend-state { font-size: 12px; color: var(--muted-2); text-align: right; }
+
 /* ========== Minimal News / Rankings Polish ========== */
 .news-mode-header { padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .news-mode-header h1 { font-size: 22px; font-weight: 600; color: var(--text); }

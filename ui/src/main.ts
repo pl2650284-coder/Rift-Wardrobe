@@ -66,6 +66,8 @@ import type {
   ChampionCatalogItem,
   ChampionPresetEntry,
   ChampionStat,
+  ClaimRewardsResult,
+  FriendItem,
   LiveGameTimerSnapshot,
   MatchDetail,
   NewsDataMeta,
@@ -76,6 +78,7 @@ import type {
   ProfileSummary,
   RuntimeStatus,
   SavedPlayer,
+  SettingsFileStatus,
   SummonerOverview,
 } from "./data/types";
 import { getAssistantLogs, getAugmentStats, getChampionStats, getNewsData } from "./services/mock";
@@ -93,7 +96,7 @@ import {
 } from "./companion";
 import { renderProfileView, type OpenPlayerTab } from "./views/profile-view";
 import { renderAutomationView, type AutomationSubTab } from "./views/automation-view";
-import { renderToolkitView } from "./views/toolkit-view";
+import { renderToolkitView, type ToolkitSubTab } from "./views/toolkit-view";
 import { renderSettingsView } from "./views/settings-view";
 import type { HexDetail } from "./data/hextech";
 import { applyThemeAndAccent, isHexColor, isPresetAccent, watchSystemTheme, type ThemeMode } from "./theme";
@@ -402,6 +405,22 @@ let championCatalog: ChampionCatalogItem[] = [
 ];
 let runtimeStatus: RuntimeStatus = { wsConnected: false, connectionEpoch: 0, sessionEpoch: 0 };
 let toolkitBusy = false;
+let toolkitSubTab: ToolkitSubTab = "lobby";
+let tkQueueId = 450;
+let tkBotChampId = 22;
+let tkSpectateQuery = "";
+let tkBgSkinId = "67014";
+let tkFakeRankQueue = "RANKED_SOLO_5x5";
+let tkFakeRankTier = "CHALLENGER";
+let tkFakeRankDivision = "I";
+let tkAvailability = "chat";
+let tkStatusMessage = "";
+let tkSettingsFileStatus: SettingsFileStatus | null = null;
+let tkFriends: FriendItem[] = [];
+let tkFriendsLoading = false;
+let tkFriendQuery = "";
+let tkSelectedFriendIds = new Set<string>();
+let tkConfirmDeleteFriends = false;
 let dashboardLoading = true;
 let logsOpen = false;
 let newsDetailId: string | null = null;
@@ -1474,6 +1493,22 @@ function renderToolkitPage(): string {
     phaseLabel: phaseLabel(),
     runtimeStatus,
     toolkitBusy,
+    subTab: toolkitSubTab,
+    queueId: tkQueueId,
+    botChampId: tkBotChampId,
+    spectateQuery: tkSpectateQuery,
+    bgSkinId: tkBgSkinId,
+    fakeRankQueue: tkFakeRankQueue,
+    fakeRankTier: tkFakeRankTier,
+    fakeRankDivision: tkFakeRankDivision,
+    availability: tkAvailability,
+    statusMessage: tkStatusMessage,
+    settingsFileStatus: tkSettingsFileStatus,
+    friends: tkFriends,
+    friendsLoading: tkFriendsLoading,
+    friendQuery: tkFriendQuery,
+    selectedFriendIds: tkSelectedFriendIds,
+    confirmDeleteFriends: tkConfirmDeleteFriends,
     escape: escapeHtml,
   });
 }
@@ -2192,6 +2227,56 @@ function wireEvents(): void {
     const cd = Number(el.dataset.spellTimerCd);
     if (key && Number.isFinite(cd) && cd > 0) toggleSpellTimer(key, cd);
   }));
+  app.querySelectorAll<HTMLElement>("[data-tk-tab]").forEach((el) => el.addEventListener("click", () => {
+    const tab = el.dataset.tkTab;
+    if (tab !== "lobby" && tab !== "persona" && tab !== "friends") return;
+    toolkitSubTab = tab;
+    tkConfirmDeleteFriends = false;
+    if (tab === "friends" && tkFriends.length === 0 && snapshot.connection === "ready") void loadToolkitFriends();
+    render();
+  }));
+  app.querySelector<HTMLSelectElement>("[data-tk-queue]")?.addEventListener("change", (e) => {
+    tkQueueId = Number((e.currentTarget as HTMLSelectElement).value);
+  });
+  app.querySelector<HTMLInputElement>("[data-tk-spectate]")?.addEventListener("input", (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) tkSpectateQuery = e.currentTarget.value;
+  });
+  app.querySelector<HTMLInputElement>("[data-tk-bg-skin]")?.addEventListener("input", (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) tkBgSkinId = e.currentTarget.value;
+  });
+  app.querySelector<HTMLSelectElement>("[data-tk-rank-queue]")?.addEventListener("change", (e) => {
+    tkFakeRankQueue = (e.currentTarget as HTMLSelectElement).value;
+  });
+  app.querySelector<HTMLSelectElement>("[data-tk-rank-tier]")?.addEventListener("change", (e) => {
+    tkFakeRankTier = (e.currentTarget as HTMLSelectElement).value;
+  });
+  app.querySelector<HTMLSelectElement>("[data-tk-rank-div]")?.addEventListener("change", (e) => {
+    tkFakeRankDivision = (e.currentTarget as HTMLSelectElement).value;
+  });
+  app.querySelector<HTMLSelectElement>("[data-tk-availability]")?.addEventListener("change", (e) => {
+    tkAvailability = (e.currentTarget as HTMLSelectElement).value;
+  });
+  app.querySelector<HTMLInputElement>("[data-tk-status-msg]")?.addEventListener("input", (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) tkStatusMessage = e.currentTarget.value;
+  });
+  app.querySelector<HTMLInputElement>("[data-tk-settings-readonly]")?.addEventListener("change", (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) void toggleSettingsFileReadonly(e.currentTarget.checked);
+  });
+  app.querySelector<HTMLInputElement>("[data-tk-friend-search]")?.addEventListener("input", (e) => {
+    if (e.currentTarget instanceof HTMLInputElement) {
+      tkFriendQuery = e.currentTarget.value;
+      render();
+      window.setTimeout(() => app.querySelector<HTMLInputElement>("[data-tk-friend-search]")?.focus(), 0);
+    }
+  });
+  app.querySelectorAll<HTMLInputElement>("[data-tk-friend-check]").forEach((input) => input.addEventListener("change", () => {
+    const id = input.dataset.tkFriendCheck;
+    if (!id) return;
+    if (input.checked) tkSelectedFriendIds.add(id);
+    else tkSelectedFriendIds.delete(id);
+    tkConfirmDeleteFriends = false;
+    render();
+  }));
   app.querySelectorAll<HTMLElement>("[data-as-pos-kind]").forEach((element) => element.addEventListener("click", () => {
     const kind = element.dataset.asPosKind;
     const pos = element.dataset.asPos as PositionKey | undefined;
@@ -2271,6 +2356,26 @@ function wireEvents(): void {
     if (action === "toolkit-restart-ux") void runToolkitAction("toolkit_restart_ux", "已请求重启客户端界面");
     if (action === "toolkit-play-again") void runToolkitAction("toolkit_play_again", "已请求返回房间");
     if (action === "toolkit-leave-lobby") void runToolkitAction("toolkit_leave_lobby", "已退出当前房间");
+    if (action === "tk-create-lobby") void runToolkitInvoke("toolkit_create_queue_lobby", { queueId: tkQueueId }, "已创建房间");
+    if (action === "tk-create-practice") void runToolkitInvoke("toolkit_create_practice_5v5", { lobbyName: "峡印 5v5 训练房间" }, "已创建 5v5 训练房间");
+    if (action === "tk-add-bot-blue") void runToolkitInvoke("toolkit_add_bot", { championId: tkBotChampId, difficulty: "MEDIUM", teamId: "100" }, "已添加蓝方电脑");
+    if (action === "tk-add-bot-red") void runToolkitInvoke("toolkit_add_bot", { championId: tkBotChampId, difficulty: "MEDIUM", teamId: "200" }, "已添加红方电脑");
+    if (action === "tk-spectate") void spectatePlayer();
+    if (action === "tk-set-bg-skin") void runToolkitInvoke("toolkit_set_background_skin", { skinId: Number(tkBgSkinId) }, "已设置主页背景皮肤");
+    if (action === "tk-set-fake-rank") void runToolkitInvoke("toolkit_set_fake_rank", { queue: tkFakeRankQueue, tier: tkFakeRankTier, division: tkFakeRankDivision }, "已更新伪装段位");
+    if (action === "tk-set-availability") void runToolkitInvoke("toolkit_set_availability", { availability: tkAvailability }, "已切换在线状态");
+    if (action === "tk-set-status-msg") void runToolkitInvoke("toolkit_set_status_message", { message: tkStatusMessage }, "已更新状态签名");
+    if (action === "tk-claim-rewards") void claimAllRewards();
+    if (action === "tk-load-friends") void loadToolkitFriends();
+    if (action === "tk-ask-delete-friends") {
+      tkConfirmDeleteFriends = true;
+      render();
+    }
+    if (action === "tk-cancel-delete-friends") {
+      tkConfirmDeleteFriends = false;
+      render();
+    }
+    if (action === "tk-confirm-delete-friends") void confirmDeleteSelectedFriends();
     if (action === "news-refresh") void hydrateDashboardData(true);
     if (action === "settings") {
       currentRoute = "settings";
@@ -2399,10 +2504,154 @@ async function hydrateRuntimeStatus(): Promise<void> {
     const next = await invokeCommand<RuntimeStatus>("get_runtime_status", {});
     if (next && typeof next === "object" && typeof next.wsConnected === "boolean") {
       runtimeStatus = next;
-      if (currentRoute === "toolkit") render();
     }
+    if (snapshot.connection === "ready") {
+      const fileStatus = await invokeCommand<SettingsFileStatus>("toolkit_get_settings_readonly", {}).catch(() => null);
+      if (fileStatus && typeof fileStatus === "object" && typeof fileStatus.found === "boolean") {
+        tkSettingsFileStatus = fileStatus;
+      }
+    }
+    if (currentRoute === "toolkit") render();
   } catch {
     // Non-critical diagnostic status.
+  }
+}
+
+async function runToolkitInvoke(
+  command: string,
+  args: Record<string, unknown>,
+  successMessage: string,
+): Promise<void> {
+  if (toolkitBusy) return;
+  if (!isTauri) {
+    showToast(`演示：${successMessage}`);
+    return;
+  }
+  toolkitBusy = true;
+  render();
+  try {
+    await invokeCommand(command, args);
+    showToast(successMessage);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    toolkitBusy = false;
+    render();
+  }
+}
+
+async function spectatePlayer(): Promise<void> {
+  const query = tkSpectateQuery.trim();
+  if (!query) {
+    showToast("请输入要观战的玩家 名字#编号", "error");
+    return;
+  }
+  if (!isTauri) {
+    showToast(`演示：启动观战 ${query}`);
+    return;
+  }
+  toolkitBusy = true;
+  render();
+  try {
+    const name = await invokeCommand<string>("toolkit_spectate_player", { query });
+    showToast(`已启动观战 ${name}`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    toolkitBusy = false;
+    render();
+  }
+}
+
+async function claimAllRewards(): Promise<void> {
+  if (toolkitBusy) return;
+  if (!isTauri) {
+    showToast("演示：已完成待领奖励检查");
+    return;
+  }
+  toolkitBusy = true;
+  render();
+  try {
+    const res = await invokeCommand<ClaimRewardsResult>("toolkit_claim_rewards", {});
+    showToast(`已领取 ${res.claimedGrants} 项奖励，确认 ${res.viewedMissions} 项任务`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    toolkitBusy = false;
+    render();
+  }
+}
+
+async function toggleSettingsFileReadonly(readonly: boolean): Promise<void> {
+  if (toolkitBusy) return;
+  if (!isTauri) {
+    tkSettingsFileStatus = { found: true, readonly, path: "demo/PersistedSettings.json" };
+    render();
+    showToast(readonly ? "演示：已锁定只读" : "演示：已恢复可写");
+    return;
+  }
+  toolkitBusy = true;
+  render();
+  try {
+    tkSettingsFileStatus = await invokeCommand<SettingsFileStatus>("toolkit_set_settings_readonly", { readonly });
+    showToast(readonly ? "已锁定 PersistedSettings.json 为只读" : "已恢复游戏设置可写");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    toolkitBusy = false;
+    render();
+  }
+}
+
+async function loadToolkitFriends(): Promise<void> {
+  if (tkFriendsLoading) return;
+  if (!isTauri) {
+    tkFriends = [
+      { id: "demo-f1", puuid: "p1", gameName: "测试好友甲", tagLine: "1001", availability: "offline", groupName: "默认分组", note: "" },
+      { id: "demo-f2", puuid: "p2", gameName: "测试好友乙", tagLine: "1002", availability: "chat", groupName: "开黑", note: "辅助" },
+    ];
+    render();
+    return;
+  }
+  tkFriendsLoading = true;
+  render();
+  try {
+    const list = await invokeCommand<FriendItem[]>("toolkit_list_friends", {});
+    tkFriends = Array.isArray(list) ? list : [];
+    tkSelectedFriendIds.clear();
+    tkConfirmDeleteFriends = false;
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    tkFriendsLoading = false;
+    render();
+  }
+}
+
+async function confirmDeleteSelectedFriends(): Promise<void> {
+  const ids = [...tkSelectedFriendIds];
+  if (!ids.length || toolkitBusy) return;
+  if (!isTauri) {
+    tkFriends = tkFriends.filter((f) => !tkSelectedFriendIds.has(f.id));
+    tkSelectedFriendIds.clear();
+    tkConfirmDeleteFriends = false;
+    render();
+    showToast(`演示：已删除 ${ids.length} 位好友`);
+    return;
+  }
+  toolkitBusy = true;
+  render();
+  try {
+    const deleted = await invokeCommand<number>("toolkit_delete_friends", { ids });
+    tkFriends = tkFriends.filter((f) => !tkSelectedFriendIds.has(f.id));
+    tkSelectedFriendIds.clear();
+    tkConfirmDeleteFriends = false;
+    showToast(`已删除 ${deleted} 位好友`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    toolkitBusy = false;
+    render();
   }
 }
 
