@@ -1,6 +1,6 @@
 use crate::{
     discovery::Credentials,
-    models::{now_ms, AppSnapshot, ApplyResult, ConnectionState, Skin},
+    models::{now_ms, AppSnapshot, ApplyResult, BenchChampion, BenchState, ConnectionState, Skin},
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use reqwest::{Method, StatusCode};
@@ -239,6 +239,231 @@ impl LcuClient {
             .map(|_| ())
     }
 
+    pub async fn champ_select_action(
+        &self,
+        action_id: i64,
+        champion_id: i64,
+        completed: Option<bool>,
+    ) -> Result<(), LcuError> {
+        let mut payload = json!({ "championId": champion_id });
+        if let Some(done) = completed {
+            payload["completed"] = json!(done);
+        }
+        let endpoint = format!("/lol-champ-select/v1/session/actions/{action_id}");
+        self.request_json(Method::PATCH, &endpoint, Some(&payload))
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn bench_swap(&self, champion_id: i64) -> Result<(), LcuError> {
+        let endpoint = format!("/lol-champ-select/v1/session/bench/swap/{champion_id}");
+        self.request_json(Method::POST, &endpoint, None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn reroll_champion(&self) -> Result<(), LcuError> {
+        self.request_json(
+            Method::POST,
+            "/lol-champ-select/v1/session/my-selection/reroll",
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    pub async fn get_subset_champion_list(&self) -> Result<Vec<i64>, LcuError> {
+        let Some(Value::Array(items)) = self
+            .optional_json("/lol-lobby-team-builder/champ-select/v1/subset-champion-list")
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        Ok(items.iter().filter_map(id_value).filter(|id| *id > 0).collect())
+    }
+
+    pub async fn bench_swap_or_pick(&self, champion_id: i64) -> Result<(), String> {
+        if champion_id <= 0 {
+            return Err("无效的英雄 ID".to_string());
+        }
+        let session = self
+            .optional_json(CHAMP_SELECT_SESSION_ENDPOINT)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "当前不在英雄选择阶段".to_string())?;
+        let timer_phase = session
+            .pointer("/timer/phase")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let local_cell = id_at(&session, "localPlayerCellId").unwrap_or(-1);
+        let current_champ = local_player(&session)
+            .and_then(|m| id_at(m, "championId"))
+            .unwrap_or(0);
+
+        if timer_phase == "BAN_PICK" && current_champ <= 0 {
+            let pick_action_id = session
+                .get("actions")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_array)
+                .flatten()
+                .find(|a| {
+                    a.get("type").and_then(Value::as_str) == Some("pick")
+                        && a.get("completed").and_then(Value::as_bool) != Some(true)
+                        && id_at(a, "actorCellId") == Some(local_cell)
+                })
+                .and_then(|a| id_at(a, "id"));
+            if let Some(action_id) = pick_action_id {
+                return self
+                    .champ_select_action(action_id, champion_id, Some(true))
+                    .await
+                    .map_err(|_| "选择英雄失败".to_string());
+            }
+        }
+        self.bench_swap(champion_id)
+            .await
+            .map_err(|_| "抢英雄失败，可能已被队友换走或暂不可选".to_string())
+    }
+
+    pub async fn bench_reroll(&self, grab_back: bool) -> Result<(), String> {
+        let prev_champ = if grab_back {
+            self.optional_json(CHAMP_SELECT_SESSION_ENDPOINT)
+                .await
+                .ok()
+                .flatten()
+                .and_then(|session| {
+                    local_player(&session)
+                        .and_then(|m| id_at(m, "championId"))
+                        .filter(|id| *id > 0)
+                })
+        } else {
+            None
+        };
+        self.reroll_champion()
+            .await
+            .map_err(|_| "重随失败，请确认还有剩余骰子".to_string())?;
+        if let Some(prev_id) = prev_champ {
+            tokio::time::sleep(Duration::from_millis(35)).await;
+            if self.bench_swap(prev_id).await.is_err() {
+                tokio::time::sleep(Duration::from_millis(65)).await;
+                let _ = self.bench_swap(prev_id).await;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn respond_champion_swap(&self, trade_id: i64, accept: bool) -> Result<(), LcuError> {
+        let verb = if accept { "accept" } else { "decline" };
+        let endpoint = format!("/lol-champ-select/v1/session/champion-swaps/{trade_id}/{verb}");
+        self.request_json(Method::POST, &endpoint, None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn get_pickable_champion_ids(&self) -> Result<Vec<i64>, LcuError> {
+        let Some(Value::Array(items)) = self
+            .optional_json("/lol-champ-select/v1/pickable-champion-ids")
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        Ok(items.iter().filter_map(id_value).collect())
+    }
+
+    pub async fn get_bannable_champion_ids(&self) -> Result<Vec<i64>, LcuError> {
+        let Some(Value::Array(items)) = self
+            .optional_json("/lol-champ-select/v1/bannable-champion-ids")
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        Ok(items.iter().filter_map(id_value).collect())
+    }
+
+    pub async fn get_honor_ballot(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_json("/lol-honor-v2/v1/ballot/").await
+    }
+
+    pub async fn honor_player(
+        &self,
+        game_id: u64,
+        category: &str,
+        summoner_id: u64,
+        puuid: &str,
+    ) -> Result<(), LcuError> {
+        self.request_json(
+            Method::POST,
+            "/lol-honor-v2/v1/honor-player/",
+            Some(&json!({
+                "gameId": game_id,
+                "honorCategory": category,
+                "summonerId": summoner_id,
+                "puuid": puuid
+            })),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    pub async fn start_matchmaking(&self) -> Result<(), LcuError> {
+        self.request_json(Method::POST, "/lol-lobby/v2/lobby/matchmaking/search", None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn reconnect_game(&self) -> Result<(), LcuError> {
+        self.request_json(Method::POST, "/lol-gameflow/v1/reconnect", None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn get_received_invitations(&self) -> Result<Vec<Value>, LcuError> {
+        let Some(Value::Array(items)) = self
+            .optional_json("/lol-lobby/v2/received-invitations")
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        Ok(items)
+    }
+
+    pub async fn respond_invitation(
+        &self,
+        invitation_id: &str,
+        accept: bool,
+    ) -> Result<(), LcuError> {
+        if invitation_id.is_empty()
+            || invitation_id.contains('/')
+            || invitation_id.contains("..")
+        {
+            return Err(LcuError::Protocol("invalid invitation id".to_string()));
+        }
+        let verb = if accept { "accept" } else { "decline" };
+        let endpoint = format!("/lol-lobby/v2/received-invitations/{invitation_id}/{verb}");
+        self.request_json(Method::POST, &endpoint, None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn get_champion_summary(&self) -> Result<Vec<(i64, String)>, LcuError> {
+        let val = self
+            .profile_json("/lol-game-data/assets/v1/champion-summary.json")
+            .await?;
+        let mut items: Vec<(i64, String)> = val
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|c| {
+                let id = id_at(c, "id").filter(|id| *id > 0)?;
+                let name = string_at(c, "name")?;
+                Some((id, name))
+            })
+            .collect();
+        items.sort_by_key(|(id, _)| *id);
+        Ok(items)
+    }
+
     pub async fn get_phase(&self) -> Result<String, LcuError> {
         let phase = self
             .request_json(Method::GET, GAMEFLOW_PHASE_ENDPOINT, None)
@@ -280,14 +505,44 @@ impl LcuClient {
             return Ok(AppSnapshot::inactive(phase));
         };
 
-        normalize_snapshot(
+        let bench_enabled = bool_at(&session, "benchEnabled");
+        let (pickable_champs, subset_champs) = if bench_enabled {
+            let timer_phase = session
+                .pointer("/timer/phase")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let (p, s) = tokio::join!(
+                self.get_pickable_champion_ids(),
+                async {
+                    if timer_phase == "BAN_PICK" {
+                        self.get_subset_champion_list().await.unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    }
+                }
+            );
+            (p.unwrap_or_default(), s)
+        } else {
+            (Vec::new(), Vec::new())
+        };
+
+        let mut snapshot = normalize_snapshot(
             phase,
             &session,
             carousel.as_ref(),
             selector.as_ref(),
             pickable.as_ref(),
             my_selection.as_ref(),
-        )
+        )?;
+        if bench_enabled {
+            snapshot.bench = Some(normalize_bench_state(
+                &session,
+                snapshot.champion_id,
+                &pickable_champs,
+                &subset_champs,
+            ));
+        }
+        Ok(snapshot)
     }
 
     pub async fn apply_skin(
@@ -694,9 +949,94 @@ fn normalize_snapshot(
         write_enabled: write_block_reason.is_none(),
         write_block_reason,
         skins: skins.into_values().collect(),
+        bench: None,
         revision: 0,
         updated_at_ms: now_ms(),
     })
+}
+
+fn normalize_bench_state(
+    session: &Value,
+    current_champion_id: Option<i64>,
+    pickable_champion_ids: &[i64],
+    subset_champion_list: &[i64],
+) -> BenchState {
+    let timer_phase = session
+        .pointer("/timer/phase")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    let allow_subset = bool_at(session, "allowSubsetChampionPicks");
+    let allow_rerolling = bool_at(session, "allowRerolling");
+    let is_finalization = timer_phase == "FINALIZATION";
+    let is_ban_pick = timer_phase == "BAN_PICK";
+    let can_use = if allow_subset {
+        is_finalization || is_ban_pick
+    } else {
+        is_finalization
+    };
+
+    let rerolls_remaining = if can_use {
+        id_at(session, "rerollsRemaining")
+            .unwrap_or(0)
+            .clamp(0, 10) as u8
+    } else {
+        0
+    };
+    let show_reroll = rerolls_remaining > 0
+        || (allow_rerolling && is_finalization && !allow_subset);
+
+    let orig_bench: Vec<i64> = session
+        .get("benchChampions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|item| id_at(item, "championId").filter(|id| *id > 0))
+        .collect();
+
+    let mut combined_ids: Vec<i64> = Vec::new();
+    if is_ban_pick {
+        for &cid in subset_champion_list {
+            if cid > 0
+                && Some(cid) != current_champion_id
+                && !orig_bench.contains(&cid)
+                && !combined_ids.contains(&cid)
+            {
+                combined_ids.push(cid);
+            }
+        }
+    }
+    for cid in orig_bench {
+        if !combined_ids.contains(&cid) {
+            combined_ids.push(cid);
+        }
+    }
+
+    let pickable_set: std::collections::HashSet<i64> =
+        pickable_champion_ids.iter().copied().collect();
+    let subset_set: std::collections::HashSet<i64> =
+        subset_champion_list.iter().copied().collect();
+
+    let champions = combined_ids
+        .into_iter()
+        .map(|cid| {
+            let can_play = pickable_set.is_empty() || pickable_set.contains(&cid);
+            let waiting_on_finalization = is_ban_pick && !subset_set.is_empty() && !subset_set.contains(&cid);
+            BenchChampion {
+                champion_id: cid,
+                swappable: can_use && can_play && !waiting_on_finalization,
+            }
+        })
+        .collect();
+
+    BenchState {
+        enabled: true,
+        can_use,
+        phase: timer_phase,
+        rerolls_remaining,
+        show_reroll,
+        champions,
+    }
 }
 
 fn local_player(session: &Value) -> Option<&Value> {
@@ -870,5 +1210,26 @@ mod tests {
         )
         .expect("snapshot");
         assert!(snapshot.skins[0].is_chroma);
+    }
+
+    #[test]
+    fn bench_state_combines_subset_and_marks_unpickable_champions() {
+        let session = json!({
+            "benchEnabled": true,
+            "allowSubsetChampionPicks": true,
+            "allowRerolling": false,
+            "rerollsRemaining": 1,
+            "timer": { "phase": "BAN_PICK" },
+            "benchChampions": [{ "championId": 81 }, { "championId": 103 }]
+        });
+        let bench = normalize_bench_state(&session, Some(67), &[22, 81], &[22, 67]);
+        assert!(bench.enabled);
+        assert!(bench.can_use);
+        assert!(bench.show_reroll);
+        assert_eq!(bench.rerolls_remaining, 1);
+        assert_eq!(bench.champions.len(), 3);
+        assert_eq!(bench.champions[0], BenchChampion { champion_id: 22, swappable: true });
+        assert_eq!(bench.champions[1], BenchChampion { champion_id: 81, swappable: false });
+        assert_eq!(bench.champions[2], BenchChampion { champion_id: 103, swappable: false });
     }
 }

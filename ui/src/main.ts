@@ -54,14 +54,21 @@ import { DEFAULT_PREFERENCES } from "./data/mock";
 import type {
   AppPreferences,
   AssistantLog,
+  AutoGameflowConfig,
+  AutoGameflowSnapshot,
+  AutoSelectConfig,
+  AutoSelectSnapshot,
+  AutoSelectStrategy,
   AutomationSnapshot,
   AugmentStat,
+  ChampionCatalogItem,
   ChampionStat,
   MatchDetail,
   NewsDataMeta,
   AugmentCombo,
   OngoingGameSnapshot,
   PlayerDetail,
+  PositionKey,
   ProfileSummary,
   RuntimeStatus,
   SavedPlayer,
@@ -77,10 +84,11 @@ import {
   fetchCompanionOngoing,
   formatOngoingChatSummary,
   renderCompanionShell,
+  type CompanionBenchState,
   type CompanionTab,
 } from "./companion";
 import { renderProfileView, type OpenPlayerTab } from "./views/profile-view";
-import { renderAutomationView } from "./views/automation-view";
+import { renderAutomationView, type AutomationSubTab } from "./views/automation-view";
 import { renderToolkitView } from "./views/toolkit-view";
 import { renderSettingsView } from "./views/settings-view";
 import type { HexDetail } from "./data/hextech";
@@ -115,6 +123,7 @@ type Snapshot = {
   writeEnabled: boolean;
   writeBlockReason: string | null;
   skins: Skin[];
+  bench?: CompanionBenchState | null;
   revision: number;
   updatedAtMs: number;
 };
@@ -149,6 +158,20 @@ const demoSnapshot: Snapshot = {
   writeEnabled: true,
   writeBlockReason: null,
   skins: demoSkins,
+  bench: {
+    enabled: true,
+    canUse: true,
+    phase: "FINALIZATION",
+    rerollsRemaining: 2,
+    showReroll: true,
+    champions: [
+      { championId: 22, swappable: true },
+      { championId: 81, swappable: true },
+      { championId: 103, swappable: true },
+      { championId: 157, swappable: true },
+      { championId: 117, swappable: false },
+    ],
+  },
   revision: 1,
   updatedAtMs: Date.now(),
 };
@@ -254,6 +277,7 @@ let favoriteSkinIds = new Set<number>();
 let selectedSkinId = snapshot.selectedSkinId;
 let previewOnlySelectionId: number | null = null;
 let busy = false;
+let benchBusy = false;
 let windowMaximized = false;
 let launchAtStartup = false;
 let settingsOpen = false;
@@ -311,6 +335,53 @@ let newsMeta: NewsDataMeta = {
   source: "unavailable",
 };
 let assistantLogs: AssistantLog[] = [];
+let autoSelectLogs: AssistantLog[] = [];
+let autoGameflowLogs: AssistantLog[] = [];
+let automationSubTab: AutomationSubTab = "flow";
+let autoSelectPickPos: PositionKey = "default";
+let autoSelectBanPos: PositionKey = "default";
+let autoSelectPaused = false;
+let autoSelectRevision = -1;
+let autoGameflowRevision = -1;
+let autoSelectConfig: AutoSelectConfig = {
+  pickEnabled: false,
+  pickStrategy: "show-and-lock-in",
+  pickDelaySeconds: 0,
+  showIntent: false,
+  ignoreTeammateIntent: false,
+  pickChampions: { default: [], top: [], jungle: [], middle: [], bottom: [], utility: [] },
+  banEnabled: false,
+  banStrategy: "show-and-lock-in",
+  banDelaySeconds: 0,
+  banAvoidTeammateIntent: true,
+  banChampions: { default: [], top: [], jungle: [], middle: [], bottom: [], utility: [] },
+  benchEnabled: false,
+  benchDelaySeconds: 1,
+  benchChampions: [],
+  benchAutoAcceptTrade: false,
+};
+let autoGameflowConfig: AutoGameflowConfig = {
+  autoHonorEnabled: false,
+  autoHonorStrategy: "random-teammate",
+  autoPlayAgainEnabled: false,
+  autoMatchmakingEnabled: false,
+  autoMatchmakingDelaySeconds: 3,
+  autoMatchmakingMinMembers: 1,
+  autoReconnectEnabled: false,
+  autoInvitationMode: "off",
+};
+let championCatalog: ChampionCatalogItem[] = [
+  { id: 67, name: "薇恩" },
+  { id: 22, name: "艾希" },
+  { id: 81, name: "伊泽瑞尔" },
+  { id: 103, name: "阿狸" },
+  { id: 157, name: "亚索" },
+  { id: 238, name: "劫" },
+  { id: 117, name: "璐璐" },
+  { id: 412, name: "锤石" },
+  { id: 64, name: "李青" },
+  { id: 24, name: "贾克斯" },
+];
 let runtimeStatus: RuntimeStatus = { wsConnected: false, connectionEpoch: 0, sessionEpoch: 0 };
 let toolkitBusy = false;
 let dashboardLoading = true;
@@ -343,6 +414,8 @@ let toastMessage: string | null = null;
 let toastKind: "info" | "error" = "info";
 let cleanupListener: UnlistenFn | undefined;
 let cleanupAutomationListener: UnlistenFn | undefined;
+let cleanupAutoSelectListener: UnlistenFn | undefined;
+let cleanupAutoGameflowListener: UnlistenFn | undefined;
 let cleanupAppearanceListener: UnlistenFn | undefined;
 let cleanupCompanionNavListener: UnlistenFn | undefined;
 let cleanupWindowResize: UnlistenFn | undefined;
@@ -1337,13 +1410,32 @@ function preferenceRow(key: string, title: string, checked: boolean): string {
   return `<label class="preference-row"><span><strong>${title}</strong></span><input class="switch-input" type="checkbox" data-pref="${key}" ${checked ? "checked" : ""} ${key === "autoAccept" && (!autoAcceptReady || autoAcceptSaving) ? "disabled" : ""} /><span class="switch-track" aria-hidden="true"></span></label>`;
 }
 
+function mergedAutomationLogs(): AssistantLog[] {
+  return [...assistantLogs, ...autoSelectLogs, ...autoGameflowLogs].slice(0, 60);
+}
+
+function activeChampionCatalog(): ChampionCatalogItem[] {
+  if (championCatalog.length > 10) return championCatalog;
+  if (championStats.length > 0) {
+    return championStats.map((c) => ({ id: c.id, name: c.name }));
+  }
+  return championCatalog;
+}
+
 function renderAutomationPage(): string {
   return renderAutomationView({
+    subTab: automationSubTab,
     autoAccept,
     autoSkin,
     autoPopupCompanion,
     companionAlwaysOnTop,
-    logs: assistantLogs,
+    autoSelect: autoSelectConfig,
+    autoSelectPaused,
+    autoGameflow: autoGameflowConfig,
+    pickPosition: autoSelectPickPos,
+    banPosition: autoSelectBanPos,
+    champions: activeChampionCatalog(),
+    logs: mergedAutomationLogs(),
     preferenceRow,
     autoAcceptDelaySelect,
     escape: escapeHtml,
@@ -1415,6 +1507,11 @@ function renderCompanionWindow(): void {
     ongoingError,
     sendingChat,
     quickTagPuuid,
+    autoSelectActive: autoSelectConfig.pickEnabled || autoSelectConfig.banEnabled || autoSelectConfig.benchEnabled,
+    autoSelectPaused,
+    benchBusy,
+    benchPriorityIds: autoSelectConfig.benchChampions,
+    championNameById: (id) => activeChampionCatalog().find((c) => c.id === id)?.name ?? `英雄 #${id}`,
     escape: escapeHtml,
     icon,
     skinImage,
@@ -1650,6 +1747,57 @@ async function applyRandom(): Promise<void> {
   await applySkin(candidate.id);
 }
 
+async function benchSwapChampion(championId: number): Promise<void> {
+  if (benchBusy || !Number.isInteger(championId) || championId <= 0) return;
+  const name = activeChampionCatalog().find((c) => c.id === championId)?.name ?? `英雄 #${championId}`;
+  if (!isTauri) {
+    showToast(`演示：已抢入 ${name}`);
+    return;
+  }
+  benchBusy = true;
+  render();
+  try {
+    await invokeCommand("bench_swap_champion", { championId });
+    showToast(`已换入 ${name}`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    benchBusy = false;
+    render();
+  }
+}
+
+async function benchReroll(grabBack: boolean): Promise<void> {
+  if (benchBusy) return;
+  if (!isTauri) {
+    showToast(grabBack ? "演示：已重随并抢回原英雄" : "演示：已重随英雄");
+    return;
+  }
+  benchBusy = true;
+  render();
+  try {
+    await invokeCommand("bench_reroll", { grabBack });
+    showToast(grabBack ? "已重随并抢回原英雄" : "已重随英雄");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    benchBusy = false;
+    render();
+  }
+}
+
+async function toggleBenchPriorityChampion(championId: number): Promise<void> {
+  if (!Number.isInteger(championId) || championId <= 0) return;
+  const next = structuredClone(autoSelectConfig);
+  const exists = next.benchChampions.includes(championId);
+  next.benchChampions = exists
+    ? next.benchChampions.filter((id) => id !== championId)
+    : [...next.benchChampions, championId];
+  await saveAutoSelectConfig(next);
+  const name = activeChampionCatalog().find((c) => c.id === championId)?.name ?? `#${championId}`;
+  showToast(exists ? `已从自动秒抢移除 ${name}` : `已加入自动秒抢：${name}`);
+}
+
 function canApplySkinImmediately(skin: Skin): boolean {
   return snapshot.connection === "ready"
     && snapshot.active
@@ -1749,6 +1897,17 @@ function wireEvents(): void {
     const id = Number(element.dataset.favoriteId);
     if (!Number.isNaN(id)) toggleFavorite(id);
   }));
+  app.querySelectorAll<HTMLElement>("[data-bench-swap]").forEach((element) => {
+    element.addEventListener("click", () => {
+      const cid = Number(element.dataset.benchSwap);
+      if (Number.isInteger(cid) && cid > 0) void benchSwapChampion(cid);
+    });
+    element.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const cid = Number(element.dataset.benchSwap);
+      if (Number.isInteger(cid) && cid > 0) void toggleBenchPriorityChampion(cid);
+    });
+  });
   app.querySelectorAll<HTMLInputElement>("[data-setting]").forEach((element) => element.addEventListener("change", () => {
     if (element.dataset.setting === "launch-at-startup") void updateLaunchAtStartup(element.checked);
   }));
@@ -1957,6 +2116,79 @@ function wireEvents(): void {
     quickTagPuuid = null;
     void deletePlayerTag(puuid);
   }));
+  app.querySelectorAll<HTMLElement>("[data-auto-tab]").forEach((element) => element.addEventListener("click", () => {
+    const tab = element.dataset.autoTab;
+    if (tab !== "flow" && tab !== "select" && tab !== "logs") return;
+    automationSubTab = tab;
+    if (tab === "select") void hydrateChampionCatalog();
+    render();
+  }));
+  app.querySelectorAll<HTMLElement>("[data-as-pos-kind]").forEach((element) => element.addEventListener("click", () => {
+    const kind = element.dataset.asPosKind;
+    const pos = element.dataset.asPos as PositionKey | undefined;
+    if (!pos || !["default", "top", "jungle", "middle", "bottom", "utility"].includes(pos)) return;
+    if (kind === "pick") autoSelectPickPos = pos;
+    if (kind === "ban") autoSelectBanPos = pos;
+    render();
+  }));
+  app.querySelectorAll<HTMLInputElement>("[data-as-bool]").forEach((element) => element.addEventListener("change", () => {
+    const key = element.dataset.asBool as keyof AutoSelectConfig | undefined;
+    if (!key) return;
+    void saveAutoSelectConfig({ ...autoSelectConfig, [key]: element.checked });
+  }));
+  app.querySelectorAll<HTMLSelectElement>("[data-as-select]").forEach((element) => element.addEventListener("change", () => {
+    const key = element.dataset.asSelect as "pickStrategy" | "banStrategy" | undefined;
+    if (!key) return;
+    void saveAutoSelectConfig({ ...autoSelectConfig, [key]: element.value as AutoSelectStrategy });
+  }));
+  app.querySelectorAll<HTMLSelectElement>("[data-as-num]").forEach((element) => element.addEventListener("change", () => {
+    const key = element.dataset.asNum as "pickDelaySeconds" | "banDelaySeconds" | "benchDelaySeconds" | undefined;
+    if (!key) return;
+    void saveAutoSelectConfig({ ...autoSelectConfig, [key]: Number(element.value) });
+  }));
+  app.querySelectorAll<HTMLSelectElement>("[data-as-add-select]").forEach((element) => element.addEventListener("change", () => {
+    const kind = element.dataset.asAddSelect;
+    const champId = Number(element.value);
+    if (!Number.isInteger(champId) || champId <= 0) return;
+    const next = structuredClone(autoSelectConfig);
+    if (kind === "pick") {
+      if (!next.pickChampions[autoSelectPickPos].includes(champId)) next.pickChampions[autoSelectPickPos].push(champId);
+    } else if (kind === "ban") {
+      if (!next.banChampions[autoSelectBanPos].includes(champId)) next.banChampions[autoSelectBanPos].push(champId);
+    } else if (kind === "bench") {
+      if (!next.benchChampions.includes(champId)) next.benchChampions.push(champId);
+    }
+    void saveAutoSelectConfig(next);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-as-remove-kind]").forEach((element) => element.addEventListener("click", () => {
+    const kind = element.dataset.asRemoveKind;
+    const champId = Number(element.dataset.asRemoveId);
+    if (!Number.isInteger(champId)) return;
+    const next = structuredClone(autoSelectConfig);
+    if (kind === "pick") {
+      next.pickChampions[autoSelectPickPos] = next.pickChampions[autoSelectPickPos].filter((id) => id !== champId);
+    } else if (kind === "ban") {
+      next.banChampions[autoSelectBanPos] = next.banChampions[autoSelectBanPos].filter((id) => id !== champId);
+    } else if (kind === "bench") {
+      next.benchChampions = next.benchChampions.filter((id) => id !== champId);
+    }
+    void saveAutoSelectConfig(next);
+  }));
+  app.querySelectorAll<HTMLInputElement>("[data-gf-bool]").forEach((element) => element.addEventListener("change", () => {
+    const key = element.dataset.gfBool as keyof AutoGameflowConfig | undefined;
+    if (!key) return;
+    void saveAutoGameflowConfig({ ...autoGameflowConfig, [key]: element.checked });
+  }));
+  app.querySelectorAll<HTMLSelectElement>("[data-gf-select]").forEach((element) => element.addEventListener("change", () => {
+    const key = element.dataset.gfSelect as "autoHonorStrategy" | "autoInvitationMode" | undefined;
+    if (!key) return;
+    void saveAutoGameflowConfig({ ...autoGameflowConfig, [key]: element.value } as AutoGameflowConfig);
+  }));
+  app.querySelectorAll<HTMLSelectElement>("[data-gf-num]").forEach((element) => element.addEventListener("change", () => {
+    const key = element.dataset.gfNum as "autoMatchmakingDelaySeconds" | "autoMatchmakingMinMembers" | undefined;
+    if (!key) return;
+    void saveAutoGameflowConfig({ ...autoGameflowConfig, [key]: Number(element.value) });
+  }));
   app.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => element.addEventListener("click", (event) => {
     const action = element.dataset.action;
     if (action === "close-settings" && element.classList.contains("modal-backdrop") && event.target !== element) return;
@@ -1998,6 +2230,9 @@ function wireEvents(): void {
     if (action === "companion-build-refresh") void loadCompanionBuild(companionBuildHeroId ?? snapshot.championId, true);
     if (action === "companion-ongoing-refresh") void loadCompanionOngoing(true);
     if (action === "companion-send-chat") void sendOngoingToChampSelectChat();
+    if (action === "toggle-auto-select-pause") void toggleAutoSelectPause();
+    if (action === "bench-reroll") void benchReroll(false);
+    if (action === "bench-reroll-grab") void benchReroll(true);
     if (action === "open-saved-players") {
       savedPlayersOpen = true;
       void hydrateSavedPlayers();
@@ -2163,6 +2398,102 @@ async function hydrateAutomation(): Promise<void> {
   }
 }
 
+function receiveAutoSelect(next: AutoSelectSnapshot): void {
+  if (!next || typeof next !== "object" || !next.config || typeof next.revision !== "number") return;
+  if (next.revision < autoSelectRevision) return;
+  autoSelectRevision = next.revision;
+  autoSelectConfig = next.config;
+  autoSelectPaused = Boolean(next.pausedThisGame);
+  autoSelectLogs = Array.isArray(next.logs) ? next.logs.map((l) => ({ ...l, time: formatTime(l.timestampMs) })) : [];
+  render();
+}
+
+function receiveAutoGameflow(next: AutoGameflowSnapshot): void {
+  if (!next || typeof next !== "object" || !next.config || typeof next.revision !== "number") return;
+  if (next.revision < autoGameflowRevision) return;
+  autoGameflowRevision = next.revision;
+  autoGameflowConfig = next.config;
+  autoGameflowLogs = Array.isArray(next.logs) ? next.logs.map((l) => ({ ...l, time: formatTime(l.timestampMs) })) : [];
+  render();
+}
+
+async function hydrateAutoSelect(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    receiveAutoSelect(await invokeCommand<AutoSelectSnapshot>("get_auto_select_state", {}));
+  } catch {
+    // Non-critical startup hydration.
+  }
+}
+
+async function hydrateAutoGameflow(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    receiveAutoGameflow(await invokeCommand<AutoGameflowSnapshot>("get_auto_gameflow_state", {}));
+  } catch {
+    // Non-critical startup hydration.
+  }
+}
+
+async function hydrateChampionCatalog(): Promise<void> {
+  if (!isTauri || championCatalog.length > 20) return;
+  try {
+    const items = await invokeCommand<ChampionCatalogItem[]>("get_champion_catalog", {});
+    if (Array.isArray(items) && items.length > 0) {
+      championCatalog = items;
+      render();
+    }
+  } catch {
+    // Fallback list remains usable.
+  }
+}
+
+async function saveAutoSelectConfig(next: AutoSelectConfig): Promise<void> {
+  if (!isTauri) {
+    autoSelectConfig = next;
+    render();
+    return;
+  }
+  try {
+    receiveAutoSelect(await invokeCommand<AutoSelectSnapshot>("set_auto_select_config", { config: next }));
+    showToast("自动选禁设置已保存");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+    render();
+  }
+}
+
+async function toggleAutoSelectPause(): Promise<void> {
+  const nextPaused = !autoSelectPaused;
+  if (!isTauri) {
+    autoSelectPaused = nextPaused;
+    render();
+    showToast(nextPaused ? "演示：已暂停本局自动选禁" : "演示：已恢复本局自动选禁");
+    return;
+  }
+  try {
+    receiveAutoSelect(await invokeCommand<AutoSelectSnapshot>("set_auto_select_paused", { paused: nextPaused }));
+    showToast(nextPaused ? "已暂停本局自动选禁" : "已恢复本局自动选禁");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  }
+}
+
+async function saveAutoGameflowConfig(next: AutoGameflowConfig): Promise<void> {
+  if (!isTauri) {
+    autoGameflowConfig = next;
+    render();
+    return;
+  }
+  try {
+    receiveAutoGameflow(await invokeCommand<AutoGameflowSnapshot>("set_auto_gameflow_config", { config: next }));
+    showToast("流程自动化设置已保存");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+    render();
+  }
+}
+
 async function updateAutoAcceptDelay(seconds: number): Promise<void> {
   await updateAutoAccept(autoAccept, seconds);
 }
@@ -2293,7 +2624,12 @@ async function bootstrap(): Promise<void> {
     }
     // Listen first so a connection established during startup cannot be missed.
     cleanupAutomationListener = await listen<AutomationSnapshot>("automation-changed", (event: { payload: AutomationSnapshot }) => receiveAutomation(event.payload));
+    cleanupAutoSelectListener = await listen<AutoSelectSnapshot>("auto-select-changed", (event: { payload: AutoSelectSnapshot }) => receiveAutoSelect(event.payload));
+    cleanupAutoGameflowListener = await listen<AutoGameflowSnapshot>("auto-gameflow-changed", (event: { payload: AutoGameflowSnapshot }) => receiveAutoGameflow(event.payload));
     void hydrateAutomation();
+    void hydrateAutoSelect();
+    void hydrateAutoGameflow();
+    if (isCompanionWindow) void hydrateChampionCatalog();
     cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => receiveSnapshot(event.payload));
     receiveSnapshot(await invokeCommand<Snapshot>("get_snapshot", {}));
     if (!isCompanionWindow && currentRoute === "toolkit") void hydrateRuntimeStatus();
@@ -2315,6 +2651,8 @@ window.addEventListener("storage", (event) => {
 window.addEventListener("beforeunload", () => {
   cleanupListener?.();
   cleanupAutomationListener?.();
+  cleanupAutoSelectListener?.();
+  cleanupAutoGameflowListener?.();
   cleanupAppearanceListener?.();
   cleanupCompanionNavListener?.();
   cleanupWindowResize?.();

@@ -1,4 +1,6 @@
 use crate::{
+    auto_gameflow::{AutoGameflow, AutoGameflowConfig, AutoGameflowSnapshot},
+    auto_select::{AutoSelect, AutoSelectConfig, AutoSelectSnapshot},
     automation::{AutoAccept, AutomationSnapshot},
     db::{Database, EncounteredGame, SavedPlayer},
     discovery,
@@ -40,6 +42,8 @@ pub struct RuntimeState {
     write_guard: Mutex<()>,
     image_cache: RwLock<HashMap<String, String>>,
     automation: Mutex<AutoAccept>,
+    auto_select: Mutex<AutoSelect>,
+    auto_gameflow: Mutex<AutoGameflow>,
     auto_popup_companion: AtomicBool,
     connection_epoch: AtomicU64,
     session_epoch: AtomicU64,
@@ -60,6 +64,8 @@ impl RuntimeState {
             write_guard: Mutex::new(()),
             image_cache: RwLock::new(HashMap::new()),
             automation: Mutex::new(AutoAccept::default()),
+            auto_select: Mutex::new(AutoSelect::default()),
+            auto_gameflow: Mutex::new(AutoGameflow::default()),
             auto_popup_companion: AtomicBool::new(true),
             connection_epoch: AtomicU64::new(0),
             session_epoch: AtomicU64::new(0),
@@ -302,6 +308,94 @@ impl RuntimeState {
         Ok(())
     }
 
+    pub fn configure_auto_select(&self, path: PathBuf) -> Result<(), String> {
+        let mut engine = self.auto_select.try_lock().map_err(|_| "自动选禁设置正在使用")?;
+        *engine = AutoSelect::load(path);
+        Ok(())
+    }
+
+    pub fn configure_auto_gameflow(&self, path: PathBuf) -> Result<(), String> {
+        let mut engine = self.auto_gameflow.try_lock().map_err(|_| "流程自动化设置正在使用")?;
+        *engine = AutoGameflow::load(path);
+        Ok(())
+    }
+
+    pub async fn auto_select_snapshot(&self) -> AutoSelectSnapshot {
+        self.auto_select.lock().await.snapshot()
+    }
+
+    pub async fn set_auto_select_config(
+        &self,
+        app: &AppHandle,
+        config: AutoSelectConfig,
+    ) -> Result<AutoSelectSnapshot, String> {
+        let mut engine = self.auto_select.lock().await;
+        let snapshot = engine.update_config(config)?;
+        drop(engine);
+        let _ = app.emit("auto-select-changed", &snapshot);
+        Ok(snapshot)
+    }
+
+    pub async fn set_auto_select_paused(
+        &self,
+        app: &AppHandle,
+        paused: bool,
+    ) -> AutoSelectSnapshot {
+        let mut engine = self.auto_select.lock().await;
+        let snapshot = engine.set_paused_this_game(paused);
+        drop(engine);
+        let _ = app.emit("auto-select-changed", &snapshot);
+        snapshot
+    }
+
+    pub async fn auto_gameflow_snapshot(&self) -> AutoGameflowSnapshot {
+        self.auto_gameflow.lock().await.snapshot()
+    }
+
+    pub async fn set_auto_gameflow_config(
+        &self,
+        app: &AppHandle,
+        config: AutoGameflowConfig,
+    ) -> Result<AutoGameflowSnapshot, String> {
+        let mut engine = self.auto_gameflow.lock().await;
+        let snapshot = engine.update_config(config)?;
+        drop(engine);
+        let _ = app.emit("auto-gameflow-changed", &snapshot);
+        Ok(snapshot)
+    }
+
+    pub async fn get_champion_catalog(&self) -> Result<Vec<(i64, String)>, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let _permit = self.acquire_low_priority_read().await?;
+        client
+            .get_champion_summary()
+            .await
+            .map_err(|_| "无法读取英雄列表".to_string())
+    }
+
+    pub async fn bench_swap_champion(&self, champion_id: i64) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.bench_swap_or_pick(champion_id).await?;
+        self.ws_wake.notify_one();
+        Ok(())
+    }
+
+    pub async fn bench_reroll(&self, grab_back: bool) -> Result<(), String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        client.bench_reroll(grab_back).await?;
+        self.ws_wake.notify_one();
+        Ok(())
+    }
+
     pub async fn automation_snapshot(&self) -> AutomationSnapshot {
         self.automation.lock().await.snapshot()
     }
@@ -323,7 +417,23 @@ impl RuntimeState {
         automation.tick(client, phase).await;
         let next = automation.snapshot();
         drop(automation);
-        if next.revision != before { let _ = app.emit("automation-changed", &next); }
+        if next.revision != before {
+            let _ = app.emit("automation-changed", &next);
+        }
+
+        let mut auto_select = self.auto_select.lock().await;
+        if auto_select.tick(client, phase).await {
+            let snap = auto_select.snapshot();
+            drop(auto_select);
+            let _ = app.emit("auto-select-changed", &snap);
+        }
+
+        let mut auto_gameflow = self.auto_gameflow.lock().await;
+        if auto_gameflow.tick(client, phase).await {
+            let snap = auto_gameflow.snapshot();
+            drop(auto_gameflow);
+            let _ = app.emit("auto-gameflow-changed", &snap);
+        }
     }
 
     pub async fn profile(&self) -> Result<PlayerProfile, String> {

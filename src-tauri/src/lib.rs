@@ -1,3 +1,5 @@
+mod auto_gameflow;
+mod auto_select;
 mod automation;
 mod db;
 mod discovery;
@@ -13,6 +15,8 @@ mod profile;
 mod rankings;
 mod runtime;
 
+use auto_gameflow::{AutoGameflowConfig, AutoGameflowSnapshot};
+use auto_select::{AutoSelectConfig, AutoSelectSnapshot};
 use automation::AutomationSnapshot;
 use db::{EncounteredGame, SavedPlayer};
 use match_history::{MatchDetail, PlayerDetail, SummonerOverview};
@@ -375,6 +379,78 @@ async fn send_champ_select_chat(
     state.send_champ_select_chat(message).await
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChampionCatalogItem {
+    id: i64,
+    name: String,
+}
+
+#[tauri::command]
+async fn get_auto_select_state(
+    state: State<'_, RuntimeState>,
+) -> Result<AutoSelectSnapshot, String> {
+    Ok(state.auto_select_snapshot().await)
+}
+
+#[tauri::command]
+async fn set_auto_select_config(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    config: AutoSelectConfig,
+) -> Result<AutoSelectSnapshot, String> {
+    state.set_auto_select_config(&app, config).await
+}
+
+#[tauri::command]
+async fn set_auto_select_paused(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    paused: bool,
+) -> Result<AutoSelectSnapshot, String> {
+    Ok(state.set_auto_select_paused(&app, paused).await)
+}
+
+#[tauri::command]
+async fn get_auto_gameflow_state(
+    state: State<'_, RuntimeState>,
+) -> Result<AutoGameflowSnapshot, String> {
+    Ok(state.auto_gameflow_snapshot().await)
+}
+
+#[tauri::command]
+async fn set_auto_gameflow_config(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    config: AutoGameflowConfig,
+) -> Result<AutoGameflowSnapshot, String> {
+    state.set_auto_gameflow_config(&app, config).await
+}
+
+#[tauri::command]
+async fn get_champion_catalog(
+    state: State<'_, RuntimeState>,
+) -> Result<Vec<ChampionCatalogItem>, String> {
+    let items = state.get_champion_catalog().await?;
+    Ok(items
+        .into_iter()
+        .map(|(id, name)| ChampionCatalogItem { id, name })
+        .collect())
+}
+
+#[tauri::command]
+async fn bench_swap_champion(
+    state: State<'_, RuntimeState>,
+    champion_id: i64,
+) -> Result<(), String> {
+    state.bench_swap_champion(champion_id).await
+}
+
+#[tauri::command]
+async fn bench_reroll(state: State<'_, RuntimeState>, grab_back: bool) -> Result<(), String> {
+    state.bench_reroll(grab_back).await
+}
+
 #[tauri::command]
 fn get_launch_at_startup() -> Result<bool, String> {
     startup_enabled()
@@ -513,6 +589,14 @@ pub fn run() {
             get_match_detail,
             get_ongoing_game,
             send_champ_select_chat,
+            get_auto_select_state,
+            set_auto_select_config,
+            set_auto_select_paused,
+            get_auto_gameflow_state,
+            set_auto_gameflow_config,
+            get_champion_catalog,
+            bench_swap_champion,
+            bench_reroll,
             get_launch_at_startup,
             set_launch_at_startup,
         ])
@@ -520,6 +604,12 @@ pub fn run() {
             let config_dir = app.path().app_config_dir()?;
             app.state::<RuntimeState>()
                 .configure_automation(config_dir.join("automation.json"))
+                .map_err(std::io::Error::other)?;
+            app.state::<RuntimeState>()
+                .configure_auto_select(config_dir.join("auto_select.json"))
+                .map_err(std::io::Error::other)?;
+            app.state::<RuntimeState>()
+                .configure_auto_gameflow(config_dir.join("auto_gameflow.json"))
                 .map_err(std::io::Error::other)?;
             app.state::<RuntimeState>()
                 .configure_database(config_dir.join("xiayin.db"))

@@ -23,6 +23,24 @@ pub struct Skin {
     pub splash_image_path: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchChampion {
+    pub champion_id: i64,
+    pub swappable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchState {
+    pub enabled: bool,
+    pub can_use: bool,
+    pub phase: String,
+    pub rerolls_remaining: u8,
+    pub show_reroll: bool,
+    pub champions: Vec<BenchChampion>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSnapshot {
@@ -36,6 +54,7 @@ pub struct AppSnapshot {
     pub write_enabled: bool,
     pub write_block_reason: Option<String>,
     pub skins: Vec<Skin>,
+    pub bench: Option<BenchState>,
     pub revision: u64,
     pub updated_at_ms: u64,
 }
@@ -53,6 +72,7 @@ impl AppSnapshot {
             write_enabled: false,
             write_block_reason: message.map(str::to_string),
             skins: Vec::new(),
+            bench: None,
             revision: 0,
             updated_at_ms: now_ms(),
         }
@@ -70,6 +90,7 @@ impl AppSnapshot {
             write_enabled: false,
             write_block_reason: Some("outside-champion-select".to_string()),
             skins: Vec::new(),
+            bench: None,
             revision: 0,
             updated_at_ms: now_ms(),
         }
@@ -86,6 +107,7 @@ impl AppSnapshot {
             && self.write_enabled == other.write_enabled
             && self.write_block_reason == other.write_block_reason
             && self.skins == other.skins
+            && self.bench == other.bench
     }
 
     pub fn mark_selected(&mut self, skin_id: i64) {

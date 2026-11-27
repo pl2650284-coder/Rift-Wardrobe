@@ -19,6 +19,20 @@ export type CompanionSkin = {
   splashImagePath: string | null;
 };
 
+export type CompanionBenchChampion = {
+  championId: number;
+  swappable: boolean;
+};
+
+export type CompanionBenchState = {
+  enabled: boolean;
+  canUse: boolean;
+  phase: string;
+  rerollsRemaining: number;
+  showReroll: boolean;
+  champions: CompanionBenchChampion[];
+};
+
 export type CompanionSnapshot = {
   connection: "disconnected" | "ready";
   phase: string;
@@ -30,6 +44,7 @@ export type CompanionSnapshot = {
   writeEnabled: boolean;
   writeBlockReason: string | null;
   skins: CompanionSkin[];
+  bench?: CompanionBenchState | null;
 };
 
 export type CompanionRenderContext = {
@@ -55,6 +70,11 @@ export type CompanionRenderContext = {
   ongoingError: string;
   sendingChat: boolean;
   quickTagPuuid: string | null;
+  autoSelectActive: boolean;
+  autoSelectPaused: boolean;
+  benchBusy: boolean;
+  benchPriorityIds: number[];
+  championNameById: (id: number) => string;
   escape: (s: string) => string;
   icon: (name: string, size?: number) => string;
   skinImage: (skin: CompanionSkin, large?: boolean) => string;
@@ -298,12 +318,68 @@ export function renderCompanionShell(ctx: CompanionRenderContext): string {
       <select class="companion-delay" data-auto-accept-delay aria-label="自动接受延迟" ${!ctx.autoAcceptReady || ctx.autoAcceptSaving ? "disabled" : ""}>
         ${[0, 1, 2, 3, 4, 5].map((s) => `<option value="${s}" ${ctx.autoAcceptDelaySeconds === s ? "selected" : ""}>${s}s</option>`).join("")}
       </select>
+      ${ctx.autoSelectActive ? `<button class="companion-pause-btn ${ctx.autoSelectPaused ? "is-paused" : ""}" data-action="toggle-auto-select-pause">${ctx.autoSelectPaused ? "已暂停选禁" : "暂停选禁"}</button>` : ""}
     </footer>
   </div>`;
 }
 
+function renderCompanionBench(ctx: CompanionRenderContext): string {
+  const { escape: e, icon, snapshot, benchBusy, benchPriorityIds, championNameById } = ctx;
+  const bench = snapshot.bench;
+  if (!bench || !bench.enabled) return "";
+
+  const currentChampId = snapshot.championId;
+  const currentChampIcon = currentChampId
+    ? ctx.gameIcon(
+        snapshot.championName ?? championNameById(currentChampId),
+        "#6b8afd",
+        `/lol-game-data/assets/v1/champion-icons/${currentChampId}.png`,
+        undefined,
+        "champion",
+        "comp-bench-self-icon",
+      )
+    : `<span class="comp-bench-self-empty">${icon("gamepad-2", 16)}</span>`;
+
+  const slots = bench.champions.slice(0, 10);
+  const emptyCount = Math.max(0, 10 - slots.length);
+
+  return `<section class="comp-bench" aria-label="大乱斗候补席">
+    <div class="comp-bench-head">
+      <strong>候补席</strong>
+      <span class="num">${slots.length} / 10</span>
+    </div>
+    <div class="comp-bench-body">
+      <div class="comp-bench-self">
+        <div class="comp-bench-self-avatar" title="${e(snapshot.championName ?? "当前英雄")}">${currentChampIcon}</div>
+        ${bench.showReroll ? `<div class="comp-bench-rerolls">
+          <button class="comp-bench-btn" data-action="bench-reroll" title="使用骰子重随（剩余 ${bench.rerollsRemaining}）" ${bench.rerollsRemaining === 0 || benchBusy ? "disabled" : ""}>
+            ${icon("refresh-cw", 12)}<span class="num">${bench.rerollsRemaining}</span>
+          </button>
+          <button class="comp-bench-btn" data-action="bench-reroll-grab" title="重随并立即抢回原英雄（给队友发福利）" ${bench.rerollsRemaining === 0 || benchBusy || !currentChampId ? "disabled" : ""}>
+            ${icon("shuffle", 12)}
+          </button>
+        </div>` : ""}
+      </div>
+      <div class="comp-bench-divider" aria-hidden="true"></div>
+      <div class="comp-bench-grid">
+        ${slots.map((item) => {
+          const name = championNameById(item.championId);
+          const priority = benchPriorityIds.includes(item.championId);
+          const disabled = !item.swappable || !bench.canUse || benchBusy;
+          return `<button class="comp-bench-slot ${disabled ? "is-locked" : ""} ${priority ? "is-priority" : ""}" data-bench-swap="${item.championId}" title="${e(disabled ? `${name}（暂不可换）` : `点击抢 ${name}（右键切换自动秒抢）`)}" ${disabled ? "disabled" : ""}>
+            ${ctx.gameIcon(name, "#6b8afd", `/lol-game-data/assets/v1/champion-icons/${item.championId}.png`, undefined, "champion")}
+            ${priority ? `<span class="comp-bench-star" aria-hidden="true"></span>` : ""}
+          </button>`;
+        }).join("")}
+        ${Array.from({ length: emptyCount }, () => `<span class="comp-bench-slot is-empty" aria-hidden="true"></span>`).join("")}
+      </div>
+    </div>
+  </section>`;
+}
+
 function renderCompanionSkins(ctx: CompanionRenderContext): string {
   const { escape: e, icon, snapshot } = ctx;
+  const benchHtml = renderCompanionBench(ctx);
   const current = snapshot.skins.find((s) => s.id === ctx.selectedSkinId) ?? snapshot.skins[0];
   const filtered = ctx.filteredSkins();
   const ready = snapshot.connection === "ready" && snapshot.active;
@@ -360,7 +436,7 @@ function renderCompanionSkins(ctx: CompanionRenderContext): string {
       </div>`
     : `<div class="comp-list-empty">${snapshot.skins.length ? "没有符合筛选条件的皮肤" : "进入选人后自动加载皮肤列表"}</div>`;
 
-  return `${stage}${tools}${list}`;
+  return `${benchHtml}${stage}${tools}${list}`;
 }
 
 function renderCompanionBuild(ctx: CompanionRenderContext): string {

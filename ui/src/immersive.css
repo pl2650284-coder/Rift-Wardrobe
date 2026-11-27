@@ -1195,6 +1195,217 @@ button:focus-visible, select:focus-visible, input:focus-visible, .skin-grid:focu
   font-weight: 600;
 }
 
+/* ========== Phase 2.3: Auto-Select & Auto-Gameflow ========== */
+.auto-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.auto-page .settings-layout { width: 100%; margin: 0; }
+.auto-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.auto-pause-pill { min-height: 32px; padding: 0 12px; font-size: 12px; }
+.auto-pause-pill.is-paused { border-color: var(--warning); color: var(--warning); }
+.as-section {
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.as-pos-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.as-pos-btn {
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 12px;
+}
+.as-pos-btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.as-priority-box { display: flex; flex-direction: column; gap: 8px; }
+.as-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; align-items: center; }
+.as-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 6px 0 8px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+  color: var(--text);
+}
+.as-chip b { color: var(--accent); font-size: 11px; }
+.as-chip-del {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-2);
+  background: transparent;
+  font-size: 13px;
+}
+.as-chip-del:hover { color: var(--negative); background: var(--loss-bg); }
+.as-empty-chip { font-size: 12px; color: var(--muted-2); }
+.as-add-row { display: flex; gap: 8px; }
+.as-champ-select { width: 100%; max-width: 240px; }
+.companion-pause-btn {
+  margin-left: auto;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.companion-pause-btn:hover { color: var(--text); border-color: var(--accent); }
+.companion-pause-btn.is-paused {
+  border-color: var(--warning);
+  color: var(--warning);
+  background: rgba(229, 181, 103, 0.12);
+}
+
+/* ========== Companion ARAM Bench Grabber ========== */
+.comp-bench {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 9px 11px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+.comp-bench-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.comp-bench-head strong { font-weight: 600; color: var(--text); }
+.comp-bench-head span { color: var(--muted-2); }
+.comp-bench-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.comp-bench-self {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.comp-bench-self-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  display: grid;
+  place-items: center;
+}
+.comp-bench-self-avatar .champion-token {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  border-radius: 50%;
+  border: 0;
+}
+.comp-bench-self-empty { color: var(--muted-2); display: grid; place-items: center; }
+.comp-bench-rerolls { display: flex; gap: 4px; }
+.comp-bench-btn {
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.comp-bench-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.comp-bench-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.comp-bench-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  flex: none;
+}
+.comp-bench-grid {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.comp-bench-slot {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.comp-bench-slot:not(.is-empty):not(.is-locked):hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.comp-bench-slot .champion-token {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: 0;
+  font-size: 11px;
+}
+.comp-bench-slot.is-locked {
+  opacity: 0.42;
+  filter: grayscale(0.85);
+  cursor: not-allowed;
+}
+.comp-bench-slot.is-empty {
+  border: 1px dashed var(--line);
+  background: var(--surface-muted);
+}
+.comp-bench-slot.is-priority {
+  border-color: var(--warning);
+}
+.comp-bench-star {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
 /* ========== Minimal News / Rankings Polish ========== */
 .news-mode-header { padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .news-mode-header h1 { font-size: 22px; font-weight: 600; color: var(--text); }

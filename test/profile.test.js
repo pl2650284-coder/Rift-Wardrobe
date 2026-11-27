@@ -163,10 +163,13 @@ const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   renderNewsPage, renderAutomationPage, renderToolkitPage, selectNewsMode, runToolkitAction,
   searchAndOpenPlayer, openMatchDetail, savePlayerTag, deletePlayerTag,
   loadCompanionOngoing, sendOngoingToChampSelectChat,
+  saveAutoSelectConfig, toggleAutoSelectPause, saveAutoGameflowConfig,
+  benchSwapChampion, benchReroll,
   updateAutoAccept, updateAutoAcceptDelay, receiveAutomation,
   state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab,
     autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs, runtimeStatus,
-    activePlayerTab, openPlayerTabs, matchDetailOpen, matchDetail, savedPlayers, ongoingGame }),
+    activePlayerTab, openPlayerTabs, matchDetailOpen, matchDetail, savedPlayers, ongoingGame,
+    autoSelectConfig, autoSelectPaused, autoGameflowConfig }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -607,4 +610,108 @@ test("companion ongoing tab renders team analysis, premade group, and sends cham
   assert.ok(chatCall);
   assert.match(chatCall.args.message, /我自己 胜率60% KDA4\.0 3连胜/);
   assert.match(chatCall.args.message, /开黑辅助 胜率70% KDA5\.1/);
+});
+
+test("auto-select & auto-gameflow configs persist via IPC and companion exposes per-game pause", async () => {
+  let asState = {
+    config: {
+      pickEnabled: false, pickStrategy: "show-and-lock-in", pickDelaySeconds: 0, showIntent: false, ignoreTeammateIntent: false,
+      pickChampions: { default: [], top: [], jungle: [], middle: [], bottom: [], utility: [] },
+      banEnabled: false, banStrategy: "show-and-lock-in", banDelaySeconds: 0, banAvoidTeammateIntent: true,
+      banChampions: { default: [], top: [], jungle: [], middle: [], bottom: [], utility: [] },
+      benchEnabled: false, benchDelaySeconds: 1, benchChampions: [], benchAutoAcceptTrade: false,
+    },
+    pausedThisGame: false, revision: 0, logs: [],
+  };
+  let gfState = {
+    config: {
+      autoHonorEnabled: false, autoHonorStrategy: "random-teammate", autoPlayAgainEnabled: false,
+      autoMatchmakingEnabled: false, autoMatchmakingDelaySeconds: 3, autoMatchmakingMinMembers: 1,
+      autoReconnectEnabled: false, autoInvitationMode: "off",
+    },
+    revision: 0, logs: [],
+  };
+  const onInvoke = async (command, args) => {
+    if (command === "get_auto_select_state") return structuredClone(asState);
+    if (command === "set_auto_select_config") {
+      asState = { ...asState, config: structuredClone(args.config), revision: asState.revision + 1 };
+      return structuredClone(asState);
+    }
+    if (command === "set_auto_select_paused") {
+      asState = { ...asState, pausedThisGame: args.paused, revision: asState.revision + 1 };
+      return structuredClone(asState);
+    }
+    if (command === "get_auto_gameflow_state") return structuredClone(gfState);
+    if (command === "set_auto_gameflow_config") {
+      gfState = { ...gfState, config: structuredClone(args.config), revision: gfState.revision + 1 };
+      return structuredClone(gfState);
+    }
+    return undefined;
+  };
+
+  const ui = page({ initial: connected, hash: "#automation", onInvoke });
+  await settle();
+  assert.match(ui.app.innerHTML, /结算自动点赞/);
+  assert.match(ui.app.innerHTML, /房主自动开始匹配/);
+  await ui.testing.saveAutoGameflowConfig({ ...gfState.config, autoHonorEnabled: true, autoPlayAgainEnabled: true });
+  assert.equal(ui.testing.state().autoGameflowConfig.autoHonorEnabled, true);
+
+  await ui.testing.saveAutoSelectConfig({
+    ...asState.config,
+    pickEnabled: true,
+    pickChampions: { ...asState.config.pickChampions, default: [67, 22] },
+  });
+  assert.equal(ui.testing.state().autoSelectConfig.pickEnabled, true);
+  assert.deepEqual(ui.testing.state().autoSelectConfig.pickChampions.default, [67, 22]);
+
+  const compUi = page({ initial: { ...connected, phase: "ChampSelect", active: true }, search: "?window=companion&tab=skin", onInvoke });
+  await settle();
+  assert.match(compUi.app.innerHTML, /data-action="toggle-auto-select-pause"/);
+  assert.match(compUi.app.innerHTML, /暂停选禁/);
+  await compUi.testing.toggleAutoSelectPause();
+  assert.equal(compUi.testing.state().autoSelectPaused, true);
+  assert.match(compUi.app.innerHTML, /已暂停选禁/);
+});
+
+test("companion window renders ARAM bench 5x2 grid and invokes swap & charity reroll", async () => {
+  const ui = page({
+    initial: {
+      ...connected,
+      phase: "ChampSelect",
+      active: true,
+      championId: 67,
+      championName: "薇恩",
+      bench: {
+        enabled: true,
+        canUse: true,
+        phase: "FINALIZATION",
+        rerollsRemaining: 2,
+        showReroll: true,
+        champions: [
+          { championId: 22, swappable: true },
+          { championId: 103, swappable: false },
+        ],
+      },
+    },
+    search: "?window=companion&tab=skin",
+    onInvoke: async (command) => {
+      if (command === "bench_swap_champion" || command === "bench_reroll") return null;
+      return undefined;
+    },
+  });
+  await settle();
+  assert.match(ui.app.innerHTML, /候补席/);
+  assert.match(ui.app.innerHTML, /data-bench-swap="22"/);
+  assert.match(ui.app.innerHTML, /data-action="bench-reroll"/);
+  assert.match(ui.app.innerHTML, /data-action="bench-reroll-grab"/);
+
+  await ui.testing.benchSwapChampion(22);
+  await ui.testing.benchReroll(true);
+  assert.deepEqual(
+    ui.nativeCalls.filter(({ command }) => command.startsWith("bench_")),
+    [
+      { command: "bench_swap_champion", args: { championId: 22 } },
+      { command: "bench_reroll", args: { grabBack: true } },
+    ],
+  );
 });

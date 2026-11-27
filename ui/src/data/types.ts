@@ -329,3 +329,56 @@ export type OngoingGameSnapshot = {
   enemyTeam: OngoingPlayer[];
   updatedAtMs: number;
 };
+
+export type PositionKey = "default" | "top" | "jungle" | "middle" | "bottom" | "utility";
+
+export type PositionChampions = Record<PositionKey, number[]>;
+
+export type AutoSelectStrategy = "show-and-lock-in" | "just-show" | "lock-in-immediately";
+
+export type AutoSelectConfig = {
+  pickEnabled: boolean;
+  pickStrategy: AutoSelectStrategy;
+  pickDelaySeconds: number;
+  showIntent: boolean;
+  ignoreTeammateIntent: boolean;
+  pickChampions: PositionChampions;
+  banEnabled: boolean;
+  banStrategy: AutoSelectStrategy;
+  banDelaySeconds: number;
+  banAvoidTeammateIntent: boolean;
+  banChampions: PositionChampions;
+  benchEnabled: boolean;
+  benchDelaySeconds: number;
+  benchChampions: number[];
+  benchAutoAcceptTrade: boolean;
+};
+
+export type AutoSelectSnapshot = {
+  config: AutoSelectConfig;
+  pausedThisGame: boolean;
+  revision: number;
+  logs: Array<Omit<AssistantLog, "time"> & { timestampMs: number }>;
+};
+
+export type AutoGameflowConfig = {
+  autoHonorEnabled: boolean;
+  autoHonorStrategy: "random-teammate" | "opt-out";
+  autoPlayAgainEnabled: boolean;
+  autoMatchmakingEnabled: boolean;
+  autoMatchmakingDelaySeconds: number;
+  autoMatchmakingMinMembers: number;
+  autoReconnectEnabled: boolean;
+  autoInvitationMode: "off" | "accept-all" | "decline-all";
+};
+
+export type AutoGameflowSnapshot = {
+  config: AutoGameflowConfig;
+  revision: number;
+  logs: Array<Omit<AssistantLog, "time"> & { timestampMs: number }>;
+};
+
+export type ChampionCatalogItem = {
+  id: number;
+  name: string;
+};
