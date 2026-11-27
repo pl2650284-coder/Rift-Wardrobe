@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { HexDetail } from "./data/hextech";
-import type { OngoingGameSnapshot, OngoingPlayer } from "./data/types";
+import type { LiveGameTimerSnapshot, OngoingGameSnapshot, OngoingPlayer } from "./data/types";
 import { HEX_QUALITIES } from "./hextech-view";
 
-export type CompanionTab = "skin" | "build" | "ongoing";
+export type CompanionTab = "skin" | "build" | "ongoing" | "timer";
 
 export type CompanionSkin = {
   id: number;
@@ -74,6 +74,9 @@ export type CompanionRenderContext = {
   autoSelectPaused: boolean;
   benchBusy: boolean;
   benchPriorityIds: number[];
+  liveTimers: LiveGameTimerSnapshot | null;
+  spellCooldowns: Record<string, number>;
+  nowMs: number;
   championNameById: (id: number) => string;
   escape: (s: string) => string;
   icon: (name: string, size?: number) => string;
@@ -273,7 +276,9 @@ export function renderCompanionShell(ctx: CompanionRenderContext): string {
     ? renderCompanionSkins(ctx)
     : tab === "build"
       ? renderCompanionBuild(ctx)
-      : renderCompanionOngoing(ctx);
+      : tab === "ongoing"
+        ? renderCompanionOngoing(ctx)
+        : renderCompanionTimer(ctx);
 
   return `<div class="companion-shell">
     <header class="titlebar companion-titlebar">
@@ -297,13 +302,16 @@ export function renderCompanionShell(ctx: CompanionRenderContext): string {
 
     <nav class="companion-tabs" role="tablist" aria-label="选人伴随功能">
       <button class="companion-tab ${tab === "skin" ? "is-active" : ""}" role="tab" aria-selected="${tab === "skin"}" data-companion-tab="skin">
-        ${icon("sparkles", 14)}<span>选人换肤</span>
+        ${icon("sparkles", 13)}<span>换肤</span>
       </button>
       <button class="companion-tab ${tab === "build" ? "is-active" : ""}" role="tab" aria-selected="${tab === "build"}" data-companion-tab="build">
-        ${icon("swords", 14)}<span>海克斯速查</span>
+        ${icon("swords", 13)}<span>海克斯</span>
       </button>
       <button class="companion-tab ${tab === "ongoing" ? "is-active" : ""}" role="tab" aria-selected="${tab === "ongoing"}" data-companion-tab="ongoing">
-        ${icon("users", 14)}<span>本局分析</span>
+        ${icon("users", 13)}<span>本局</span>
+      </button>
+      <button class="companion-tab ${tab === "timer" ? "is-active" : ""}" role="tab" aria-selected="${tab === "timer"}" data-companion-tab="timer">
+        ${icon("clock-3", 13)}<span>计时</span>
       </button>
     </nav>
 
@@ -626,5 +634,103 @@ function renderCompanionOngoing(ctx: CompanionRenderContext): string {
         ${ongoingGame.enemyTeam.map((p) => renderOngoingPlayerCard(ctx, p)).join("")}
       </div>
     </section>` : ""}
+  </div>`;
+}
+
+const MANUAL_TIMER_LANES = [
+  { key: "top", label: "上路", spell1: { name: "闪现", cd: 300 }, spell2: { name: "传送", cd: 300 } },
+  { key: "jg", label: "打野", spell1: { name: "闪现", cd: 300 }, spell2: { name: "惩戒", cd: 90 } },
+  { key: "mid", label: "中路", spell1: { name: "闪现", cd: 300 }, spell2: { name: "点燃", cd: 180 } },
+  { key: "bot", label: "下路", spell1: { name: "闪现", cd: 300 }, spell2: { name: "治疗", cd: 240 } },
+  { key: "sup", label: "辅助", spell1: { name: "闪现", cd: 300 }, spell2: { name: "虚弱", cd: 240 } },
+] as const;
+
+function formatClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(total / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function renderSpellTimerButton(
+  key: string,
+  name: string,
+  cdSeconds: number,
+  spellCooldowns: Record<string, number>,
+  nowMs: number,
+  escape: (s: string) => string,
+): string {
+  const expiresAt = spellCooldowns[key] ?? 0;
+  const remaining = Math.ceil((expiresAt - nowMs) / 1000);
+  const active = remaining > 0;
+  return `<button class="comp-cd-btn ${active ? "is-cooling" : ""}" data-spell-timer-key="${escape(key)}" data-spell-timer-cd="${cdSeconds}">
+    <span>${escape(name)}</span>
+    <b class="num">${active ? `${remaining}s` : `${cdSeconds}s`}</b>
+  </button>`;
+}
+
+function renderCompanionTimer(ctx: CompanionRenderContext): string {
+  const { escape: e, icon, liveTimers, spellCooldowns, nowMs } = ctx;
+  const inGame = Boolean(liveTimers?.inGame);
+
+  if (inGame && liveTimers) {
+    const respawn = liveTimers.selfRespawn;
+    return `<div class="comp-timer">
+      <div class="comp-build-head">
+        <div class="comp-og-head-title">
+          <strong>对局计时</strong>
+          <span class="num">${formatClock(liveTimers.gameTimeSeconds)}</span>
+        </div>
+        <div class="comp-og-head-actions">
+          <button class="secondary-button comp-chat-btn" data-action="reset-spell-timers">重置</button>
+          <button class="companion-icon-btn" data-action="refresh-live-timers" title="刷新对局数据">${icon("refresh-ccw", 14)}</button>
+        </div>
+      </div>
+
+      ${respawn?.isDead ? `<div class="comp-respawn-banner">
+        <span>${e(respawn.championName)} 复活倒计时</span>
+        <strong class="num">${Math.ceil(respawn.respawnTimer)}s</strong>
+      </div>` : ""}
+
+      <div class="comp-timer-list">
+        ${liveTimers.enemies.map((enemy, idx) => `<div class="comp-timer-row">
+          <div class="comp-timer-who">
+            <strong>${e(enemy.championName)}</strong>
+            <span class="num">
+              ${enemy.isDead ? `阵亡 ${Math.ceil(enemy.respawnTimer)}s` : e(enemy.summonerName)}
+              ${enemy.hasIonianBoots ? " · CD鞋" : ""}${enemy.hasCosmicInsight ? " · 星界" : ""}
+            </span>
+          </div>
+          <div class="comp-timer-spells">
+            ${renderSpellTimerButton(`live-${idx}-1`, enemy.spell1.name, enemy.spell1.effectiveCd, spellCooldowns, nowMs, e)}
+            ${renderSpellTimerButton(`live-${idx}-2`, enemy.spell2.name, enemy.spell2.effectiveCd, spellCooldowns, nowMs, e)}
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  return `<div class="comp-timer">
+    <div class="comp-build-head">
+      <div class="comp-og-head-title">
+        <strong>技能计时</strong>
+        <span>手动模式</span>
+      </div>
+      <div class="comp-og-head-actions">
+        <button class="secondary-button comp-chat-btn" data-action="reset-spell-timers">重置</button>
+        <button class="companion-icon-btn" data-action="refresh-live-timers" title="检测对局">${icon("refresh-ccw", 14)}</button>
+      </div>
+    </div>
+    <div class="comp-timer-list">
+      ${MANUAL_TIMER_LANES.map((lane) => `<div class="comp-timer-row">
+        <div class="comp-timer-who">
+          <strong>${lane.label}</strong>
+        </div>
+        <div class="comp-timer-spells">
+          ${renderSpellTimerButton(`manual-${lane.key}-1`, lane.spell1.name, lane.spell1.cd, spellCooldowns, nowMs, e)}
+          ${renderSpellTimerButton(`manual-${lane.key}-2`, lane.spell2.name, lane.spell2.cd, spellCooldowns, nowMs, e)}
+        </div>
+      </div>`).join("")}
+    </div>
   </div>`;
 }

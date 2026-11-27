@@ -1,3 +1,4 @@
+mod auto_champ_config;
 mod auto_gameflow;
 mod auto_select;
 mod automation;
@@ -7,6 +8,7 @@ mod game_assets;
 mod hextech;
 mod lcu;
 mod lcu_ws;
+mod live_client;
 mod match_history;
 mod models;
 mod official_data;
@@ -15,10 +17,12 @@ mod profile;
 mod rankings;
 mod runtime;
 
+use auto_champ_config::{AutoChampConfigSnapshot, ChampionPresetEntry};
 use auto_gameflow::{AutoGameflowConfig, AutoGameflowSnapshot};
 use auto_select::{AutoSelectConfig, AutoSelectSnapshot};
 use automation::AutomationSnapshot;
 use db::{EncounteredGame, SavedPlayer};
+use live_client::LiveGameTimerSnapshot;
 use match_history::{MatchDetail, PlayerDetail, SummonerOverview};
 use models::{AppSnapshot, ApplyResult};
 use official_data::NewsDataSnapshot;
@@ -452,6 +456,82 @@ async fn bench_reroll(state: State<'_, RuntimeState>, grab_back: bool) -> Result
 }
 
 #[tauri::command]
+async fn get_auto_champ_config(
+    state: State<'_, RuntimeState>,
+) -> Result<AutoChampConfigSnapshot, String> {
+    Ok(state.auto_champ_config_snapshot().await)
+}
+
+#[tauri::command]
+async fn set_auto_champ_config_enabled(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    enabled: bool,
+) -> Result<AutoChampConfigSnapshot, String> {
+    state.set_auto_champ_config_enabled(&app, enabled).await
+}
+
+#[tauri::command]
+async fn upsert_champ_preset(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    entry: ChampionPresetEntry,
+) -> Result<AutoChampConfigSnapshot, String> {
+    state.upsert_champ_preset(&app, entry).await
+}
+
+#[tauri::command]
+async fn delete_champ_preset(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    champion_id: i64,
+    mode: String,
+) -> Result<AutoChampConfigSnapshot, String> {
+    state.delete_champ_preset(&app, champion_id, mode).await
+}
+
+#[tauri::command]
+async fn capture_current_champ_config(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    champion_id: i64,
+    mode: String,
+) -> Result<AutoChampConfigSnapshot, String> {
+    state
+        .capture_current_champ_config(&app, champion_id, mode)
+        .await
+}
+
+#[tauri::command]
+async fn import_recommended_runes(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    champion_id: i64,
+    mode: String,
+) -> Result<AutoChampConfigSnapshot, String> {
+    state
+        .import_recommended_runes(&app, champion_id, mode)
+        .await
+}
+
+#[tauri::command]
+async fn apply_champ_preset_now(
+    app: tauri::AppHandle,
+    state: State<'_, RuntimeState>,
+    champion_id: i64,
+    mode: String,
+) -> Result<AutoChampConfigSnapshot, String> {
+    state.apply_champ_preset_now(&app, champion_id, mode).await
+}
+
+#[tauri::command]
+async fn get_live_game_timers(
+    state: State<'_, RuntimeState>,
+) -> Result<LiveGameTimerSnapshot, String> {
+    Ok(state.get_live_game_timers().await)
+}
+
+#[tauri::command]
 fn get_launch_at_startup() -> Result<bool, String> {
     startup_enabled()
 }
@@ -597,6 +677,14 @@ pub fn run() {
             get_champion_catalog,
             bench_swap_champion,
             bench_reroll,
+            get_auto_champ_config,
+            set_auto_champ_config_enabled,
+            upsert_champ_preset,
+            delete_champ_preset,
+            capture_current_champ_config,
+            import_recommended_runes,
+            apply_champ_preset_now,
+            get_live_game_timers,
             get_launch_at_startup,
             set_launch_at_startup,
         ])
@@ -610,6 +698,9 @@ pub fn run() {
                 .map_err(std::io::Error::other)?;
             app.state::<RuntimeState>()
                 .configure_auto_gameflow(config_dir.join("auto_gameflow.json"))
+                .map_err(std::io::Error::other)?;
+            app.state::<RuntimeState>()
+                .configure_auto_champ_config(config_dir.join("auto_champ_config.json"))
                 .map_err(std::io::Error::other)?;
             app.state::<RuntimeState>()
                 .configure_database(config_dir.join("xiayin.db"))

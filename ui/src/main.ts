@@ -54,6 +54,8 @@ import { DEFAULT_PREFERENCES } from "./data/mock";
 import type {
   AppPreferences,
   AssistantLog,
+  AutoChampConfigData,
+  AutoChampConfigSnapshot,
   AutoGameflowConfig,
   AutoGameflowSnapshot,
   AutoSelectConfig,
@@ -62,7 +64,9 @@ import type {
   AutomationSnapshot,
   AugmentStat,
   ChampionCatalogItem,
+  ChampionPresetEntry,
   ChampionStat,
+  LiveGameTimerSnapshot,
   MatchDetail,
   NewsDataMeta,
   AugmentCombo,
@@ -234,7 +238,9 @@ const initialCompanionTab: CompanionTab = urlCompanionTab === "build"
   ? "build"
   : urlCompanionTab === "ongoing"
     ? "ongoing"
-    : "skin";
+    : urlCompanionTab === "timer"
+      ? "timer"
+      : "skin";
 const disconnectedSnapshot: Snapshot = {
   connection: "disconnected",
   phase: "Disconnected",
@@ -337,12 +343,24 @@ let newsMeta: NewsDataMeta = {
 let assistantLogs: AssistantLog[] = [];
 let autoSelectLogs: AssistantLog[] = [];
 let autoGameflowLogs: AssistantLog[] = [];
+let autoChampConfigLogs: AssistantLog[] = [];
 let automationSubTab: AutomationSubTab = "flow";
 let autoSelectPickPos: PositionKey = "default";
 let autoSelectBanPos: PositionKey = "default";
 let autoSelectPaused = false;
 let autoSelectRevision = -1;
 let autoGameflowRevision = -1;
+let autoChampConfigRevision = -1;
+let autoChampConfig: AutoChampConfigData = { enabled: false, presets: {} };
+let ccChampionId = 67;
+let ccMode: "default" | "aram" | "ranked" = "default";
+let ccSpell1Id = 4;
+let ccSpell2Id = 7;
+let ccBusy = false;
+let liveTimers: LiveGameTimerSnapshot | null = null;
+let spellCooldowns: Record<string, number> = {};
+let companionTimerInterval: number | undefined;
+let companionTimerTicks = 0;
 let autoSelectConfig: AutoSelectConfig = {
   pickEnabled: false,
   pickStrategy: "show-and-lock-in",
@@ -416,6 +434,7 @@ let cleanupListener: UnlistenFn | undefined;
 let cleanupAutomationListener: UnlistenFn | undefined;
 let cleanupAutoSelectListener: UnlistenFn | undefined;
 let cleanupAutoGameflowListener: UnlistenFn | undefined;
+let cleanupChampConfigListener: UnlistenFn | undefined;
 let cleanupAppearanceListener: UnlistenFn | undefined;
 let cleanupCompanionNavListener: UnlistenFn | undefined;
 let cleanupWindowResize: UnlistenFn | undefined;
@@ -1411,7 +1430,7 @@ function preferenceRow(key: string, title: string, checked: boolean): string {
 }
 
 function mergedAutomationLogs(): AssistantLog[] {
-  return [...assistantLogs, ...autoSelectLogs, ...autoGameflowLogs].slice(0, 60);
+  return [...assistantLogs, ...autoSelectLogs, ...autoGameflowLogs, ...autoChampConfigLogs].slice(0, 60);
 }
 
 function activeChampionCatalog(): ChampionCatalogItem[] {
@@ -1432,6 +1451,12 @@ function renderAutomationPage(): string {
     autoSelect: autoSelectConfig,
     autoSelectPaused,
     autoGameflow: autoGameflowConfig,
+    autoChampConfig,
+    ccChampionId,
+    ccMode,
+    ccSpell1Id,
+    ccSpell2Id,
+    ccBusy,
     pickPosition: autoSelectPickPos,
     banPosition: autoSelectBanPos,
     champions: activeChampionCatalog(),
@@ -1511,6 +1536,9 @@ function renderCompanionWindow(): void {
     autoSelectPaused,
     benchBusy,
     benchPriorityIds: autoSelectConfig.benchChampions,
+    liveTimers,
+    spellCooldowns,
+    nowMs: Date.now(),
     championNameById: (id) => activeChampionCatalog().find((c) => c.id === id)?.name ?? `英雄 #${id}`,
     escape: escapeHtml,
     icon,
@@ -2027,13 +2055,16 @@ function wireEvents(): void {
   }));
   app.querySelectorAll<HTMLElement>("[data-companion-tab]").forEach((element) => element.addEventListener("click", () => {
     const tab = element.dataset.companionTab;
-    if (tab !== "skin" && tab !== "build" && tab !== "ongoing") return;
+    if (tab !== "skin" && tab !== "build" && tab !== "ongoing" && tab !== "timer") return;
     companionTab = tab;
     if (tab === "build") {
       void loadCompanionBuild(companionBuildHeroId ?? snapshot.championId);
     }
     if (tab === "ongoing") {
       void loadCompanionOngoing();
+    }
+    if (tab === "timer") {
+      void refreshLiveTimers();
     }
     render();
   }));
@@ -2118,10 +2149,48 @@ function wireEvents(): void {
   }));
   app.querySelectorAll<HTMLElement>("[data-auto-tab]").forEach((element) => element.addEventListener("click", () => {
     const tab = element.dataset.autoTab;
-    if (tab !== "flow" && tab !== "select" && tab !== "logs") return;
+    if (tab !== "flow" && tab !== "select" && tab !== "champ-config" && tab !== "logs") return;
     automationSubTab = tab;
-    if (tab === "select") void hydrateChampionCatalog();
+    if (tab === "select" || tab === "champ-config") void hydrateChampionCatalog();
     render();
+  }));
+  app.querySelector<HTMLInputElement>("[data-cc-enabled]")?.addEventListener("change", (event) => {
+    const input = event.currentTarget;
+    if (input instanceof HTMLInputElement) void toggleAutoChampConfigEnabled(input.checked);
+  });
+  app.querySelector<HTMLSelectElement>("[data-cc-champ]")?.addEventListener("change", (event) => {
+    const select = event.currentTarget as HTMLSelectElement;
+    ccChampionId = Number(select.value);
+    syncSelectedChampPresetSpells();
+    render();
+  });
+  app.querySelector<HTMLSelectElement>("[data-cc-mode]")?.addEventListener("change", (event) => {
+    const mode = (event.currentTarget as HTMLSelectElement).value;
+    if (mode !== "default" && mode !== "aram" && mode !== "ranked") return;
+    ccMode = mode;
+    syncSelectedChampPresetSpells();
+    render();
+  });
+  app.querySelector<HTMLSelectElement>("[data-cc-spell1]")?.addEventListener("change", (event) => {
+    ccSpell1Id = Number((event.currentTarget as HTMLSelectElement).value);
+  });
+  app.querySelector<HTMLSelectElement>("[data-cc-spell2]")?.addEventListener("change", (event) => {
+    ccSpell2Id = Number((event.currentTarget as HTMLSelectElement).value);
+  });
+  app.querySelectorAll<HTMLElement>("[data-cc-apply-cid]").forEach((el) => el.addEventListener("click", () => {
+    const cid = Number(el.dataset.ccApplyCid);
+    const mode = el.dataset.ccApplyMode ?? "default";
+    if (Number.isInteger(cid) && cid > 0) void applyChampPresetNow(cid, mode);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-cc-del-cid]").forEach((el) => el.addEventListener("click", () => {
+    const cid = Number(el.dataset.ccDelCid);
+    const mode = el.dataset.ccDelMode ?? "default";
+    if (Number.isInteger(cid) && cid > 0) void deleteChampPreset(cid, mode);
+  }));
+  app.querySelectorAll<HTMLElement>("[data-spell-timer-key]").forEach((el) => el.addEventListener("click", () => {
+    const key = el.dataset.spellTimerKey;
+    const cd = Number(el.dataset.spellTimerCd);
+    if (key && Number.isFinite(cd) && cd > 0) toggleSpellTimer(key, cd);
   }));
   app.querySelectorAll<HTMLElement>("[data-as-pos-kind]").forEach((element) => element.addEventListener("click", () => {
     const kind = element.dataset.asPosKind;
@@ -2233,6 +2302,15 @@ function wireEvents(): void {
     if (action === "toggle-auto-select-pause") void toggleAutoSelectPause();
     if (action === "bench-reroll") void benchReroll(false);
     if (action === "bench-reroll-grab") void benchReroll(true);
+    if (action === "cc-save-spells") void saveChampSpellsPreset();
+    if (action === "cc-capture") void captureCurrentChampConfig();
+    if (action === "cc-import-rec") void importRecommendedRunes();
+    if (action === "cc-apply-now") void applyChampPresetNow(ccChampionId, ccMode);
+    if (action === "reset-spell-timers") {
+      spellCooldowns = {};
+      render();
+    }
+    if (action === "refresh-live-timers") void refreshLiveTimers();
     if (action === "open-saved-players") {
       savedPlayersOpen = true;
       void hydrateSavedPlayers();
@@ -2494,6 +2572,190 @@ async function saveAutoGameflowConfig(next: AutoGameflowConfig): Promise<void> {
   }
 }
 
+function syncSelectedChampPresetSpells(): void {
+  const entry = autoChampConfig.presets[`${ccChampionId}:${ccMode}`];
+  if (entry?.spells) {
+    ccSpell1Id = entry.spells.spell1Id;
+    ccSpell2Id = entry.spells.spell2Id;
+  }
+}
+
+function receiveAutoChampConfig(next: AutoChampConfigSnapshot): void {
+  if (!next || typeof next !== "object" || !next.data || typeof next.revision !== "number") return;
+  if (next.revision < autoChampConfigRevision) return;
+  autoChampConfigRevision = next.revision;
+  autoChampConfig = next.data;
+  autoChampConfigLogs = Array.isArray(next.logs) ? next.logs.map((l) => ({ ...l, time: formatTime(l.timestampMs) })) : [];
+  syncSelectedChampPresetSpells();
+  render();
+}
+
+async function hydrateAutoChampConfig(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("get_auto_champ_config", {}));
+  } catch {
+    // Non-critical startup hydration.
+  }
+}
+
+async function toggleAutoChampConfigEnabled(enabled: boolean): Promise<void> {
+  if (!isTauri) {
+    autoChampConfig = { ...autoChampConfig, enabled };
+    render();
+    return;
+  }
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("set_auto_champ_config_enabled", { enabled }));
+    showToast(enabled ? "已开启自动应用英雄符文与技能" : "已关闭自动应用英雄配置");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  }
+}
+
+async function saveChampSpellsPreset(): Promise<void> {
+  if (ccBusy) return;
+  if (ccSpell1Id === ccSpell2Id) {
+    showToast("两个召唤师技能不能相同", "error");
+    return;
+  }
+  const existing = autoChampConfig.presets[`${ccChampionId}:${ccMode}`];
+  const entry: ChampionPresetEntry = {
+    championId: ccChampionId,
+    mode: ccMode,
+    runes: existing?.runes ?? null,
+    spells: { spell1Id: ccSpell1Id, spell2Id: ccSpell2Id },
+  };
+  if (!isTauri) {
+    autoChampConfig = {
+      ...autoChampConfig,
+      presets: { ...autoChampConfig.presets, [`${ccChampionId}:${ccMode}`]: entry },
+    };
+    render();
+    showToast("演示：已保存技能预设");
+    return;
+  }
+  ccBusy = true;
+  render();
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("upsert_champ_preset", { entry }));
+    showToast("已保存召唤师技能预设");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    ccBusy = false;
+    render();
+  }
+}
+
+async function captureCurrentChampConfig(): Promise<void> {
+  if (ccBusy) return;
+  if (!isTauri) {
+    showToast("演示模式无法读取客户端符文页", "error");
+    return;
+  }
+  ccBusy = true;
+  render();
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("capture_current_champ_config", {
+      championId: ccChampionId,
+      mode: ccMode,
+    }));
+    showToast("已抓取当前符文与技能预设");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    ccBusy = false;
+    render();
+  }
+}
+
+async function importRecommendedRunes(): Promise<void> {
+  if (ccBusy) return;
+  if (!isTauri) {
+    showToast("演示模式无法读取官方推荐符文", "error");
+    return;
+  }
+  ccBusy = true;
+  render();
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("import_recommended_runes", {
+      championId: ccChampionId,
+      mode: ccMode,
+    }));
+    showToast("已导入官方推荐符文");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    ccBusy = false;
+    render();
+  }
+}
+
+async function applyChampPresetNow(championId: number, mode: string): Promise<void> {
+  if (ccBusy) return;
+  if (!isTauri) {
+    showToast("演示：已应用英雄预设");
+    return;
+  }
+  ccBusy = true;
+  render();
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("apply_champ_preset_now", {
+      championId,
+      mode,
+    }));
+    showToast("已应用英雄符文与技能");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    ccBusy = false;
+    render();
+  }
+}
+
+async function deleteChampPreset(championId: number, mode: string): Promise<void> {
+  if (!isTauri) {
+    const next = { ...autoChampConfig.presets };
+    delete next[`${championId}:${mode}`];
+    autoChampConfig = { ...autoChampConfig, presets: next };
+    render();
+    return;
+  }
+  try {
+    receiveAutoChampConfig(await invokeCommand<AutoChampConfigSnapshot>("delete_champ_preset", {
+      championId,
+      mode,
+    }));
+    showToast("已删除该英雄配置");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), "error");
+  }
+}
+
+function toggleSpellTimer(key: string, cdSeconds: number): void {
+  const now = Date.now();
+  if ((spellCooldowns[key] ?? 0) > now) {
+    delete spellCooldowns[key];
+  } else {
+    spellCooldowns[key] = now + cdSeconds * 1000;
+  }
+  render();
+}
+
+async function refreshLiveTimers(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    const next = await invokeCommand<LiveGameTimerSnapshot>("get_live_game_timers", {});
+    if (next && typeof next === "object" && typeof next.inGame === "boolean") {
+      liveTimers = next;
+      if (isCompanionWindow && companionTab === "timer") render();
+    }
+  } catch {
+    // 2999 port is only alive during an active game.
+  }
+}
+
 async function updateAutoAcceptDelay(seconds: number): Promise<void> {
   await updateAutoAccept(autoAccept, seconds);
 }
@@ -2579,6 +2841,22 @@ async function bootstrap(): Promise<void> {
   if (isCompanionWindow && companionTab === "ongoing") {
     void loadCompanionOngoing();
   }
+  if (isCompanionWindow && companionTab === "timer") {
+    void refreshLiveTimers();
+  }
+  if (isCompanionWindow) {
+    companionTimerInterval = window.setInterval(() => {
+      if (companionTab !== "timer") return;
+      companionTimerTicks += 1;
+      const now = Date.now();
+      const hasActiveCd = Object.values(spellCooldowns).some((t) => t > now);
+      if (companionTimerTicks % 2 === 0 && isTauri) {
+        void refreshLiveTimers();
+      } else if (hasActiveCd) {
+        render();
+      }
+    }, 1_000);
+  }
   if (!isCompanionWindow) {
     void hydrateDashboardData();
     if (currentRoute === "news") loadNewsRanking();
@@ -2611,13 +2889,15 @@ async function bootstrap(): Promise<void> {
     if (isCompanionWindow) {
       cleanupCompanionNavListener = await listen<{ tab?: string | null; heroId?: number | null }>("companion-navigate", (event) => {
         const payload = event.payload;
-        if (payload?.tab === "skin" || payload?.tab === "build" || payload?.tab === "ongoing") companionTab = payload.tab;
+        if (payload?.tab === "skin" || payload?.tab === "build" || payload?.tab === "ongoing" || payload?.tab === "timer") companionTab = payload.tab;
         if (typeof payload?.heroId === "number" && payload.heroId > 0) {
           void loadCompanionBuild(payload.heroId);
         } else if (companionTab === "build") {
           void loadCompanionBuild(snapshot.championId);
         } else if (companionTab === "ongoing") {
           void loadCompanionOngoing(true);
+        } else if (companionTab === "timer") {
+          void refreshLiveTimers();
         }
         render();
       });
@@ -2626,9 +2906,11 @@ async function bootstrap(): Promise<void> {
     cleanupAutomationListener = await listen<AutomationSnapshot>("automation-changed", (event: { payload: AutomationSnapshot }) => receiveAutomation(event.payload));
     cleanupAutoSelectListener = await listen<AutoSelectSnapshot>("auto-select-changed", (event: { payload: AutoSelectSnapshot }) => receiveAutoSelect(event.payload));
     cleanupAutoGameflowListener = await listen<AutoGameflowSnapshot>("auto-gameflow-changed", (event: { payload: AutoGameflowSnapshot }) => receiveAutoGameflow(event.payload));
+    cleanupChampConfigListener = await listen<AutoChampConfigSnapshot>("auto-champ-config-changed", (event: { payload: AutoChampConfigSnapshot }) => receiveAutoChampConfig(event.payload));
     void hydrateAutomation();
     void hydrateAutoSelect();
     void hydrateAutoGameflow();
+    void hydrateAutoChampConfig();
     if (isCompanionWindow) void hydrateChampionCatalog();
     cleanupListener = await listen<Snapshot>("snapshot-changed", (event: { payload: Snapshot }) => receiveSnapshot(event.payload));
     receiveSnapshot(await invokeCommand<Snapshot>("get_snapshot", {}));
@@ -2653,11 +2935,13 @@ window.addEventListener("beforeunload", () => {
   cleanupAutomationListener?.();
   cleanupAutoSelectListener?.();
   cleanupAutoGameflowListener?.();
+  cleanupChampConfigListener?.();
   cleanupAppearanceListener?.();
   cleanupCompanionNavListener?.();
   cleanupWindowResize?.();
   cleanupSystemTheme?.();
   window.clearInterval(profileRefreshTimer);
+  window.clearInterval(companionTimerInterval);
 });
 window.addEventListener("focus", () => {
   refreshProfileIfNeeded();

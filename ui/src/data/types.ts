@@ -382,3 +382,65 @@ export type ChampionCatalogItem = {
   id: number;
   name: string;
 };
+
+export type ChampionRunesPreset = {
+  name: string;
+  primaryStyleId: number;
+  subStyleId: number;
+  selectedPerkIds: number[];
+};
+
+export type SummonerSpellsPreset = {
+  spell1Id: number;
+  spell2Id: number;
+};
+
+export type ChampionPresetEntry = {
+  championId: number;
+  mode: string;
+  runes: ChampionRunesPreset | null;
+  spells: SummonerSpellsPreset | null;
+};
+
+export type AutoChampConfigData = {
+  enabled: boolean;
+  presets: Record<string, ChampionPresetEntry>;
+};
+
+export type AutoChampConfigSnapshot = {
+  data: AutoChampConfigData;
+  revision: number;
+  logs: Array<Omit<AssistantLog, "time"> & { timestampMs: number }>;
+};
+
+export type LiveRespawnInfo = {
+  isDead: boolean;
+  respawnTimer: number;
+  championName: string;
+};
+
+export type LiveSpellInfo = {
+  name: string;
+  rawKey: string;
+  baseCd: number;
+  effectiveCd: number;
+};
+
+export type LiveEnemyPlayer = {
+  summonerName: string;
+  championName: string;
+  isDead: boolean;
+  respawnTimer: number;
+  hasIonianBoots: boolean;
+  hasCosmicInsight: boolean;
+  spell1: LiveSpellInfo;
+  spell2: LiveSpellInfo;
+};
+
+export type LiveGameTimerSnapshot = {
+  inGame: boolean;
+  gameTimeSeconds: number;
+  gameMode: string;
+  selfRespawn: LiveRespawnInfo | null;
+  enemies: LiveEnemyPlayer[];
+};

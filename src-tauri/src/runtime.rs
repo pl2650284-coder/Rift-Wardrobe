@@ -1,4 +1,7 @@
 use crate::{
+    auto_champ_config::{
+        self, AutoChampConfig, AutoChampConfigSnapshot, ChampionPresetEntry, SummonerSpellsPreset,
+    },
     auto_gameflow::{AutoGameflow, AutoGameflowConfig, AutoGameflowSnapshot},
     auto_select::{AutoSelect, AutoSelectConfig, AutoSelectSnapshot},
     automation::{AutoAccept, AutomationSnapshot},
@@ -6,6 +9,7 @@ use crate::{
     discovery,
     lcu::LcuClient,
     lcu_ws::{self, LcuEvent},
+    live_client::{self, LiveGameTimerSnapshot},
     match_history::{MatchDetail, PlayerDetail, SummonerOverview},
     models::{AppSnapshot, ApplyResult},
     ongoing_game::{self, OngoingGameSnapshot},
@@ -44,6 +48,7 @@ pub struct RuntimeState {
     automation: Mutex<AutoAccept>,
     auto_select: Mutex<AutoSelect>,
     auto_gameflow: Mutex<AutoGameflow>,
+    auto_champ_config: Mutex<AutoChampConfig>,
     auto_popup_companion: AtomicBool,
     connection_epoch: AtomicU64,
     session_epoch: AtomicU64,
@@ -66,6 +71,7 @@ impl RuntimeState {
             automation: Mutex::new(AutoAccept::default()),
             auto_select: Mutex::new(AutoSelect::default()),
             auto_gameflow: Mutex::new(AutoGameflow::default()),
+            auto_champ_config: Mutex::new(AutoChampConfig::default()),
             auto_popup_companion: AtomicBool::new(true),
             connection_epoch: AtomicU64::new(0),
             session_epoch: AtomicU64::new(0),
@@ -320,6 +326,147 @@ impl RuntimeState {
         Ok(())
     }
 
+    pub fn configure_auto_champ_config(&self, path: PathBuf) -> Result<(), String> {
+        let mut engine = self.auto_champ_config.try_lock().map_err(|_| "英雄配置正在使用")?;
+        *engine = AutoChampConfig::load(path);
+        Ok(())
+    }
+
+    pub async fn auto_champ_config_snapshot(&self) -> AutoChampConfigSnapshot {
+        self.auto_champ_config.lock().await.snapshot()
+    }
+
+    pub async fn set_auto_champ_config_enabled(
+        &self,
+        app: &AppHandle,
+        enabled: bool,
+    ) -> Result<AutoChampConfigSnapshot, String> {
+        let mut engine = self.auto_champ_config.lock().await;
+        let snap = engine.set_enabled(enabled)?;
+        drop(engine);
+        let _ = app.emit("auto-champ-config-changed", &snap);
+        Ok(snap)
+    }
+
+    pub async fn upsert_champ_preset(
+        &self,
+        app: &AppHandle,
+        entry: ChampionPresetEntry,
+    ) -> Result<AutoChampConfigSnapshot, String> {
+        let mut engine = self.auto_champ_config.lock().await;
+        let snap = engine.upsert_preset(entry)?;
+        drop(engine);
+        let _ = app.emit("auto-champ-config-changed", &snap);
+        Ok(snap)
+    }
+
+    pub async fn delete_champ_preset(
+        &self,
+        app: &AppHandle,
+        champion_id: i64,
+        mode: String,
+    ) -> Result<AutoChampConfigSnapshot, String> {
+        let mut engine = self.auto_champ_config.lock().await;
+        let snap = engine.delete_preset(champion_id, &mode)?;
+        drop(engine);
+        let _ = app.emit("auto-champ-config-changed", &snap);
+        Ok(snap)
+    }
+
+    pub async fn capture_current_champ_config(
+        &self,
+        app: &AppHandle,
+        champion_id: i64,
+        mode: String,
+    ) -> Result<AutoChampConfigSnapshot, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let current_page = client.get_current_perk_page().await.ok().flatten();
+        let runes = current_page
+            .as_ref()
+            .and_then(|val| auto_champ_config::parse_perk_page(val, &format!("英雄 #{champion_id}")));
+        let selection = client.get_my_selection().await.ok().flatten();
+        let spells = selection.as_ref().and_then(|sel| {
+            let s1 = sel.get("spell1Id").and_then(|v| v.as_i64()).filter(|id| *id > 0)?;
+            let s2 = sel.get("spell2Id").and_then(|v| v.as_i64()).filter(|id| *id > 0)?;
+            (s1 != s2).then_some(SummonerSpellsPreset {
+                spell1_id: s1,
+                spell2_id: s2,
+            })
+        });
+        if runes.is_none() && spells.is_none() {
+            return Err("未读取到当前符文页或选人技能，请先在客户端配置好符文".to_string());
+        }
+        let mut engine = self.auto_champ_config.lock().await;
+        let existing = engine.snapshot().data.lookup(champion_id, &mode).cloned();
+        let entry = ChampionPresetEntry {
+            champion_id,
+            mode: auto_champ_config::normalize_mode(&mode).to_string(),
+            runes: runes.or_else(|| existing.as_ref().and_then(|e| e.runes.clone())),
+            spells: spells.or_else(|| existing.as_ref().and_then(|e| e.spells.clone())),
+        };
+        let snap = engine.upsert_preset(entry)?;
+        drop(engine);
+        let _ = app.emit("auto-champ-config-changed", &snap);
+        Ok(snap)
+    }
+
+    pub async fn import_recommended_runes(
+        &self,
+        app: &AppHandle,
+        champion_id: i64,
+        mode: String,
+    ) -> Result<AutoChampConfigSnapshot, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let normalized = auto_champ_config::normalize_mode(&mode);
+        let map_id = if normalized == "aram" { 12 } else { 11 };
+        let page = client
+            .get_recommended_perk_page(champion_id, map_id)
+            .await
+            .map_err(|_| "无法读取官方推荐符文".to_string())?
+            .ok_or_else(|| "客户端未返回该英雄的官方推荐符文".to_string())?;
+        let runes = auto_champ_config::parse_recommended_page(&page, &format!("推荐符文 #{champion_id}"))
+            .ok_or_else(|| "官方推荐符文格式暂不支持".to_string())?;
+        let mut engine = self.auto_champ_config.lock().await;
+        let existing = engine.snapshot().data.lookup(champion_id, normalized).cloned();
+        let entry = ChampionPresetEntry {
+            champion_id,
+            mode: normalized.to_string(),
+            runes: Some(runes),
+            spells: existing.and_then(|e| e.spells),
+        };
+        let snap = engine.upsert_preset(entry)?;
+        drop(engine);
+        let _ = app.emit("auto-champ-config-changed", &snap);
+        Ok(snap)
+    }
+
+    pub async fn apply_champ_preset_now(
+        &self,
+        app: &AppHandle,
+        champion_id: i64,
+        mode: String,
+    ) -> Result<AutoChampConfigSnapshot, String> {
+        let client = self
+            .client()
+            .await
+            .ok_or_else(|| "CLIENT_DISCONNECTED: 请先启动并登录英雄联盟客户端".to_string())?;
+        let mut engine = self.auto_champ_config.lock().await;
+        let snap = engine.apply_now(&client, champion_id, &mode).await?;
+        drop(engine);
+        let _ = app.emit("auto-champ-config-changed", &snap);
+        Ok(snap)
+    }
+
+    pub async fn get_live_game_timers(&self) -> LiveGameTimerSnapshot {
+        live_client::fetch_live_game_timers().await
+    }
+
     pub async fn auto_select_snapshot(&self) -> AutoSelectSnapshot {
         self.auto_select.lock().await.snapshot()
     }
@@ -433,6 +580,23 @@ impl RuntimeState {
             let snap = auto_gameflow.snapshot();
             drop(auto_gameflow);
             let _ = app.emit("auto-gameflow-changed", &snap);
+        }
+
+        let current_snap = self.snapshot.read().await.clone();
+        let mut champ_cfg = self.auto_champ_config.lock().await;
+        if champ_cfg
+            .tick(
+                client,
+                phase,
+                current_snap.context_id.as_deref(),
+                current_snap.champion_id,
+                current_snap.bench.as_ref().is_some_and(|b| b.enabled),
+            )
+            .await
+        {
+            let snap = champ_cfg.snapshot();
+            drop(champ_cfg);
+            let _ = app.emit("auto-champ-config-changed", &snap);
         }
     }
 

@@ -165,11 +165,12 @@ const pageCode = compile("../ui/src/main.ts") + `\nexports.testing = {
   loadCompanionOngoing, sendOngoingToChampSelectChat,
   saveAutoSelectConfig, toggleAutoSelectPause, saveAutoGameflowConfig,
   benchSwapChampion, benchReroll,
+  toggleAutoChampConfigEnabled, saveChampSpellsPreset, toggleSpellTimer, refreshLiveTimers,
   updateAutoAccept, updateAutoAcceptDelay, receiveAutomation,
   state: () => ({ snapshot, profileData, profileLoading, profileError, newsMode, newsTab,
     autoAccept, autoAcceptDelaySeconds, autoAcceptReady, autoAcceptSaving, assistantLogs, runtimeStatus,
     activePlayerTab, openPlayerTabs, matchDetailOpen, matchDetail, savedPlayers, ongoingGame,
-    autoSelectConfig, autoSelectPaused, autoGameflowConfig }),
+    autoSelectConfig, autoSelectPaused, autoGameflowConfig, autoChampConfig, liveTimers, spellCooldowns }),
 };`;
 const disconnected = {
   connection: "disconnected", phase: "Disconnected", active: false, contextId: null,
@@ -714,4 +715,53 @@ test("companion window renders ARAM bench 5x2 grid and invokes swap & charity re
       { command: "bench_reroll", args: { grabBack: true } },
     ],
   );
+});
+
+test("auto champ config saves presets and companion timer tab tracks enemy spells & respawn", async () => {
+  let ccState = { data: { enabled: false, presets: {} }, revision: 0, logs: [] };
+  const onInvoke = async (command, args) => {
+    if (command === "get_auto_champ_config") return structuredClone(ccState);
+    if (command === "set_auto_champ_config_enabled") {
+      ccState = { ...ccState, data: { ...ccState.data, enabled: args.enabled }, revision: ccState.revision + 1 };
+      return structuredClone(ccState);
+    }
+    if (command === "upsert_champ_preset") {
+      const k = `${args.entry.championId}:${args.entry.mode}`;
+      ccState = {
+        ...ccState,
+        data: { ...ccState.data, presets: { ...ccState.data.presets, [k]: args.entry } },
+        revision: ccState.revision + 1,
+      };
+      return structuredClone(ccState);
+    }
+    if (command === "get_live_game_timers") {
+      return {
+        inGame: true, gameTimeSeconds: 615, gameMode: "CLASSIC",
+        selfRespawn: { isDead: true, respawnTimer: 18.4, championName: "薇恩" },
+        enemies: [{
+          summonerName: "敌方中单", championName: "阿狸", isDead: false, respawnTimer: 0,
+          hasIonianBoots: true, hasCosmicInsight: false,
+          spell1: { name: "闪现", rawKey: "Flash", baseCd: 300, effectiveCd: 273 },
+          spell2: { name: "点燃", rawKey: "Dot", baseCd: 180, effectiveCd: 164 },
+        }],
+      };
+    }
+    return undefined;
+  };
+
+  const ui = page({ initial: connected, hash: "#automation", onInvoke });
+  await settle();
+  await ui.testing.toggleAutoChampConfigEnabled(true);
+  await ui.testing.saveChampSpellsPreset();
+  assert.equal(ui.testing.state().autoChampConfig.enabled, true);
+  assert.ok(ui.testing.state().autoChampConfig.presets["67:default"]);
+
+  const compUi = page({ initial: connected, search: "?window=companion&tab=timer", onInvoke });
+  await settle();
+  assert.match(compUi.app.innerHTML, /复活倒计时/);
+  assert.match(compUi.app.innerHTML, /阿狸/);
+  assert.match(compUi.app.innerHTML, /273s/);
+  compUi.testing.toggleSpellTimer("live-0-1", 273);
+  assert.ok(compUi.testing.state().spellCooldowns["live-0-1"] > Date.now());
+  assert.match(compUi.app.innerHTML, /is-cooling/);
 });

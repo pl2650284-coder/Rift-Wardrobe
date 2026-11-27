@@ -1,12 +1,26 @@
 import type {
   AssistantLog,
+  AutoChampConfigData,
   AutoGameflowConfig,
   AutoSelectConfig,
   ChampionCatalogItem,
   PositionKey,
 } from "../data/types";
 
-export type AutomationSubTab = "flow" | "select" | "logs";
+export type AutomationSubTab = "flow" | "select" | "champ-config" | "logs";
+
+export const SUMMONER_SPELLS: Array<{ id: number; name: string }> = [
+  { id: 4, name: "闪现" },
+  { id: 14, name: "点燃" },
+  { id: 12, name: "传送" },
+  { id: 7, name: "治疗" },
+  { id: 21, name: "屏障" },
+  { id: 3, name: "虚弱" },
+  { id: 6, name: "疾跑" },
+  { id: 11, name: "惩戒" },
+  { id: 1, name: "净化" },
+  { id: 32, name: "雪球" },
+];
 
 export type AutomationViewProps = {
   subTab: AutomationSubTab;
@@ -17,6 +31,12 @@ export type AutomationViewProps = {
   autoSelect: AutoSelectConfig;
   autoSelectPaused: boolean;
   autoGameflow: AutoGameflowConfig;
+  autoChampConfig: AutoChampConfigData;
+  ccChampionId: number;
+  ccMode: "default" | "aram" | "ranked";
+  ccSpell1Id: number;
+  ccSpell2Id: number;
+  ccBusy: boolean;
   pickPosition: PositionKey;
   banPosition: PositionKey;
   champions: ChampionCatalogItem[];
@@ -78,6 +98,12 @@ export function renderAutomationView({
   autoSelect,
   autoSelectPaused,
   autoGameflow,
+  autoChampConfig,
+  ccChampionId,
+  ccMode,
+  ccSpell1Id,
+  ccSpell2Id,
+  ccBusy,
   pickPosition,
   banPosition,
   champions,
@@ -86,16 +112,98 @@ export function renderAutomationView({
   autoAcceptDelaySelect,
   escape,
 }: AutomationViewProps): string {
+  const spellName = (id: number): string => SUMMONER_SPELLS.find((s) => s.id === id)?.name ?? `#${id}`;
+  const modeLabel = (mode: string): string => mode === "aram" ? "大乱斗" : mode === "ranked" ? "排位" : "默认";
+
   const nav = `<div class="auto-top-bar">
     <div class="mp-seg" role="tablist" aria-label="自动化分类">
       <button class="${subTab === "flow" ? "is-active" : ""}" data-auto-tab="flow">流程自动化</button>
       <button class="${subTab === "select" ? "is-active" : ""}" data-auto-tab="select">自动选禁</button>
+      <button class="${subTab === "champ-config" ? "is-active" : ""}" data-auto-tab="champ-config">英雄配置</button>
       <button class="${subTab === "logs" ? "is-active" : ""}" data-auto-tab="logs">执行日志${logs.length ? ` (${logs.length})` : ""}</button>
     </div>
     ${autoSelect.pickEnabled || autoSelect.banEnabled || autoSelect.benchEnabled
       ? `<button class="secondary-button auto-pause-pill ${autoSelectPaused ? "is-paused" : ""}" data-action="toggle-auto-select-pause">${autoSelectPaused ? "本局已暂停选禁" : "暂停本局选禁"}</button>`
       : ""}
   </div>`;
+
+  if (subTab === "champ-config") {
+    const presetList = Object.values(autoChampConfig.presets).sort((a, b) => a.championId - b.championId);
+    const activeKey = `${ccChampionId}:${ccMode}`;
+    const activePreset = autoChampConfig.presets[activeKey] ?? null;
+
+    return `<div class="auto-page">
+      ${nav}
+      <section class="settings-layout">
+        <div class="settings-column">
+          <article class="settings-panel">
+            <header class="panel-heading"><div><h2>符文与技能预设</h2></div></header>
+            <div class="preference-content">
+              ${boolRow('data-cc-enabled', "选人时自动应用预设", autoChampConfig.enabled)}
+              <div class="preference-row">
+                <span><strong>目标英雄</strong></span>
+                <select class="auto-accept-delay" data-cc-champ aria-label="目标英雄">
+                  ${champions.map((c) => `<option value="${c.id}" ${c.id === ccChampionId ? "selected" : ""}>${escape(c.name)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="preference-row">
+                <span><strong>适用模式</strong></span>
+                <select class="auto-accept-delay" data-cc-mode aria-label="适用模式">
+                  <option value="default" ${ccMode === "default" ? "selected" : ""}>默认</option>
+                  <option value="aram" ${ccMode === "aram" ? "selected" : ""}>大乱斗</option>
+                  <option value="ranked" ${ccMode === "ranked" ? "selected" : ""}>排位</option>
+                </select>
+              </div>
+              <div class="preference-row">
+                <span><strong>召唤师技能 D / F</strong></span>
+                <div class="cc-spell-pair">
+                  <select class="auto-accept-delay" data-cc-spell1 aria-label="召唤师技能 D">
+                    ${SUMMONER_SPELLS.map((s) => `<option value="${s.id}" ${s.id === ccSpell1Id ? "selected" : ""}>${s.name}</option>`).join("")}
+                  </select>
+                  <select class="auto-accept-delay" data-cc-spell2 aria-label="召唤师技能 F">
+                    ${SUMMONER_SPELLS.map((s) => `<option value="${s.id}" ${s.id === ccSpell2Id ? "selected" : ""}>${s.name}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+              <div class="preference-row preference-row--static">
+                <span><strong>符文页</strong></span>
+                <span class="toolkit-status-val">${activePreset?.runes ? escape(activePreset.runes.name) : "未配置"}</span>
+              </div>
+              <div class="cc-actions">
+                <button class="secondary-button" data-action="cc-save-spells" ${ccBusy ? "disabled" : ""}>保存技能</button>
+                <button class="secondary-button" data-action="cc-capture" ${ccBusy ? "disabled" : ""}>抓取当前符文</button>
+                <button class="secondary-button" data-action="cc-import-rec" ${ccBusy ? "disabled" : ""}>导入官方推荐</button>
+                <button class="primary-button" data-action="cc-apply-now" ${ccBusy || !activePreset ? "disabled" : ""}>立即应用</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="settings-column">
+          <article class="settings-panel">
+            <header class="panel-heading"><div><h2>已保存配置 (${presetList.length})</h2></div></header>
+            <div class="auto-log-wrap">
+              ${presetList.length
+                ? `<div class="cc-preset-list">${presetList.map((item) => `<div class="cc-preset-row">
+                    <div class="cc-preset-main">
+                      <strong>${escape(champName(champions, item.championId))}</strong>
+                      <span class="cc-mode-pill">${modeLabel(item.mode)}</span>
+                      <span class="cc-preset-meta">
+                        ${item.runes ? escape(item.runes.name) : "无符文"} · ${item.spells ? `${spellName(item.spells.spell1Id)}+${spellName(item.spells.spell2Id)}` : "无技能"}
+                      </span>
+                    </div>
+                    <div class="cc-preset-ops">
+                      <button class="text-button" data-cc-apply-cid="${item.championId}" data-cc-apply-mode="${item.mode}">应用</button>
+                      <button class="text-button" data-cc-del-cid="${item.championId}" data-cc-del-mode="${item.mode}">删除</button>
+                    </div>
+                  </div>`).join("")}</div>`
+                : `<div class="auto-log-empty">暂无英雄配置</div>`}
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>`;
+  }
 
   if (subTab === "logs") {
     return `<div class="auto-page">

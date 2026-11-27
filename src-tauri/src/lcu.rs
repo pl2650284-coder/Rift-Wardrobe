@@ -464,6 +464,120 @@ impl LcuClient {
         Ok(items)
     }
 
+    pub async fn set_summoner_spells(&self, spell1_id: i64, spell2_id: i64) -> Result<(), LcuError> {
+        self.request_json(
+            Method::PATCH,
+            MY_SELECTION_ENDPOINT,
+            Some(&json!({ "spell1Id": spell1_id, "spell2Id": spell2_id })),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    pub async fn get_my_selection(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_json(MY_SELECTION_ENDPOINT).await
+    }
+
+    pub async fn get_current_perk_page(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_json("/lol-perks/v1/currentpage").await
+    }
+
+    pub async fn get_perk_pages(&self) -> Result<Vec<Value>, LcuError> {
+        let Some(Value::Array(items)) = self.optional_json("/lol-perks/v1/pages").await? else {
+            return Ok(Vec::new());
+        };
+        Ok(items)
+    }
+
+    pub async fn get_perk_inventory(&self) -> Result<Option<Value>, LcuError> {
+        self.optional_json("/lol-perks/v1/inventory").await
+    }
+
+    pub async fn apply_perk_page(
+        &self,
+        name: &str,
+        primary_style_id: i64,
+        sub_style_id: i64,
+        selected_perk_ids: &[i64],
+    ) -> Result<(), LcuError> {
+        let pages = self.get_perk_pages().await?;
+        let existing_id = pages
+            .iter()
+            .find(|p| {
+                p.get("isEditable").and_then(Value::as_bool) == Some(true)
+                    && p.get("name")
+                        .and_then(Value::as_str)
+                        .is_some_and(|n| n.starts_with("[峡印]"))
+            })
+            .or_else(|| {
+                pages
+                    .iter()
+                    .find(|p| p.get("isEditable").and_then(Value::as_bool) == Some(true))
+            })
+            .and_then(|p| id_at(p, "id"));
+
+        let page_id = if let Some(id) = existing_id {
+            id
+        } else {
+            let can_add = self
+                .get_perk_inventory()
+                .await
+                .ok()
+                .flatten()
+                .and_then(|inv| inv.get("canAddCustomPage").and_then(Value::as_bool))
+                .unwrap_or(false);
+            if !can_add {
+                return Err(LcuError::Protocol("no editable perk page available".to_string()));
+            }
+            let created = self
+                .request_json(
+                    Method::POST,
+                    "/lol-perks/v1/pages/",
+                    Some(&json!({
+                        "name": name,
+                        "isEditable": true,
+                        "primaryStyleId": primary_style_id.to_string()
+                    })),
+                )
+                .await?;
+            id_at(&created, "id")
+                .ok_or_else(|| LcuError::Protocol("created perk page missing id".to_string()))?
+        };
+
+        let endpoint = format!("/lol-perks/v1/pages/{page_id}");
+        self.request_json(
+            Method::PUT,
+            &endpoint,
+            Some(&json!({
+                "id": page_id,
+                "name": name,
+                "isTemporary": false,
+                "isRecommendationOverride": false,
+                "primaryStyleId": primary_style_id,
+                "subStyleId": sub_style_id,
+                "selectedPerkIds": selected_perk_ids
+            })),
+        )
+        .await?;
+        self.request_json(Method::PUT, "/lol-perks/v1/currentpage", Some(&json!(page_id)))
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn get_recommended_perk_page(
+        &self,
+        champion_id: i64,
+        map_id: i64,
+    ) -> Result<Option<Value>, LcuError> {
+        let endpoint = format!(
+            "/lol-perks/v1/recommended-pages/champion/{champion_id}/position/NONE/map/{map_id}"
+        );
+        let Some(Value::Array(pages)) = self.optional_slow_json(&endpoint).await? else {
+            return Ok(None);
+        };
+        Ok(pages.into_iter().next())
+    }
+
     pub async fn get_phase(&self) -> Result<String, LcuError> {
         let phase = self
             .request_json(Method::GET, GAMEFLOW_PHASE_ENDPOINT, None)
